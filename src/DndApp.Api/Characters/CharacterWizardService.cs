@@ -7,6 +7,11 @@ public interface ICharacterWizardService
 {
     CharacterWizardResult StartDraft(StartCharacterWizardRequest request);
     CharacterWizardDraft? GetDraft(Guid characterId);
+    IReadOnlyList<CharacterSummary> ListCharacters(bool includeArchived);
+    CharacterSummary? GetCharacter(Guid characterId);
+    CharacterSummary? UpdateCharacter(Guid characterId, UpdateCharacterRequest request);
+    CharacterSummary? ArchiveCharacter(Guid characterId);
+    CharacterSummary? DuplicateCharacter(Guid characterId, DuplicateCharacterRequest request);
     CharacterWizardResult SubmitStep(Guid characterId, SubmitWizardStepRequest request);
     CharacterWizardResult Finalize(Guid characterId, FinalizeWizardRequest request);
     CharacterWizardResult CopyToRuleset(Guid characterId, CopyCharacterRulesetRequest request);
@@ -15,6 +20,7 @@ public interface ICharacterWizardService
 public sealed class CharacterWizardService : ICharacterWizardService
 {
     private readonly ConcurrentDictionary<Guid, CharacterWizardDraft> _drafts = new();
+    private readonly ConcurrentDictionary<Guid, CharacterRecord> _characters = new();
     private readonly IMixedRulesResolutionService _resolver;
 
     public CharacterWizardService(IMixedRulesResolutionService resolver)
@@ -55,6 +61,76 @@ public sealed class CharacterWizardService : ICharacterWizardService
     public CharacterWizardDraft? GetDraft(Guid characterId)
     {
         return _drafts.TryGetValue(characterId, out var draft) ? draft : null;
+    }
+
+    public IReadOnlyList<CharacterSummary> ListCharacters(bool includeArchived)
+    {
+        return _characters.Values
+            .Where(x => includeArchived || !x.IsArchived)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .Select(ToSummary)
+            .ToArray();
+    }
+
+    public CharacterSummary? GetCharacter(Guid characterId)
+    {
+        return _characters.TryGetValue(characterId, out var character) ? ToSummary(character) : null;
+    }
+
+    public CharacterSummary? UpdateCharacter(Guid characterId, UpdateCharacterRequest request)
+    {
+        if (!_characters.TryGetValue(characterId, out var character))
+        {
+            return null;
+        }
+
+        var name = string.IsNullOrWhiteSpace(request.CharacterName) ? character.CharacterName : request.CharacterName.Trim();
+        var updated = character with
+        {
+            CharacterName = name,
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        _characters[characterId] = updated;
+        return ToSummary(updated);
+    }
+
+    public CharacterSummary? ArchiveCharacter(Guid characterId)
+    {
+        if (!_characters.TryGetValue(characterId, out var character))
+        {
+            return null;
+        }
+
+        var updated = character with
+        {
+            IsArchived = true,
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        _characters[characterId] = updated;
+        return ToSummary(updated);
+    }
+
+    public CharacterSummary? DuplicateCharacter(Guid characterId, DuplicateCharacterRequest request)
+    {
+        if (!_characters.TryGetValue(characterId, out var character))
+        {
+            return null;
+        }
+
+        var suffix = string.IsNullOrWhiteSpace(request.NameSuffix) ? "Copy" : request.NameSuffix.Trim();
+        var now = DateTimeOffset.UtcNow;
+        var duplicate = new CharacterRecord(
+            Guid.NewGuid(),
+            $"{character.CharacterName} ({suffix})",
+            character.RulesProfile,
+            false,
+            now,
+            now);
+
+        _characters[duplicate.CharacterId] = duplicate;
+        return ToSummary(duplicate);
     }
 
     public CharacterWizardResult SubmitStep(Guid characterId, SubmitWizardStepRequest request)
@@ -117,6 +193,17 @@ public sealed class CharacterWizardService : ICharacterWizardService
             Warnings = resolveResult.Warnings
         };
         _drafts[characterId] = finalized;
+
+        var now = DateTimeOffset.UtcNow;
+        var character = new CharacterRecord(
+            finalized.CharacterId,
+            finalized.CharacterName,
+            finalized.RulesProfile,
+            false,
+            now,
+            now);
+        _characters[finalized.CharacterId] = character;
+
         return new CharacterWizardResult(true, finalized, Array.Empty<string>(), resolveResult.Warnings);
     }
 
@@ -154,6 +241,18 @@ public sealed class CharacterWizardService : ICharacterWizardService
         return new CharacterWizardResult(true, copied, Array.Empty<string>(), warnings);
     }
 
+    private static CharacterSummary ToSummary(CharacterRecord character)
+    {
+        return new CharacterSummary(
+            character.CharacterId,
+            character.CharacterName,
+            character.RulesProfile.BaseRuleSystem,
+            character.RulesProfile.MixedModeEnabled,
+            character.IsArchived,
+            character.CreatedAtUtc,
+            character.UpdatedAtUtc);
+    }
+
     private static List<string> ValidateSelectionsAgainstRulesMode(RulesProfile profile, IReadOnlyList<RuleModuleSelection> selections)
     {
         var errors = new List<string>();
@@ -187,4 +286,12 @@ public sealed class CharacterWizardService : ICharacterWizardService
 
         return errors;
     }
+
+    private sealed record CharacterRecord(
+        Guid CharacterId,
+        string CharacterName,
+        RulesProfile RulesProfile,
+        bool IsArchived,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset UpdatedAtUtc);
 }

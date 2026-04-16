@@ -41,3 +41,16 @@ public sealed record CharacterWizardResult(
     CharacterWizardDraft? Draft,
     IReadOnlyList<string> Errors,
     IReadOnlyList<string> Warnings);
+
+public sealed record CharacterSummary(
+    Guid CharacterId,
+    string CharacterName,
+    RuleSystemMode BaseRuleSystem,
+    bool MixedModeEnabled,
+    bool IsArchived,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record UpdateCharacterRequest(string? CharacterName);
+
+public sealed record DuplicateCharacterRequest(string? NameSuffix);

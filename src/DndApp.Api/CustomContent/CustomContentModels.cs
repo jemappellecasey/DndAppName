@@ -27,3 +27,18 @@ public sealed record ValidationResult(
     bool IsValid,
     IReadOnlyList<string> Errors,
     IReadOnlyList<string> Warnings);
+
+public sealed record BuilderGuidance(
+    string Title,
+    IReadOnlyList<string> Rules,
+    IReadOnlyList<string> Tips);
+
+public sealed record OriginPreviewResult(
+    ValidationResult Validation,
+    int TotalAbilityBonus,
+    IReadOnlyList<string> DerivedTags);
+
+public sealed record SpeciesPreviewResult(
+    ValidationResult Validation,
+    int WalkingSpeed,
+    IReadOnlyList<string> DerivedTags);

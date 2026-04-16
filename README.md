@@ -48,10 +48,19 @@ Outputs are written under:
 4. `POST /wizard/characters/{characterId}/finalize`
 5. `POST /characters/{characterId}/copy-to-ruleset`
 6. `POST /rules/resolve-mixed`
+7. `GET /characters`
+8. `GET /characters/{characterId}`
+9. `PATCH /characters/{characterId}`
+10. `POST /characters/{characterId}/archive`
+11. `POST /characters/{characterId}/duplicate`
 
 ### Custom content
 1. `POST /characters/{characterId}/custom/origin`
 2. `POST /characters/{characterId}/custom/species`
+3. `GET /custom/builders/origin/guidance`
+4. `GET /custom/builders/species/guidance`
+5. `POST /custom/builders/origin/preview`
+6. `POST /custom/builders/species/preview`
 
 ### Items and calculations
 1. `POST /characters/{characterId}/items/apply-effects`

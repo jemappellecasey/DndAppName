@@ -88,6 +88,22 @@ app.MapPost(
         return Results.Ok(response);
     });
 
+app.MapGet(
+    "/custom/builders/origin/guidance",
+    (ICustomContentValidationService validator) => Results.Ok(validator.GetOriginGuidance()));
+
+app.MapGet(
+    "/custom/builders/species/guidance",
+    (ICustomContentValidationService validator) => Results.Ok(validator.GetSpeciesGuidance()));
+
+app.MapPost(
+    "/custom/builders/origin/preview",
+    (CreateCustomOriginRequest request, ICustomContentValidationService validator) => Results.Ok(validator.PreviewOrigin(request)));
+
+app.MapPost(
+    "/custom/builders/species/preview",
+    (CreateCustomSpeciesRequest request, ICustomContentValidationService validator) => Results.Ok(validator.PreviewSpecies(request)));
+
 app.MapPost(
     "/characters/{characterId:guid}/items/apply-effects",
     (Guid characterId, ApplyItemEffectsRequest request, IItemEffectPipelineService pipeline) =>
@@ -146,6 +162,46 @@ app.MapGet(
     (Guid characterId, ICharacterWizardService wizardService) =>
     {
         var result = wizardService.GetDraft(characterId);
+        return result is null ? Results.NotFound() : Results.Ok(result);
+    });
+
+app.MapGet(
+    "/characters",
+    (bool includeArchived, ICharacterWizardService wizardService) =>
+    {
+        var result = wizardService.ListCharacters(includeArchived);
+        return Results.Ok(result);
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}",
+    (Guid characterId, ICharacterWizardService wizardService) =>
+    {
+        var result = wizardService.GetCharacter(characterId);
+        return result is null ? Results.NotFound() : Results.Ok(result);
+    });
+
+app.MapPatch(
+    "/characters/{characterId:guid}",
+    (Guid characterId, UpdateCharacterRequest request, ICharacterWizardService wizardService) =>
+    {
+        var result = wizardService.UpdateCharacter(characterId, request);
+        return result is null ? Results.NotFound() : Results.Ok(result);
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/archive",
+    (Guid characterId, ICharacterWizardService wizardService) =>
+    {
+        var result = wizardService.ArchiveCharacter(characterId);
+        return result is null ? Results.NotFound() : Results.Ok(result);
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/duplicate",
+    (Guid characterId, DuplicateCharacterRequest request, ICharacterWizardService wizardService) =>
+    {
+        var result = wizardService.DuplicateCharacter(characterId, request);
         return result is null ? Results.NotFound() : Results.Ok(result);
     });
 

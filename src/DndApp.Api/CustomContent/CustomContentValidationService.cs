@@ -4,6 +4,10 @@ public interface ICustomContentValidationService
 {
     ValidationResult ValidateOrigin(CreateCustomOriginRequest request);
     ValidationResult ValidateSpecies(CreateCustomSpeciesRequest request);
+    BuilderGuidance GetOriginGuidance();
+    BuilderGuidance GetSpeciesGuidance();
+    OriginPreviewResult PreviewOrigin(CreateCustomOriginRequest request);
+    SpeciesPreviewResult PreviewSpecies(CreateCustomSpeciesRequest request);
 }
 
 public sealed class CustomContentValidationService : ICustomContentValidationService
@@ -103,5 +107,77 @@ public sealed class CustomContentValidationService : ICustomContentValidationSer
         }
 
         return new ValidationResult(errors.Count == 0, errors, warnings);
+    }
+
+    public BuilderGuidance GetOriginGuidance()
+    {
+        return new BuilderGuidance(
+            "Custom Origin Guidance",
+            new[]
+            {
+                "Guided mode requires 2-3 ability bonus entries with total bonus 2-3.",
+                "Guided mode requires exactly 2 skill proficiencies.",
+                "Guided mode requires at least one feature note."
+            },
+            new[]
+            {
+                "Use fully-custom mode for experimental or campaign-specific designs.",
+                "Keep origin notes concise so the character sheet remains readable."
+            });
+    }
+
+    public BuilderGuidance GetSpeciesGuidance()
+    {
+        return new BuilderGuidance(
+            "Custom Species Guidance",
+            new[]
+            {
+                "Guided mode requires walking speed between 25 and 40.",
+                "Guided mode requires 1-6 traits.",
+                "Guided mode requires size and at least one language."
+            },
+            new[]
+            {
+                "Use fully-custom mode when intentionally deviating from standard balance.",
+                "Prefer clear trait names so effects can be traced in calculations."
+            });
+    }
+
+    public OriginPreviewResult PreviewOrigin(CreateCustomOriginRequest request)
+    {
+        var validation = ValidateOrigin(request);
+        var abilityTotal = request.AbilityBonuses.Sum(x => x.Bonus);
+        var tags = new List<string>
+        {
+            request.Mode == CustomContentMode.GuidedCustom ? "guided-custom" : "fully-custom"
+        };
+
+        if (request.SkillProficiencies.Count >= 2)
+        {
+            tags.Add("skill-ready");
+        }
+
+        return new OriginPreviewResult(validation, abilityTotal, tags);
+    }
+
+    public SpeciesPreviewResult PreviewSpecies(CreateCustomSpeciesRequest request)
+    {
+        var validation = ValidateSpecies(request);
+        var tags = new List<string>
+        {
+            request.Mode == CustomContentMode.GuidedCustom ? "guided-custom" : "fully-custom"
+        };
+
+        if (request.WalkingSpeed >= 35)
+        {
+            tags.Add("fast-movement");
+        }
+
+        if (request.Traits.Count >= 4)
+        {
+            tags.Add("trait-dense");
+        }
+
+        return new SpeciesPreviewResult(validation, request.WalkingSpeed, tags);
     }
 }
