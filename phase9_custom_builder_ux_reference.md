@@ -10,3 +10,17 @@
 1. Guided rule constraints are exposed for UI flow hints.
 2. Preview endpoints return validation plus lightweight derived tags.
 3. Guided mode remains strict; fully custom mode remains warning-oriented.
+
+## Example preview payload
+```json
+{
+  "name": "Wanderer-Born",
+  "mode": "GuidedCustom",
+  "abilityBonuses": [
+    { "ability": "Wisdom", "bonus": 2 },
+    { "ability": "Dexterity", "bonus": 1 }
+  ],
+  "skillProficiencies": ["Perception", "Stealth"],
+  "featureNotes": ["Keen Trail Sense"]
+}
+```
