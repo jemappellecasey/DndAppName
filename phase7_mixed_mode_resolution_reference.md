@@ -15,3 +15,14 @@
 2. Full candidates per slot
 3. Resolution reason
 4. Warnings and errors
+
+## Example request payload
+```json
+{
+  "baseRuleSystem": "Rules2014",
+  "mixedModeEnabled": true,
+  "overlaySources": ["PHB2024"],
+  "selections": [],
+  "explicitOverridesBySlot": {}
+}
+```
