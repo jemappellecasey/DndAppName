@@ -1,0 +1,2771 @@
+{
+  "SourceCode": "dmg2014",
+  "SourceFile": "DnDDMG2014.md",
+  "GeneratedAtUtc": "2026-04-16T20:20:43.2780458+00:00",
+  "SectionCount": 307,
+  "Sections": [
+    {
+      "SectionIndex": 1,
+      "Title": "Page 0",
+      "StartLine": 1,
+      "EndLine": 111,
+      "LineCount": 110,
+      "Confidence": 0.92,
+      "Preview": "CREDITS"
+    },
+    {
+      "SectionIndex": 2,
+      "Title": "Page 1",
+      "StartLine": 112,
+      "EndLine": 268,
+      "LineCount": 156,
+      "Confidence": 0.92,
+      "Preview": "**CONTENTS**"
+    },
+    {
+      "SectionIndex": 3,
+      "Title": "Page 2",
+      "StartLine": 269,
+      "EndLine": 404,
+      "LineCount": 135,
+      "Confidence": 0.92,
+      "Preview": "**INTRODUCTION**"
+    },
+    {
+      "SectionIndex": 4,
+      "Title": "Page 3",
+      "StartLine": 405,
+      "EndLine": 487,
+      "LineCount": 82,
+      "Confidence": 0.92,
+      "Preview": "**PART** **2:** **MASTER** **OF ADVENTURES**"
+    },
+    {
+      "SectionIndex": 5,
+      "Title": "Page 4",
+      "StartLine": 488,
+      "EndLine": 628,
+      "LineCount": 140,
+      "Confidence": 0.92,
+      "Preview": "**KNow YouR PLAYERS**"
+    },
+    {
+      "SectionIndex": 6,
+      "Title": "Page 5",
+      "StartLine": 629,
+      "EndLine": 630,
+      "LineCount": 1,
+      "Confidence": 0.84,
+      "Preview": ""
+    },
+    {
+      "SectionIndex": 7,
+      "Title": "**PART1**",
+      "StartLine": 631,
+      "EndLine": 638,
+      "LineCount": 7,
+      "Confidence": 0.92,
+      "Preview": "Master of Worlds"
+    },
+    {
+      "SectionIndex": 8,
+      "Title": "Page 7",
+      "StartLine": 639,
+      "EndLine": 774,
+      "LineCount": 135,
+      "Confidence": 0.92,
+      "Preview": "OUR WORLD IS TH E SETTING FOR YOUR CAMPAIGN, the place where adventures happen. Even"
+    },
+    {
+      "SectionIndex": 9,
+      "Title": "Page 8",
+      "StartLine": 775,
+      "EndLine": 908,
+      "LineCount": 133,
+      "Confidence": 0.92,
+      "Preview": "an everyday occurrence, as magical flying ships and trains carry travelers from one great city to another."
+    },
+    {
+      "SectionIndex": 10,
+      "Title": "Page 9",
+      "StartLine": 909,
+      "EndLine": 1052,
+      "LineCount": 143,
+      "Confidence": 0.92,
+      "Preview": "for example, might also be patron of magic and prophecy, while the god of Light could be the sun god"
+    },
+    {
+      "SectionIndex": 11,
+      "Title": "Page 10",
+      "StartLine": 1053,
+      "EndLine": 1188,
+      "LineCount": 135,
+      "Confidence": 0.92,
+      "Preview": "so seek to liberate their spirits from this material world and its evils through asceticism and contemplation."
+    },
+    {
+      "SectionIndex": 12,
+      "Title": "Page 11",
+      "StartLine": 1189,
+      "EndLine": 1278,
+      "LineCount": 89,
+      "Confidence": 0.92,
+      "Preview": "FORCES AND PHILOSOPHIES Not all divine powers need to be derived from deities."
+    },
+    {
+      "SectionIndex": 13,
+      "Title": "Page 12",
+      "StartLine": 1279,
+      "EndLine": 1391,
+      "LineCount": 112,
+      "Confidence": 0.92,
+      "Preview": "KINGDOM SCALE"
+    },
+    {
+      "SectionIndex": 14,
+      "Title": "Page 13",
+      "StartLine": 1392,
+      "EndLine": 1462,
+      "LineCount": 70,
+      "Confidence": 0.92,
+      "Preview": "**SETTLEMENTS**"
+    },
+    {
+      "SectionIndex": 15,
+      "Title": "Page 14",
+      "StartLine": 1463,
+      "EndLine": 1533,
+      "LineCount": 70,
+      "Confidence": 0.92,
+      "Preview": "To make a home base come alive, you\u0027ll need to invest some time fl eshing out details, but the players"
+    },
+    {
+      "SectionIndex": 16,
+      "Title": "Page 15",
+      "StartLine": 1534,
+      "EndLine": 1707,
+      "LineCount": 173,
+      "Confidence": 0.92,
+      "Preview": "_ lost settlements are agricultural villages, supporting themselves and nearby towns or cities with crops and"
+    },
+    {
+      "SectionIndex": 17,
+      "Title": "Page 16",
+      "StartLine": 1708,
+      "EndLine": 1841,
+      "LineCount": 133,
+      "Confidence": 0.92,
+      "Preview": "_**Autocracy.**_ One hereditary ruler wields absolute power. The autocrat either is supported by a welldeveloped bureaucracy or military or stands as the"
+    },
+    {
+      "SectionIndex": 18,
+      "Title": "Page 17",
+      "StartLine": 1842,
+      "EndLine": 1988,
+      "LineCount": 146,
+      "Confidence": 0.92,
+      "Preview": "each is ruled by a council of drow high priestesses who answer to Lolth, the Demon Queen of Spiders."
+    },
+    {
+      "SectionIndex": 19,
+      "Title": "Page 18",
+      "StartLine": 1989,
+      "EndLine": 2110,
+      "LineCount": 121,
+      "Confidence": 0.92,
+      "Preview": "_**Trade Bars.**_ Large numbers of coins can be difficult to transport and account for. Many merchants prefer"
+    },
+    {
+      "SectionIndex": 20,
+      "Title": "Page 19",
+      "StartLine": 2111,
+      "EndLine": 2234,
+      "LineCount": 123,
+      "Confidence": 0.92,
+      "Preview": "11ARPER5 ORDER OF THE GAUNTLET EMERALD ENCLAVE LoRDs\u0027 ..ALLIANCE ZHENTARIM"
+    },
+    {
+      "SectionIndex": 21,
+      "Title": "Page 20",
+      "StartLine": 2235,
+      "EndLine": 2377,
+      "LineCount": 142,
+      "Confidence": 0.92,
+      "Preview": "give you a good sense of the organization\u0027s personality. From there, think about typical members. How might"
+    },
+    {
+      "SectionIndex": 22,
+      "Title": "Page 21",
+      "StartLine": 2378,
+      "EndLine": 2525,
+      "LineCount": 147,
+      "Confidence": 0.92,
+      "Preview": "dedicated to preserving the natural order-might be less friend ly toward characters who have not cultivated"
+    },
+    {
+      "SectionIndex": 23,
+      "Title": "Page 22",
+      "StartLine": 2526,
+      "EndLine": 2659,
+      "LineCount": 133,
+      "Confidence": 0.92,
+      "Preview": "anyone who can afford them. People purchase tickets to ride airships and trains propelled by elemental magic."
+    },
+    {
+      "SectionIndex": 24,
+      "Title": "Page 23",
+      "StartLine": 2660,
+      "EndLine": 2736,
+      "LineCount": 76,
+      "Confidence": 0.92,
+      "Preview": "**CREATING A** **CAMPAIGN**"
+    },
+    {
+      "SectionIndex": 25,
+      "Title": "Page 24",
+      "StartLine": 2737,
+      "EndLine": 2870,
+      "LineCount": 133,
+      "Confidence": 0.92,
+      "Preview": "Or perhaps they begin the campaign in the dungeons of an evil baron\u0027s castle where they\u0027ve been locked up"
+    },
+    {
+      "SectionIndex": 26,
+      "Title": "Page 25",
+      "StartLine": 2871,
+      "EndLine": 3019,
+      "LineCount": 148,
+      "Confidence": 0.92,
+      "Preview": "?..7"
+    },
+    {
+      "SectionIndex": 27,
+      "Title": "Page 26",
+      "StartLine": 3020,
+      "EndLine": 3169,
+      "LineCount": 149,
+      "Confidence": 0.92,
+      "Preview": "might be a local sage, seer, hedge wizard, wise elder, or teacher."
+    },
+    {
+      "SectionIndex": 28,
+      "Title": "Page 27",
+      "StartLine": 3170,
+      "EndLine": 3267,
+      "LineCount": 97,
+      "Confidence": 0.92,
+      "Preview": "- Describe or name the creature that warned the populace about the oncoming disaster. Who listened?"
+    },
+    {
+      "SectionIndex": 29,
+      "Title": "Page 28",
+      "StartLine": 3268,
+      "EndLine": 3345,
+      "LineCount": 77,
+      "Confidence": 0.92,
+      "Preview": "Imagine that part of your campaign world erupts in revolution. Pick a power group in your current campaign"
+    },
+    {
+      "SectionIndex": 30,
+      "Title": "Page 29",
+      "StartLine": 3346,
+      "EndLine": 3497,
+      "LineCount": 151,
+      "Confidence": 0.92,
+      "Preview": "Who or what is to blame for the loss? Describe an immediate consequence of the loss."
+    },
+    {
+      "SectionIndex": 31,
+      "Title": "Page 30",
+      "StartLine": 3498,
+      "EndLine": 3632,
+      "LineCount": 134,
+      "Confidence": 0.92,
+      "Preview": "9. PREDICTION\u0027 OMEN\u0027 PROPHECY Sometimes the foretelling of a world-shaking event"
+    },
+    {
+      "SectionIndex": 32,
+      "Title": "Page 31",
+      "StartLine": 3633,
+      "EndLine": 3759,
+      "LineCount": 126,
+      "Confidence": 0.92,
+      "Preview": "times of day. And some holy days are local, observed by dle fa ithful of a specific temple."
+    },
+    {
+      "SectionIndex": 33,
+      "Title": "Page 32",
+      "StartLine": 3760,
+      "EndLine": 3904,
+      "LineCount": 144,
+      "Confidence": 0.92,
+      "Preview": "**PLAY STYLE**"
+    },
+    {
+      "SectionIndex": 34,
+      "Title": "Page 34",
+      "StartLine": 3905,
+      "EndLine": 4038,
+      "LineCount": 133,
+      "Confidence": 0.92,
+      "Preview": "CHARACTER NAMES"
+    },
+    {
+      "SectionIndex": 35,
+      "Title": "Page 35",
+      "StartLine": 4039,
+      "EndLine": 4174,
+      "LineCount": 135,
+      "Confidence": 0.92,
+      "Preview": "This approach also allows you to break your design work down into smaller pieces. Create material such"
+    },
+    {
+      "SectionIndex": 36,
+      "Title": "Page 36",
+      "StartLine": 4175,
+      "EndLine": 4320,
+      "LineCount": 145,
+      "Confidence": 0.92,
+      "Preview": "Characters who reach 20th level have attained the pinnacle of mortal achievement. Their deeds are"
+    },
+    {
+      "SectionIndex": 37,
+      "Title": "Page 37",
+      "StartLine": 4321,
+      "EndLine": 4410,
+      "LineCount": 89,
+      "Confidence": 0.92,
+      "Preview": "- e protagonists are motivated more by greed and self"
+    },
+    {
+      "SectionIndex": 38,
+      "Title": "Page 38",
+      "StartLine": 4411,
+      "EndLine": 4531,
+      "LineCount": 120,
+      "Confidence": 0.92,
+      "Preview": "**DARK FANTASY**"
+    },
+    {
+      "SectionIndex": 39,
+      "Title": "Page 39",
+      "StartLine": 4532,
+      "EndLine": 4717,
+      "LineCount": 185,
+      "Confidence": 0.92,
+      "Preview": "\u00B7arfare in a fantasy world is rife \\.Vith opportunities -adventure. A war campaign isn\u0022t generally concerned"
+    },
+    {
+      "SectionIndex": 40,
+      "Title": "Page 41",
+      "StartLine": 4718,
+      "EndLine": 4721,
+      "LineCount": 3,
+      "Confidence": 0.92,
+      "Preview": "HAPTER 2: CREATING A MULTIVERSE"
+    },
+    {
+      "SectionIndex": 41,
+      "Title": "l",
+      "StartLine": 4722,
+      "EndLine": 4875,
+      "LineCount": 153,
+      "Confidence": 0.92,
+      "Preview": "HEN ADVENTURERS RE ACH HIGHER LE VELS, their path extends to other dimensions of"
+    },
+    {
+      "SectionIndex": 42,
+      "Title": "Page 42",
+      "StartLine": 4876,
+      "EndLine": 5011,
+      "LineCount": 135,
+      "Confidence": 0.92,
+      "Preview": "Wheel, the World Tree, and the World Axis, but you can create or adapt whatever model works best for the"
+    },
+    {
+      "SectionIndex": 43,
+      "Title": "Page 43",
+      "StartLine": 5012,
+      "EndLine": 5133,
+      "LineCount": 121,
+      "Confidence": 0.92,
+      "Preview": "\u0022PLA NAR PORTALS"
+    },
+    {
+      "SectionIndex": 44,
+      "Title": "Page 44",
+      "StartLine": 5134,
+      "EndLine": 5233,
+      "LineCount": 99,
+      "Confidence": 0.92,
+      "Preview": "**SPELLS**"
+    },
+    {
+      "SectionIndex": 45,
+      "Title": "Page 45",
+      "StartLine": 5234,
+      "EndLine": 5350,
+      "LineCount": 116,
+      "Confidence": 0.92,
+      "Preview": "dead god or other chunks of rock drifting forever in the silvery void. Much more commonplace are color pools"
+    },
+    {
+      "SectionIndex": 46,
+      "Title": "Page 46",
+      "StartLine": 5351,
+      "EndLine": 5479,
+      "LineCount": 128,
+      "Confidence": 0.92,
+      "Preview": "**PSYCHIC** **WIND** **EFFECTS**"
+    },
+    {
+      "SectionIndex": 47,
+      "Title": "Page 47",
+      "StartLine": 5480,
+      "EndLine": 5624,
+      "LineCount": 144,
+      "Confidence": 0.92,
+      "Preview": "**ETHEREAL** **CURTAINS**"
+    },
+    {
+      "SectionIndex": 48,
+      "Title": "Page 48",
+      "StartLine": 5625,
+      "EndLine": 5699,
+      "LineCount": 74,
+      "Confidence": 0.92,
+      "Preview": "MEMORY LOSS A creature that leaves the Feywild must make a DC"
+    },
+    {
+      "SectionIndex": 49,
+      "Title": "Page 49",
+      "StartLine": 5700,
+      "EndLine": 5767,
+      "LineCount": 67,
+      "Confidence": 0.92,
+      "Preview": "**S HADOWFELL**"
+    },
+    {
+      "SectionIndex": 50,
+      "Title": "Page 50",
+      "StartLine": 5768,
+      "EndLine": 5907,
+      "LineCount": 139,
+      "Confidence": 0.92,
+      "Preview": "these \u0022darklords,\u0022 and through cruelty or carelessness trapped innocent mortals in these domains as well."
+    },
+    {
+      "SectionIndex": 51,
+      "Title": "Page 51",
+      "StartLine": 5908,
+      "EndLine": 6007,
+      "LineCount": 99,
+      "Confidence": 0.92,
+      "Preview": "wt of clashing energies and colliding substance ed the Elemental Chaos. Elementals can be found"
+    },
+    {
+      "SectionIndex": 52,
+      "Title": "Page 52",
+      "StartLine": 6008,
+      "EndLine": 6074,
+      "LineCount": 66,
+      "Confidence": 0.92,
+      "Preview": "At the other end of the plane. near the Frostfell (the plane of ice that borders the Plane of Water), is a region"
+    },
+    {
+      "SectionIndex": 53,
+      "Title": "Page 53",
+      "StartLine": 6075,
+      "EndLine": 6162,
+      "LineCount": 87,
+      "Confidence": 0.92,
+      "Preview": "PLANE OF FIRE"
+    },
+    {
+      "SectionIndex": 54,
+      "Title": "Page 54",
+      "StartLine": 6163,
+      "EndLine": 6232,
+      "LineCount": 69,
+      "Confidence": 0.92,
+      "Preview": "item for sale, though the price might wei! be more than gold. The efreet are fond of trading in favors, especially"
+    },
+    {
+      "SectionIndex": 55,
+      "Title": "Page 55",
+      "StartLine": 6233,
+      "EndLine": 6307,
+      "LineCount": 74,
+      "Confidence": 0.92,
+      "Preview": ",, \u0027 \u0027\u0022 **THE**"
+    },
+    {
+      "SectionIndex": 56,
+      "Title": "Page 56",
+      "StartLine": 6308,
+      "EndLine": 6490,
+      "LineCount": 182,
+      "Confidence": 0.92,
+      "Preview": "actual homes aren\u0027t literally places at all, but exemplify the idea that the Outer Planes are realms of thought and"
+    },
+    {
+      "SectionIndex": 57,
+      "Title": "Page 57",
+      "StartLine": 6491,
+      "EndLine": 6590,
+      "LineCount": 99,
+      "Confidence": 0.92,
+      "Preview": "-=:;.\u00B7.,.,-,\u003C1\u00B7\u0022-. going from simple stairs of wood or stone to a"
+    },
+    {
+      "SectionIndex": 58,
+      "Title": "Page 58",
+      "StartLine": 6591,
+      "EndLine": 6675,
+      "LineCount": 84,
+      "Confidence": 0.92,
+      "Preview": "and wildflowers wave in the wind with vibrant life. The plane embodies nature\u0027s wildness and beauty, but it also"
+    },
+    {
+      "SectionIndex": 59,
+      "Title": "Page 59",
+      "StartLine": 6676,
+      "EndLine": 6772,
+      "LineCount": 96,
+      "Confidence": 0.92,
+      "Preview": "O PTIONAL RULE: INTENS E YEARN ING"
+    },
+    {
+      "SectionIndex": 60,
+      "Title": "Page 60",
+      "StartLine": 6773,
+      "EndLine": 6926,
+      "LineCount": 153,
+      "Confidence": 0.92,
+      "Preview": "Finally, a creature can use an action to make an Intelligence check to stabilize a spherical area centered"
+    },
+    {
+      "SectionIndex": 61,
+      "Title": "Page 61",
+      "StartLine": 6927,
+      "EndLine": 7095,
+      "LineCount": 168,
+      "Confidence": 0.92,
+      "Preview": "that figure into the schemes of the Spider Queen. Lolth\u0027s servants also build dungeons amid the webbing,"
+    },
+    {
+      "SectionIndex": 62,
+      "Title": "Page 62",
+      "StartLine": 7096,
+      "EndLine": 7235,
+      "LineCount": 139,
+      "Confidence": 0.92,
+      "Preview": "**THE** **NINE** **HELLS**"
+    },
+    {
+      "SectionIndex": 63,
+      "Title": "Page 63",
+      "StartLine": 7236,
+      "EndLine": 7303,
+      "LineCount": 67,
+      "Confidence": 0.92,
+      "Preview": "Stygia is also home to its previous ruler, the serpentine archdevil Geryon, who was dismissed"
+    },
+    {
+      "SectionIndex": 64,
+      "Title": "Page 64",
+      "StartLine": 7304,
+      "EndLine": 7411,
+      "LineCount": 107,
+      "Confidence": 0.92,
+      "Preview": "MECHANUS"
+    },
+    {
+      "SectionIndex": 65,
+      "Title": "Page 65",
+      "StartLine": 7412,
+      "EndLine": 7500,
+      "LineCount": 88,
+      "Confidence": 0.92,
+      "Preview": "have the celestial type and are always brave and kindhearted, but otherwise they look and behave like"
+    },
+    {
+      "SectionIndex": 66,
+      "Title": "Page 66",
+      "StartLine": 7501,
+      "EndLine": 7650,
+      "LineCount": 149,
+      "Confidence": 0.92,
+      "Preview": "_I_"
+    },
+    {
+      "SectionIndex": 67,
+      "Title": "Page 69",
+      "StartLine": 7651,
+      "EndLine": 7788,
+      "LineCount": 137,
+      "Confidence": 0.92,
+      "Preview": "**CHAPTE** **R** **3:** **CREATING A** **DV ENTURES**"
+    },
+    {
+      "SectionIndex": 68,
+      "Title": "Page 70",
+      "StartLine": 7789,
+      "EndLine": 7927,
+      "LineCount": 138,
+      "Confidence": 0.92,
+      "Preview": "USEFUL MAPS A good adventure needs thoughtfully constructed"
+    },
+    {
+      "SectionIndex": 69,
+      "Title": "Page 71",
+      "StartLine": 7928,
+      "EndLine": 8002,
+      "LineCount": 74,
+      "Confidence": 0.92,
+      "Preview": "\u00B7:,derness Goals table provides similar inspiration for"
+    },
+    {
+      "SectionIndex": 70,
+      "Title": "Page 72",
+      "StartLine": 8003,
+      "EndLine": 8185,
+      "LineCount": 182,
+      "Confidence": 0.92,
+      "Preview": "O\u0022\u0022i\u0027Mi:.\u0027i\\ C.o~\u0022Ldl2 Goal"
+    },
+    {
+      "SectionIndex": 71,
+      "Title": "Page 73",
+      "StartLine": 8186,
+      "EndLine": 8357,
+      "LineCount": 171,
+      "Confidence": 0.92,
+      "Preview": ":. C ON SID ER THE IDE AL CLIMAX -:-::e climactic ending of an adventure fulfills the promise"
+    },
+    {
+      "SectionIndex": 72,
+      "Title": "Page 74",
+      "StartLine": 8358,
+      "EndLine": 8469,
+      "LineCount": 111,
+      "Confidence": 0.92,
+      "Preview": "ongoing plan to commit more crimes, the villain\u0027s goal is to lie low or flee the scene."
+    },
+    {
+      "SectionIndex": 73,
+      "Title": "Page 75",
+      "StartLine": 8470,
+      "EndLine": 8626,
+      "LineCount": 156,
+      "Confidence": 0.92,
+      "Preview": "_-= \u00B7_ I DENTIFY IMPORTANT NPCs"
+    },
+    {
+      "SectionIndex": 74,
+      "Title": "Page 76",
+      "StartLine": 8627,
+      "EndLine": 8760,
+      "LineCount": 133,
+      "Confidence": 0.92,
+      "Preview": "Suspects might be obvious or could come to light during the investigation. One technique often used in detective"
+    },
+    {
+      "SectionIndex": 75,
+      "Title": "Page 77",
+      "StartLine": 8761,
+      "EndLine": 8965,
+      "LineCount": 204,
+      "Confidence": 0.92,
+      "Preview": "**:;** **RAMING** **EVENTS**"
+    },
+    {
+      "SectionIndex": 76,
+      "Title": "Page 78",
+      "StartLine": 8966,
+      "EndLine": 9055,
+      "LineCount": 89,
+      "Confidence": 0.92,
+      "Preview": "on the characters. A love interest might demand that a character turn away from a dangerous quest. A"
+    },
+    {
+      "SectionIndex": 77,
+      "Title": "Page 79",
+      "StartLine": 9056,
+      "EndLine": 9203,
+      "LineCount": 147,
+      "Confidence": 0.92,
+      "Preview": ": -~- .\u2022 ~ ?=-~ OE ~~ c -:- ::T =: s"
+    },
+    {
+      "SectionIndex": 78,
+      "Title": "Page 80",
+      "StartLine": 9204,
+      "EndLine": 9342,
+      "LineCount": 138,
+      "Confidence": 0.92,
+      "Preview": "COMBAT ENCOUNTER DIFFICULTY There are four categories of encounter difficulty."
+    },
+    {
+      "SectionIndex": 79,
+      "Title": "Page 81",
+      "StartLine": 9343,
+      "EndLine": 9402,
+      "LineCount": 59,
+      "Confidence": 0.92,
+      "Preview": "?or example, an encounter with one bugbear and"
+    },
+    {
+      "SectionIndex": 80,
+      "Title": "Page 82",
+      "StartLine": 9403,
+      "EndLine": 9471,
+      "LineCount": 68,
+      "Confidence": 0.92,
+      "Preview": "medium, hard, and deadly encounters. Just remember that groups of monsters eat up more of that budget than"
+    },
+    {
+      "SectionIndex": 81,
+      "Title": "Page 83",
+      "StartLine": 9472,
+      "EndLine": 9609,
+      "LineCount": 137,
+      "Confidence": 0.92,
+      "Preview": ":ncrease the difficulty of the encounter by one step \u0022:-am easy to medium, for example) if the characters"
+    },
+    {
+      "SectionIndex": 82,
+      "Title": "Page 84",
+      "StartLine": 9610,
+      "EndLine": 9710,
+      "LineCount": 100,
+      "Confidence": 0.92,
+      "Preview": "CRE ATI NG R AN DO M E N COUNTER TABLES Creating your own random encounter tables is"
+    },
+    {
+      "SectionIndex": 83,
+      "Title": "Page 85",
+      "StartLine": 9711,
+      "EndLine": 9837,
+      "LineCount": 126,
+      "Confidence": 0.92,
+      "Preview": "- \u2022 \u2022\u2022\u2022 \u2022 [\u2022 ]"
+    },
+    {
+      "SectionIndex": 84,
+      "Title": "Page 87",
+      "StartLine": 9838,
+      "EndLine": 10041,
+      "LineCount": 203,
+      "Confidence": 0.92,
+      "Preview": "CHAPTER 4: CREATING NONPLAYER CHARACTERS"
+    },
+    {
+      "SectionIndex": 85,
+      "Title": "Page 88",
+      "StartLine": 10042,
+      "EndLine": 10229,
+      "LineCount": 187,
+      "Confidence": 0.92,
+      "Preview": "I NTERAC T IO N S WITH OT HE RS In one sentence, describe how the NPC interacts"
+    },
+    {
+      "SectionIndex": 86,
+      "Title": "Page 89",
+      "StartLine": 10230,
+      "EndLine": 10298,
+      "LineCount": 68,
+      "Confidence": 0.92,
+      "Preview": "BO ND In a sentence, summarize the people, places, or things"
+    },
+    {
+      "SectionIndex": 87,
+      "Title": "Page 90",
+      "StartLine": 10299,
+      "EndLine": 10413,
+      "LineCount": 114,
+      "Confidence": 0.92,
+      "Preview": "time to give it a bit of background, a distinctive quirk of appearance, and especially an ideal, a bond, and a flaw."
+    },
+    {
+      "SectionIndex": 88,
+      "Title": "Page 91",
+      "StartLine": 10414,
+      "EndLine": 10525,
+      "LineCount": 111,
+      "Confidence": 0.92,
+      "Preview": "protecting lower-level NPC party members and to provide healing when this protection fails."
+    },
+    {
+      "SectionIndex": 89,
+      "Title": "Page 92",
+      "StartLine": 10526,
+      "EndLine": 10671,
+      "LineCount": 145,
+      "Confidence": 0.92,
+      "Preview": "contacts for beginning adventurers, and characters are likely to secure more helpful contacts over the course of"
+    },
+    {
+      "SectionIndex": 90,
+      "Title": "Page 93",
+      "StartLine": 10672,
+      "EndLine": 10751,
+      "LineCount": 79,
+      "Confidence": 0.92,
+      "Preview": "**o1 LL** **AIN** **1** **S** **METHODS** **d20** **Methods**"
+    },
+    {
+      "SectionIndex": 91,
+      "Title": "Page 94",
+      "StartLine": 10752,
+      "EndLine": 10845,
+      "LineCount": 93,
+      "Confidence": 0.92,
+      "Preview": "Weakness"
+    },
+    {
+      "SectionIndex": 92,
+      "Title": "Page 95",
+      "StartLine": 10846,
+      "EndLine": 11011,
+      "LineCount": 165,
+      "Confidence": 0.92,
+      "Preview": "H A NNEL DIVINITY: TOUCH OF DEATH :illrting at 2nd level, the cleric can use Channel Divinity"
+    },
+    {
+      "SectionIndex": 93,
+      "Title": "Page 97",
+      "StartLine": 11012,
+      "EndLine": 11196,
+      "LineCount": 184,
+      "Confidence": 0.92,
+      "Preview": "**C HAPTER** **5:** **ADVENTURE** **ENVIRONMENTS**"
+    },
+    {
+      "SectionIndex": 94,
+      "Title": "Page 98",
+      "StartLine": 11197,
+      "EndLine": 11264,
+      "LineCount": 67,
+      "Confidence": 0.92,
+      "Preview": "beholder\u00B7s disintegration eye ray have walls that are un naturally smooth, and the beholder\u0027s lair might"
+    },
+    {
+      "SectionIndex": 95,
+      "Title": "Page 99",
+      "StartLine": 11265,
+      "EndLine": 11435,
+      "LineCount": 170,
+      "Confidence": 0.92,
+      "Preview": "**NPC CLASS**"
+    },
+    {
+      "SectionIndex": 96,
+      "Title": "Page 100",
+      "StartLine": 11436,
+      "EndLine": 11577,
+      "LineCount": 141,
+      "Confidence": 0.92,
+      "Preview": "after door and killing whatever lies beyond. But the ebb and flow of power between groups in a dungeon"
+    },
+    {
+      "SectionIndex": 97,
+      "Title": "Page 101",
+      "StartLine": 11578,
+      "EndLine": 11624,
+      "LineCount": 46,
+      "Confidence": 0.92,
+      "Preview": "**CATACOMBS**"
+    },
+    {
+      "SectionIndex": 98,
+      "Title": "Page 102",
+      "StartLine": 11625,
+      "EndLine": 11681,
+      "LineCount": 56,
+      "Confidence": 0.92,
+      "Preview": "determin\u00B7e whether any of them notices tracks or signs of a tapestry or rug having been recently disturbed."
+    },
+    {
+      "SectionIndex": 99,
+      "Title": "Page 103",
+      "StartLine": 11682,
+      "EndLine": 11818,
+      "LineCount": 136,
+      "Confidence": 0.92,
+      "Preview": "In subterranean settlements, even races that have darkvision use fire for warmth, cooking, and defense."
+    },
+    {
+      "SectionIndex": 100,
+      "Title": "Page 104",
+      "StartLine": 11819,
+      "EndLine": 11959,
+      "LineCount": 140,
+      "Confidence": 0.92,
+      "Preview": "**WILDERNESS**"
+    },
+    {
+      "SectionIndex": 101,
+      "Title": "Page 106",
+      "StartLine": 11960,
+      "EndLine": 12105,
+      "LineCount": 145,
+      "Confidence": 0.92,
+      "Preview": "abandoned campsites, and other finds can add flavor to your world, foreshadow future encounters or events, or"
+    },
+    {
+      "SectionIndex": 102,
+      "Title": "Page 107",
+      "StartLine": 12106,
+      "EndLine": 12198,
+      "LineCount": 92,
+      "Confidence": 0.92,
+      "Preview": "STRONGHOLDS Strongholds provide the local population with protection"
+    },
+    {
+      "SectionIndex": 103,
+      "Title": "Page 108",
+      "StartLine": 12199,
+      "EndLine": 12330,
+      "LineCount": 131,
+      "Confidence": 0.92,
+      "Preview": "The other hazards presented here can be identified with a successful Intelligence (Nature) check. Use the"
+    },
+    {
+      "SectionIndex": 104,
+      "Title": "Page 109",
+      "StartLine": 12331,
+      "EndLine": 12402,
+      "LineCount": 71,
+      "Confidence": 0.92,
+      "Preview": "THIN leE Thin ice has a weight tolerance of 3d10 x 10 pounds per"
+    },
+    {
+      "SectionIndex": 105,
+      "Title": "Page 110",
+      "StartLine": 12403,
+      "EndLine": 12642,
+      "LineCount": 239,
+      "Confidence": 0.92,
+      "Preview": "If the Wisdom (Survival) check succeeds, the party travels in the desired direction without becoming lost."
+    },
+    {
+      "SectionIndex": 106,
+      "Title": "Page 111",
+      "StartLine": 12643,
+      "EndLine": 12792,
+      "LineCount": 149,
+      "Confidence": 0.92,
+      "Preview": "RANDOM BUILDINGS"
+    },
+    {
+      "SectionIndex": 107,
+      "Title": "Page 112",
+      "StartLine": 12793,
+      "EndLine": 12928,
+      "LineCount": 135,
+      "Confidence": 0.92,
+      "Preview": "**SHOP**"
+    },
+    {
+      "SectionIndex": 108,
+      "Title": "Page 113",
+      "StartLine": 12929,
+      "EndLine": 12937,
+      "LineCount": 8,
+      "Confidence": 0.92,
+      "Preview": "/"
+    },
+    {
+      "SectionIndex": 109,
+      "Title": "Page 114",
+      "StartLine": 12938,
+      "EndLine": 13082,
+      "LineCount": 144,
+      "Confidence": 0.92,
+      "Preview": "witnesses, hit by stray arrow fire, or mistaken for members of one group and attacked by the other."
+    },
+    {
+      "SectionIndex": 110,
+      "Title": "Page 115",
+      "StartLine": 13083,
+      "EndLine": 13127,
+      "LineCount": 44,
+      "Confidence": 0.92,
+      "Preview": "determining exhaustion. Swimming for an hour at a depth greater than 200 feet counts as 4 hours."
+    },
+    {
+      "SectionIndex": 111,
+      "Title": "Page 116",
+      "StartLine": 13128,
+      "EndLine": 13215,
+      "LineCount": 87,
+      "Confidence": 0.92,
+      "Preview": "the direction and distance of the ship\u0027s travel) or the sun and the stars."
+    },
+    {
+      "SectionIndex": 112,
+      "Title": "Page 117",
+      "StartLine": 13216,
+      "EndLine": 13332,
+      "LineCount": 116,
+      "Confidence": 0.92,
+      "Preview": "**AIRB** **ORNE** **AND** **WATERBORNE** **VEHICLES**"
+    },
+    {
+      "SectionIndex": 113,
+      "Title": "Page 118",
+      "StartLine": 13333,
+      "EndLine": 13397,
+      "LineCount": 64,
+      "Confidence": 0.92,
+      "Preview": "As adventurers travel through the air, random encounters as you normally would. lgnore -.,...,,~-\u00AD"
+    },
+    {
+      "SectionIndex": 114,
+      "Title": "Page 119",
+      "StartLine": 13398,
+      "EndLine": 13507,
+      "LineCount": 109,
+      "Confidence": 0.92,
+      "Preview": "actively looking for a trap can attempt a Wisdom (Perception) check against the trap\u0027s DC. You can"
+    },
+    {
+      "SectionIndex": 115,
+      "Title": "Page 120",
+      "StartLine": 13508,
+      "EndLine": 13644,
+      "LineCount": 136,
+      "Confidence": 0.92,
+      "Preview": "an effect that changes over time. or otherwi e produce a dynamic cha llenge. Otherwise, the complex trap can be"
+    },
+    {
+      "SectionIndex": 116,
+      "Title": "Page 121",
+      "StartLine": 13645,
+      "EndLine": 13780,
+      "LineCount": 135,
+      "Confidence": 0.92,
+      "Preview": "15 Dexterity check using thieves\u0027 tools, provided that the mechanism can be reached and the character can see."
+    },
+    {
+      "SectionIndex": 117,
+      "Title": "Page 123",
+      "StartLine": 13781,
+      "EndLine": 13784,
+      "LineCount": 3,
+      "Confidence": 0.92,
+      "Preview": "**CHAPTER** **6:** **BETWEEN ADVENTURES**"
+    },
+    {
+      "SectionIndex": 118,
+      "Title": "_(_",
+      "StartLine": 13785,
+      "EndLine": 13923,
+      "LineCount": 138,
+      "Confidence": 0.92,
+      "Preview": "\\"
+    },
+    {
+      "SectionIndex": 119,
+      "Title": "Page 124",
+      "StartLine": 13924,
+      "EndLine": 14064,
+      "LineCount": 140,
+      "Confidence": 0.92,
+      "Preview": "To keep players from straying, save your best ideas for the very end of your adventures, or insert them during"
+    },
+    {
+      "SectionIndex": 120,
+      "Title": "Page 125",
+      "StartLine": 14065,
+      "EndLine": 14184,
+      "LineCount": 119,
+      "Confidence": 0.92,
+      "Preview": "AIN TENANCE COSTS"
+    },
+    {
+      "SectionIndex": 121,
+      "Title": "Page 126",
+      "StartLine": 14185,
+      "EndLine": 14337,
+      "LineCount": 152,
+      "Confidence": 0.92,
+      "Preview": "MoRE Do-\\\\~TIME AcTn~TIE"
+    },
+    {
+      "SectionIndex": 122,
+      "Title": "Page 127",
+      "StartLine": 14338,
+      "EndLine": 14507,
+      "LineCount": 169,
+      "Confidence": 0.92,
+      "Preview": "cast _magic missile._ That same character could make a _\u002B1 weapon_ (another uncommon item), no particular"
+    },
+    {
+      "SectionIndex": 123,
+      "Title": "Page 128",
+      "StartLine": 14508,
+      "EndLine": 14574,
+      "LineCount": 66,
+      "Confidence": 0.92,
+      "Preview": "You determine a buyer\u0027s identity. Buyers sometimes procure rare and very rare items through proxies to"
+    },
+    {
+      "SectionIndex": 124,
+      "Title": "Page 129",
+      "StartLine": 14575,
+      "EndLine": 14696,
+      "LineCount": 121,
+      "Confidence": 0.92,
+      "Preview": "S OWING R UMORS"
+    },
+    {
+      "SectionIndex": 125,
+      "Title": "Page 131",
+      "StartLine": 14697,
+      "EndLine": 14841,
+      "LineCount": 144,
+      "Confidence": 0.92,
+      "Preview": "**CHAPTER** **7:** **TREASURE**"
+    },
+    {
+      "SectionIndex": 126,
+      "Title": "Page 132",
+      "StartLine": 14842,
+      "EndLine": 15005,
+      "LineCount": 163,
+      "Confidence": 0.92,
+      "Preview": "GEMSTONES If a treasure hoard includes gemstones, you can use"
+    },
+    {
+      "SectionIndex": 127,
+      "Title": "Page 133",
+      "StartLine": 15006,
+      "EndLine": 15192,
+      "LineCount": 186,
+      "Confidence": 0.92,
+      "Preview": "**250** **GP** **ART** **OBJECTS**"
+    },
+    {
+      "SectionIndex": 128,
+      "Title": "Page 134",
+      "StartLine": 15193,
+      "EndLine": 15365,
+      "LineCount": 172,
+      "Confidence": 0.92,
+      "Preview": "Plenty of people might like to have a magic sword, but few of them can afford it. Those who can afford such an"
+    },
+    {
+      "SectionIndex": 129,
+      "Title": "Page 135",
+      "StartLine": 15366,
+      "EndLine": 15545,
+      "LineCount": 179,
+      "Confidence": 0.92,
+      "Preview": "**TREASURE** **HOARD:** **CHALLENGE** **0-4**"
+    },
+    {
+      "SectionIndex": 130,
+      "Title": "Page 136",
+      "StartLine": 15546,
+      "EndLine": 15696,
+      "LineCount": 150,
+      "Confidence": 0.92,
+      "Preview": "An item can be attuned to only one creature at a r.ir and a creature can be attuned to no more than three"
+    },
+    {
+      "SectionIndex": 131,
+      "Title": "Page 137",
+      "StartLine": 15697,
+      "EndLine": 15840,
+      "LineCount": 143,
+      "Confidence": 0.92,
+      "Preview": "i cursed. Most methods of identifying items, including rhe _identify_ spell, fail to reveal such a curse, although"
+    },
+    {
+      "SectionIndex": 132,
+      "Title": "Page 138",
+      "StartLine": 15841,
+      "EndLine": 15996,
+      "LineCount": 155,
+      "Confidence": 0.92,
+      "Preview": "STAFFS A magic staff is about 5 or 6 feet long. Staffs vary widely"
+    },
+    {
+      "SectionIndex": 133,
+      "Title": "Page 139",
+      "StartLine": 15997,
+      "EndLine": 16137,
+      "LineCount": 140,
+      "Confidence": 0.92,
+      "Preview": "Dwarves might make items usable only by dwarf-sized and dwarf-shaped characters."
+    },
+    {
+      "SectionIndex": 134,
+      "Title": "Page 140",
+      "StartLine": 16138,
+      "EndLine": 16305,
+      "LineCount": 167,
+      "Confidence": 0.92,
+      "Preview": "**WHo CREATED** **IT** **oR** **WAs** **INTENDED** **TO** **UsE** **IT?**"
+    },
+    {
+      "SectionIndex": 135,
+      "Title": "Page 141",
+      "StartLine": 16306,
+      "EndLine": 16518,
+      "LineCount": 212,
+      "Confidence": 0.92,
+      "Preview": "**WHAT** **MINOR** **PROPERTY** **DOES** **IT** **HAVE?**"
+    },
+    {
+      "SectionIndex": 136,
+      "Title": "Page 142",
+      "StartLine": 16519,
+      "EndLine": 16620,
+      "LineCount": 101,
+      "Confidence": 0.92,
+      "Preview": "**RANDOM** **MAGIC** **ITEMS**"
+    },
+    {
+      "SectionIndex": 137,
+      "Title": "Page 143",
+      "StartLine": 16621,
+      "EndLine": 16775,
+      "LineCount": 154,
+      "Confidence": 0.92,
+      "Preview": "**MAGIC** **ITEM** **TABLE** **c**"
+    },
+    {
+      "SectionIndex": 138,
+      "Title": "Page 144",
+      "StartLine": 16776,
+      "EndLine": 16883,
+      "LineCount": 107,
+      "Confidence": 0.92,
+      "Preview": "**MAGIC** **ITEM** **TABLE** **F**"
+    },
+    {
+      "SectionIndex": 139,
+      "Title": "Page 145",
+      "StartLine": 16884,
+      "EndLine": 16962,
+      "LineCount": 78,
+      "Confidence": 0.92,
+      "Preview": "**MAGIC** **ITEM** **TABLE** **G**"
+    },
+    {
+      "SectionIndex": 140,
+      "Title": "Page 146",
+      "StartLine": 16963,
+      "EndLine": 17102,
+      "LineCount": 139,
+      "Confidence": 0.92,
+      "Preview": "**MAGIC** **ITEM** **TABLE** **H**"
+    },
+    {
+      "SectionIndex": 141,
+      "Title": "Page 147",
+      "StartLine": 17103,
+      "EndLine": 17254,
+      "LineCount": 151,
+      "Confidence": 0.92,
+      "Preview": "**MAGIC** **ITEM** **TABLE** **I**"
+    },
+    {
+      "SectionIndex": 142,
+      "Title": "Page 148",
+      "StartLine": 17255,
+      "EndLine": 17355,
+      "LineCount": 100,
+      "Confidence": 0.92,
+      "Preview": "AMULET OF THE 10 ."
+    },
+    {
+      "SectionIndex": 143,
+      "Title": "Page 149",
+      "StartLine": 17356,
+      "EndLine": 17502,
+      "LineCount": 146,
+      "Confidence": 0.92,
+      "Preview": "ANIMATED SHIELD"
+    },
+    {
+      "SectionIndex": 144,
+      "Title": "Page 150",
+      "StartLine": 17503,
+      "EndLine": 17616,
+      "LineCount": 113,
+      "Confidence": 0.92,
+      "Preview": "ARMOR OF CoLD RES I STANcE"
+    },
+    {
+      "SectionIndex": 145,
+      "Title": "Page 151",
+      "StartLine": 17617,
+      "EndLine": 17769,
+      "LineCount": 152,
+      "Confidence": 0.92,
+      "Preview": "BAG OF 110LOING"
+    },
+    {
+      "SectionIndex": 146,
+      "Title": "Page 152",
+      "StartLine": 17770,
+      "EndLine": 17892,
+      "LineCount": 122,
+      "Confidence": 0.92,
+      "Preview": "Astral Plane. If the bag is turned inside out, its contents spill forth, unharmed, but the bag must be put right"
+    },
+    {
+      "SectionIndex": 147,
+      "Title": "Page 153",
+      "StartLine": 17893,
+      "EndLine": 18004,
+      "LineCount": 111,
+      "Confidence": 0.92,
+      "Preview": "BooTs OF"
+    },
+    {
+      "SectionIndex": 148,
+      "Title": "Page 154",
+      "StartLine": 18005,
+      "EndLine": 18099,
+      "LineCount": 94,
+      "Confidence": 0.92,
+      "Preview": "BooTs OF THE"
+    },
+    {
+      "SectionIndex": 149,
+      "Title": "Page 155",
+      "StartLine": 18100,
+      "EndLine": 18204,
+      "LineCount": 104,
+      "Confidence": 0.92,
+      "Preview": "BooTs o\u2022 STR IDING"
+    },
+    {
+      "SectionIndex": 150,
+      "Title": "Page 156",
+      "StartLine": 18205,
+      "EndLine": 18301,
+      "LineCount": 96,
+      "Confidence": 0.92,
+      "Preview": "CLOAK OF"
+    },
+    {
+      "SectionIndex": 151,
+      "Title": "Page 157",
+      "StartLine": 18302,
+      "EndLine": 18400,
+      "LineCount": 98,
+      "Confidence": 0.92,
+      "Preview": "C I RCLE T"
+    },
+    {
+      "SectionIndex": 152,
+      "Title": "Page 158",
+      "StartLine": 18401,
+      "EndLine": 18515,
+      "LineCount": 114,
+      "Confidence": 0.92,
+      "Preview": "face has a different effect. If the cube has insufficient charges remaining, nothing happens. Otherwise, a"
+    },
+    {
+      "SectionIndex": 153,
+      "Title": "Page 159",
+      "StartLine": 18516,
+      "EndLine": 18621,
+      "LineCount": 105,
+      "Confidence": 0.92,
+      "Preview": "The tower is made of adamantine, and its magic prevents it from being tipped over. The roof, the door,"
+    },
+    {
+      "SectionIndex": 154,
+      "Title": "Page 160",
+      "StartLine": 18622,
+      "EndLine": 18802,
+      "LineCount": 180,
+      "Confidence": 0.92,
+      "Preview": "uses an action to visually inspect the creature identifies it as illusory with a successful DC 15 Intelligence"
+    },
+    {
+      "SectionIndex": 155,
+      "Title": "Page 161",
+      "StartLine": 18803,
+      "EndLine": 18806,
+      "LineCount": 3,
+      "Confidence": 0.92,
+      "Preview": "CHAPTER 7 I TREASURE"
+    },
+    {
+      "SectionIndex": 156,
+      "Title": "Page 162",
+      "StartLine": 18807,
+      "EndLine": 18966,
+      "LineCount": 159,
+      "Confidence": 0.92,
+      "Preview": "any divination magic, but a _wish_ spell can reveal the location of your prison. You draw no more cards."
+    },
+    {
+      "SectionIndex": 157,
+      "Title": "Page 163",
+      "StartLine": 18967,
+      "EndLine": 19060,
+      "LineCount": 93,
+      "Confidence": 0.92,
+      "Preview": "~t il the start of your next turn, although yo u must hold"
+    },
+    {
+      "SectionIndex": 158,
+      "Title": "Page 164",
+      "StartLine": 19061,
+      "EndLine": 19146,
+      "LineCount": 85,
+      "Confidence": 0.92,
+      "Preview": "DwARvEN THROWER"
+    },
+    {
+      "SectionIndex": 159,
+      "Title": "Page 165",
+      "StartLine": 19147,
+      "EndLine": 19248,
+      "LineCount": 101,
+      "Confidence": 0.92,
+      "Preview": "DR IFTGLOBE"
+    },
+    {
+      "SectionIndex": 160,
+      "Title": "Page 166",
+      "StartLine": 19249,
+      "EndLine": 19343,
+      "LineCount": 94,
+      "Confidence": 0.92,
+      "Preview": "Eves oF CHARMING"
+    },
+    {
+      "SectionIndex": 161,
+      "Title": "Page 167",
+      "StartLine": 19344,
+      "EndLine": 19434,
+      "LineCount": 90,
+      "Confidence": 0.92,
+      "Preview": "SERPENTINE Owe"
+    },
+    {
+      "SectionIndex": 162,
+      "Title": "Page 168",
+      "StartLine": 19435,
+      "EndLine": 19525,
+      "LineCount": 90,
+      "Confidence": 0.92,
+      "Preview": "FoLDING BoAT"
+    },
+    {
+      "SectionIndex": 163,
+      "Title": "Page 169",
+      "StartLine": 19526,
+      "EndLine": 19619,
+      "LineCount": 93,
+      "Confidence": 0.92,
+      "Preview": "FLAME ToNGUE"
+    },
+    {
+      "SectionIndex": 164,
+      "Title": "Page 170",
+      "StartLine": 19620,
+      "EndLine": 19696,
+      "LineCount": 76,
+      "Confidence": 0.92,
+      "Preview": "G E M OF SEEING"
+    },
+    {
+      "SectionIndex": 165,
+      "Title": "Page 171",
+      "StartLine": 19697,
+      "EndLine": 19799,
+      "LineCount": 102,
+      "Confidence": 0.92,
+      "Preview": "HAMMER OF THUNDERBOLTS _Weapon (maul), legendary_"
+    },
+    {
+      "SectionIndex": 166,
+      "Title": "Page 172",
+      "StartLine": 19800,
+      "EndLine": 19903,
+      "LineCount": 103,
+      "Confidence": 0.92,
+      "Preview": "- \u2022"
+    },
+    {
+      "SectionIndex": 167,
+      "Title": "Page 173",
+      "StartLine": 19904,
+      "EndLine": 19998,
+      "LineCount": 94,
+      "Confidence": 0.92,
+      "Preview": "11oLv AvENGER"
+    },
+    {
+      "SectionIndex": 168,
+      "Title": "Page 174",
+      "StartLine": 19999,
+      "EndLine": 20096,
+      "LineCount": 97,
+      "Confidence": 0.92,
+      "Preview": "Doss LuTE"
+    },
+    {
+      "SectionIndex": 169,
+      "Title": "Page 175",
+      "StartLine": 20097,
+      "EndLine": 20206,
+      "LineCount": 109,
+      "Confidence": 0.92,
+      "Preview": "A stone has AC 24, 10 hit points, and resistance to all damage. It is considered to be an object that is being"
+    },
+    {
+      "SectionIndex": 170,
+      "Title": "Page 176",
+      "StartLine": 20207,
+      "EndLine": 20314,
+      "LineCount": 107,
+      "Confidence": 0.92,
+      "Preview": "IRON FLASK _Wondrous item, legendary_"
+    },
+    {
+      "SectionIndex": 171,
+      "Title": "Page 177",
+      "StartLine": 20315,
+      "EndLine": 20397,
+      "LineCount": 82,
+      "Confidence": 0.92,
+      "Preview": "JAVELIN"
+    },
+    {
+      "SectionIndex": 172,
+      "Title": "Page 178",
+      "StartLine": 20398,
+      "EndLine": 20477,
+      "LineCount": 79,
+      "Confidence": 0.92,
+      "Preview": "MANTLE OF"
+    },
+    {
+      "SectionIndex": 173,
+      "Title": "Page 179",
+      "StartLine": 20478,
+      "EndLine": 20565,
+      "LineCount": 87,
+      "Confidence": 0.92,
+      "Preview": "r8r"
+    },
+    {
+      "SectionIndex": 174,
+      "Title": "Page 180",
+      "StartLine": 20566,
+      "EndLine": 20663,
+      "LineCount": 97,
+      "Confidence": 0.92,
+      "Preview": "NECKLACE OF"
+    },
+    {
+      "SectionIndex": 175,
+      "Title": "Page 181",
+      "StartLine": 20664,
+      "EndLine": 20742,
+      "LineCount": 78,
+      "Confidence": 0.92,
+      "Preview": "NINE LIVES STEALER _Weapon (any sword), very rare (requires attunement)_"
+    },
+    {
+      "SectionIndex": 176,
+      "Title": "Page 182",
+      "StartLine": 20743,
+      "EndLine": 20823,
+      "LineCount": 80,
+      "Confidence": 0.92,
+      "Preview": "PERIAPT 01\u0027 liEAL TH"
+    },
+    {
+      "SectionIndex": 177,
+      "Title": "Page 183",
+      "StartLine": 20824,
+      "EndLine": 20906,
+      "LineCount": 82,
+      "Confidence": 0.92,
+      "Preview": "P I PES OF liAUNTING"
+    },
+    {
+      "SectionIndex": 178,
+      "Title": "Page 185",
+      "StartLine": 20907,
+      "EndLine": 21072,
+      "LineCount": 165,
+      "Confidence": 0.92,
+      "Preview": "on a different plane, so it can\u0027t be u ed to create open passages. Any creature inside an open _portable hole_ can"
+    },
+    {
+      "SectionIndex": 179,
+      "Title": "Page 186",
+      "StartLine": 21073,
+      "EndLine": 21233,
+      "LineCount": 160,
+      "Confidence": 0.92,
+      "Preview": "**POTIONS** **OF** **HEALING**"
+    },
+    {
+      "SectionIndex": 180,
+      "Title": "Page 187",
+      "StartLine": 21234,
+      "EndLine": 21319,
+      "LineCount": 85,
+      "Confidence": 0.92,
+      "Preview": "pounds at half that speed. The bird disappears after flyi ng its maximum distance for a day or if it drops to 0"
+    },
+    {
+      "SectionIndex": 181,
+      "Title": "Page 188",
+      "StartLine": 21320,
+      "EndLine": 21422,
+      "LineCount": 102,
+      "Confidence": 0.92,
+      "Preview": "RING OF ANIMAL INFL UENCE"
+    },
+    {
+      "SectionIndex": 182,
+      "Title": "Page 189",
+      "StartLine": 21423,
+      "EndLine": 21530,
+      "LineCount": 107,
+      "Confidence": 0.92,
+      "Preview": "R I NG OF"
+    },
+    {
+      "SectionIndex": 183,
+      "Title": "Page 190",
+      "StartLine": 21531,
+      "EndLine": 21650,
+      "LineCount": 119,
+      "Confidence": 0.92,
+      "Preview": "RING OF P ROTEC T ION"
+    },
+    {
+      "SectionIndex": 184,
+      "Title": "Page 191",
+      "StartLine": 21651,
+      "EndLine": 21767,
+      "LineCount": 116,
+      "Confidence": 0.92,
+      "Preview": "RING OF"
+    },
+    {
+      "SectionIndex": 185,
+      "Title": "Page 192",
+      "StartLine": 21768,
+      "EndLine": 21842,
+      "LineCount": 74,
+      "Confidence": 0.92,
+      "Preview": "R ose - F STARS"
+    },
+    {
+      "SectionIndex": 186,
+      "Title": "Page 193",
+      "StartLine": 21843,
+      "EndLine": 21944,
+      "LineCount": 101,
+      "Confidence": 0.92,
+      "Preview": "R OBE OF US EF UL ITEMS _Wondrous item, uncommon_"
+    },
+    {
+      "SectionIndex": 187,
+      "Title": "Page 194",
+      "StartLine": 21945,
+      "EndLine": 22029,
+      "LineCount": 84,
+      "Confidence": 0.92,
+      "Preview": "Roo OF"
+    },
+    {
+      "SectionIndex": 188,
+      "Title": "Page 195",
+      "StartLine": 22030,
+      "EndLine": 22188,
+      "LineCount": 158,
+      "Confidence": 0.92,
+      "Preview": "Ylore weight or lack of solid anchorin cau es the rod to revert to its normal form."
+    },
+    {
+      "SectionIndex": 189,
+      "Title": "Page 197",
+      "StartLine": 22189,
+      "EndLine": 22285,
+      "LineCount": 96,
+      "Confidence": 0.92,
+      "Preview": "RoPE oF"
+    },
+    {
+      "SectionIndex": 190,
+      "Title": "Page 198",
+      "StartLine": 22286,
+      "EndLine": 22380,
+      "LineCount": 94,
+      "Confidence": 0.92,
+      "Preview": "SLIPPERS OF SPIDER CLIM BING _Wondrous item, uncommon (requires attunement)_"
+    },
+    {
+      "SectionIndex": 191,
+      "Title": "Page 199",
+      "StartLine": 22381,
+      "EndLine": 22497,
+      "LineCount": 116,
+      "Confidence": 0.92,
+      "Preview": "successfully copied. Whether the check ucceeds or fa ils, the _spell scroll_ is destroyed."
+    },
+    {
+      "SectionIndex": 192,
+      "Title": "Page 200",
+      "StartLine": 22498,
+      "EndLine": 22591,
+      "LineCount": 93,
+      "Confidence": 0.92,
+      "Preview": "STAFF OF FROST _Staff,_ _very rare (requires attunement by a druid,_"
+    },
+    {
+      "SectionIndex": 193,
+      "Title": "Page 201",
+      "StartLine": 22592,
+      "EndLine": 22751,
+      "LineCount": 159,
+      "Confidence": 0.92,
+      "Preview": "equal to 16 x the number of charge in the taff. Every other creature in the area must make a DC 17 Dexterity"
+    },
+    {
+      "SectionIndex": 194,
+      "Title": "Page 202",
+      "StartLine": 22752,
+      "EndLine": 22828,
+      "LineCount": 76,
+      "Confidence": 0.92,
+      "Preview": "STAFF OF THE PYTHON _Staff,_ _uncommon (requires attunement by a cleric, druid,_"
+    },
+    {
+      "SectionIndex": 195,
+      "Title": "Page 203",
+      "StartLine": 22829,
+      "EndLine": 22911,
+      "LineCount": 82,
+      "Confidence": 0.92,
+      "Preview": "STAFF OF THE WooDLAND S"
+    },
+    {
+      "SectionIndex": 196,
+      "Title": "Page 204",
+      "StartLine": 22912,
+      "EndLine": 23013,
+      "LineCount": 101,
+      "Confidence": 0.92,
+      "Preview": "SwoRD OF SHARPNESS"
+    },
+    {
+      "SectionIndex": 197,
+      "Title": "Page 205",
+      "StartLine": 23014,
+      "EndLine": 23119,
+      "LineCount": 105,
+      "Confidence": 0.92,
+      "Preview": "TALISMAN"
+    },
+    {
+      "SectionIndex": 198,
+      "Title": "Page 206",
+      "StartLine": 23120,
+      "EndLine": 23197,
+      "LineCount": 77,
+      "Confidence": 0.92,
+      "Preview": "T ENTAC L E Ro o"
+    },
+    {
+      "SectionIndex": 199,
+      "Title": "Page 207",
+      "StartLine": 23198,
+      "EndLine": 23294,
+      "LineCount": 96,
+      "Confidence": 0.92,
+      "Preview": "Vecna watches anyone using this tome. He ca n also Tite cryptic messages in the book. These messages"
+    },
+    {
+      "SectionIndex": 200,
+      "Title": "Page 208",
+      "StartLine": 23295,
+      "EndLine": 23369,
+      "LineCount": 74,
+      "Confidence": 0.92,
+      "Preview": "WAND OF FIREBALL S"
+    },
+    {
+      "SectionIndex": 201,
+      "Title": "Page 209",
+      "StartLine": 23370,
+      "EndLine": 23458,
+      "LineCount": 88,
+      "Confidence": 0.92,
+      "Preview": "**AND** **OF** **LIGHTNING BOLTS** _-land, rare (requires attunement by a spellcaster)_"
+    },
+    {
+      "SectionIndex": 202,
+      "Title": "Page 210",
+      "StartLine": 23459,
+      "EndLine": 23558,
+      "LineCount": 99,
+      "Confidence": 0.92,
+      "Preview": "WAND OF THE WAR MAGE, \u002B1, \u002B2, OR \u002B3"
+    },
+    {
+      "SectionIndex": 203,
+      "Title": "Page 211",
+      "StartLine": 23559,
+      "EndLine": 23698,
+      "LineCount": 139,
+      "Confidence": 0.92,
+      "Preview": "**dlOO** **Effect**"
+    },
+    {
+      "SectionIndex": 204,
+      "Title": "Page 212",
+      "StartLine": 23699,
+      "EndLine": 23801,
+      "LineCount": 102,
+      "Confidence": 0.92,
+      "Preview": "WiNGS OF FLYING"
+    },
+    {
+      "SectionIndex": 205,
+      "Title": "Page 214",
+      "StartLine": 23802,
+      "EndLine": 23936,
+      "LineCount": 134,
+      "Confidence": 0.92,
+      "Preview": "**CONFLIC** **T**"
+    },
+    {
+      "SectionIndex": 206,
+      "Title": "Page 215",
+      "StartLine": 23937,
+      "EndLine": 24100,
+      "LineCount": 163,
+      "Confidence": 0.92,
+      "Preview": "_**Soul Hunter.**_ While you hold the weapon. you are aware of the presence of Tiny or larger creatures within"
+    },
+    {
+      "SectionIndex": 207,
+      "Title": "Page 216",
+      "StartLine": 24101,
+      "EndLine": 24232,
+      "LineCount": 131,
+      "Confidence": 0.92,
+      "Preview": "when it wants to communicate something it has sensed. It can communicate more explicitly, through visions or"
+    },
+    {
+      "SectionIndex": 208,
+      "Title": "Page 217",
+      "StartLine": 24233,
+      "EndLine": 24361,
+      "LineCount": 128,
+      "Confidence": 0.92,
+      "Preview": "**ARTIFACTS**"
+    },
+    {
+      "SectionIndex": 209,
+      "Title": "Page 218",
+      "StartLine": 24362,
+      "EndLine": 24536,
+      "LineCount": 174,
+      "Confidence": 0.92,
+      "Preview": "**MAJOR** **DETRIMENTAL** **PROPERTIES**"
+    },
+    {
+      "SectionIndex": 210,
+      "Title": "Page 219",
+      "StartLine": 24537,
+      "EndLine": 24660,
+      "LineCount": 123,
+      "Confidence": 0.92,
+      "Preview": "dl 00 Property"
+    },
+    {
+      "SectionIndex": 211,
+      "Title": "Page 220",
+      "StartLine": 24661,
+      "EndLine": 24798,
+      "LineCount": 137,
+      "Confidence": 0.92,
+      "Preview": "points by this damage disappears in a blinding flash is destroyed, leaving its possessions behind."
+    },
+    {
+      "SectionIndex": 212,
+      "Title": "Page 221",
+      "StartLine": 24799,
+      "EndLine": 24900,
+      "LineCount": 101,
+      "Confidence": 0.92,
+      "Preview": "**VILE** **LORE**"
+    },
+    {
+      "SectionIndex": 213,
+      "Title": "Page 222",
+      "StartLine": 24901,
+      "EndLine": 25043,
+      "LineCount": 142,
+      "Confidence": 0.92,
+      "Preview": "- 1 minor beneficial property 1 major beneficial property"
+    },
+    {
+      "SectionIndex": 214,
+      "Title": "Page 223",
+      "StartLine": 25044,
+      "EndLine": 25145,
+      "LineCount": 101,
+      "Confidence": 0.92,
+      "Preview": "to ash, and are destroyed forever. Any other attempt _to_ destroy the eye or hand seems _to_ work, but the artifact"
+    },
+    {
+      "SectionIndex": 215,
+      "Title": "Page 224",
+      "StartLine": 25146,
+      "EndLine": 25236,
+      "LineCount": 90,
+      "Confidence": 0.92,
+      "Preview": "SwoRD OF KAs _Wondrous item, artifact (requires attunement)_"
+    },
+    {
+      "SectionIndex": 216,
+      "Title": "Page 225",
+      "StartLine": 25237,
+      "EndLine": 25380,
+      "LineCount": 143,
+      "Confidence": 0.92,
+      "Preview": "WAND OF 0RCUS"
+    },
+    {
+      "SectionIndex": 217,
+      "Title": "Page 226",
+      "StartLine": 25381,
+      "EndLine": 25534,
+      "LineCount": 153,
+      "Confidence": 0.92,
+      "Preview": "A character should receive only a blessing that is useful to him or her, and some blessings come with"
+    },
+    {
+      "SectionIndex": 218,
+      "Title": "Page 227",
+      "StartLine": 25535,
+      "EndLine": 25618,
+      "LineCount": 83,
+      "Confidence": 0.92,
+      "Preview": "A letter of recommendation is worth only as much as the person who wrote it and offer no benefit in places"
+    },
+    {
+      "SectionIndex": 219,
+      "Title": "Page 228",
+      "StartLine": 25619,
+      "EndLine": 25692,
+      "LineCount": 73,
+      "Confidence": 0.92,
+      "Preview": "As an additional reward, the individual bequeathing the stronghold might offer to pay its maintenance cost"
+    },
+    {
+      "SectionIndex": 220,
+      "Title": "Page 229",
+      "StartLine": 25693,
+      "EndLine": 25764,
+      "LineCount": 71,
+      "Confidence": 0.92,
+      "Preview": "TRAINING A character might be offered pecial training in lieu of"
+    },
+    {
+      "SectionIndex": 221,
+      "Title": "Page 230",
+      "StartLine": 25765,
+      "EndLine": 25898,
+      "LineCount": 133,
+      "Confidence": 0.92,
+      "Preview": "BOO N OF QUICK CASTING Choose one of your spells of 1st through 3rd level that"
+    },
+    {
+      "SectionIndex": 222,
+      "Title": "Page 233",
+      "StartLine": 25899,
+      "EndLine": 26033,
+      "LineCount": 134,
+      "Confidence": 0.92,
+      "Preview": "**CHAPTER** **8:** **RUNNING THE** **GAME**"
+    },
+    {
+      "SectionIndex": 223,
+      "Title": "Page 234",
+      "StartLine": 26034,
+      "EndLine": 26167,
+      "LineCount": 133,
+      "Confidence": 0.92,
+      "Preview": "Have another player run the missing player\u0027s character. The player running the extra character"
+    },
+    {
+      "SectionIndex": 224,
+      "Title": "Page 235",
+      "StartLine": 26168,
+      "EndLine": 26266,
+      "LineCount": 98,
+      "Confidence": 0.92,
+      "Preview": "bonuses and abilities and paying attention to the ga me and immersing themselves in"
+    },
+    {
+      "SectionIndex": 225,
+      "Title": "Page 236",
+      "StartLine": 26267,
+      "EndLine": 26422,
+      "LineCount": 155,
+      "Confidence": 0.92,
+      "Preview": "CONTESTS A contest is a kind of ability check that matches"
+    },
+    {
+      "SectionIndex": 226,
+      "Title": "Page 237",
+      "StartLine": 26423,
+      "EndLine": 26562,
+      "LineCount": 139,
+      "Confidence": 0.92,
+      "Preview": "VARIANT: AUTOMATIC SUCCESS"
+    },
+    {
+      "SectionIndex": 227,
+      "Title": "Page 238",
+      "StartLine": 26563,
+      "EndLine": 26661,
+      "LineCount": 98,
+      "Confidence": 0.92,
+      "Preview": "For example, imagine a wizard is running down a dungeon cor~idor to escape from a beholder. Around"
+    },
+    {
+      "SectionIndex": 228,
+      "Title": "Page 239",
+      "StartLine": 26662,
+      "EndLine": 26796,
+      "LineCount": 134,
+      "Confidence": 0.92,
+      "Preview": "style, consider using inspiration as a reward when"
+    },
+    {
+      "SectionIndex": 229,
+      "Title": "Page 240",
+      "StartLine": 26797,
+      "EndLine": 26940,
+      "LineCount": 143,
+      "Confidence": 0.92,
+      "Preview": "RESOLUTION AND CONSEQUENCES"
+    },
+    {
+      "SectionIndex": 230,
+      "Title": "Page 241",
+      "StartLine": 26941,
+      "EndLine": 26997,
+      "LineCount": 56,
+      "Confidence": 0.92,
+      "Preview": "For daily travel, multiply your hourly rate of travel by the number of hours traveled (typically 8 hours)."
+    },
+    {
+      "SectionIndex": 231,
+      "Title": "Page 242",
+      "StartLine": 26998,
+      "EndLine": 27147,
+      "LineCount": 149,
+      "Confidence": 0.92,
+      "Preview": "**TRACKING**"
+    },
+    {
+      "SectionIndex": 232,
+      "Title": "Page 243",
+      "StartLine": 27148,
+      "EndLine": 27302,
+      "LineCount": 154,
+      "Confidence": 0.92,
+      "Preview": "_Determining Characteristics._ The adventurers don\u0027t necessarily enter into a social interaction with a full"
+    },
+    {
+      "SectionIndex": 233,
+      "Title": "Page 244",
+      "StartLine": 27303,
+      "EndLine": 27436,
+      "LineCount": 133,
+      "Confidence": 0.92,
+      "Preview": "Also, characters and monsters with distinctive voices are memorable. If you\u0027re not a natural mimic or actor,"
+    },
+    {
+      "SectionIndex": 234,
+      "Title": "Page 245",
+      "StartLine": 27437,
+      "EndLine": 27593,
+      "LineCount": 156,
+      "Confidence": 0.92,
+      "Preview": "_Hit Points._ An object\u0027s hir points measure how much damage it can take before lo _ina_ i srrucrural integrity."
+    },
+    {
+      "SectionIndex": 235,
+      "Title": "Page 246",
+      "StartLine": 27594,
+      "EndLine": 27682,
+      "LineCount": 88,
+      "Confidence": 0.92,
+      "Preview": "25"
+    },
+    {
+      "SectionIndex": 236,
+      "Title": "Page 247",
+      "StartLine": 27683,
+      "EndLine": 27800,
+      "LineCount": 117,
+      "Confidence": 0.92,
+      "Preview": "**CREATURE** **SIZE** **ON** **SQUARES** **AND** **HEXES**"
+    },
+    {
+      "SectionIndex": 237,
+      "Title": "Page 248",
+      "StartLine": 27801,
+      "EndLine": 27899,
+      "LineCount": 98,
+      "Confidence": 0.92,
+      "Preview": "launch a _lightning bolt_ (100-foot line) at some ogres and hobgoblins, and you could use the table to say"
+    },
+    {
+      "SectionIndex": 238,
+      "Title": "Page 249",
+      "StartLine": 27900,
+      "EndLine": 28002,
+      "LineCount": 102,
+      "Confidence": 0.92,
+      "Preview": "CREATURE SIZE ON SQUARES A D HEXES A creature\u0027s size determines how much space it"
+    },
+    {
+      "SectionIndex": 239,
+      "Title": "Page 250",
+      "StartLine": 28003,
+      "EndLine": 28137,
+      "LineCount": 134,
+      "Confidence": 0.92,
+      "Preview": "OPTIONAL RULE: DIAGONALS The _Player\u0027s Handbook_ presents a simple method for"
+    },
+    {
+      "SectionIndex": 240,
+      "Title": "Page 251",
+      "StartLine": 28138,
+      "EndLine": 28215,
+      "LineCount": 77,
+      "Confidence": 0.92,
+      "Preview": "However, participants can till be -\u00B7 e rarge of opportunity attacks from creatw .: o participating"
+    },
+    {
+      "SectionIndex": 241,
+      "Title": "Page 252",
+      "StartLine": 28216,
+      "EndLine": 28350,
+      "LineCount": 134,
+      "Confidence": 0.92,
+      "Preview": "**WILDERNESS** **CHASE** **COMPLICATIONS**"
+    },
+    {
+      "SectionIndex": 242,
+      "Title": "Page 253",
+      "StartLine": 28351,
+      "EndLine": 28491,
+      "LineCount": 140,
+      "Confidence": 0.92,
+      "Preview": "or allow some of the quarry to escape. If a pursuit splits into several smaller chases, resolve each chase"
+    },
+    {
+      "SectionIndex": 243,
+      "Title": "Page 254",
+      "StartLine": 28492,
+      "EndLine": 28562,
+      "LineCount": 70,
+      "Confidence": 0.92,
+      "Preview": "SIEGE TOWER _Gargantuan object_"
+    },
+    {
+      "SectionIndex": 244,
+      "Title": "Page 255",
+      "StartLine": 28563,
+      "EndLine": 28710,
+      "LineCount": 147,
+      "Confidence": 0.92,
+      "Preview": "~A CKLE FEVER"
+    },
+    {
+      "SectionIndex": 245,
+      "Title": "Page 256",
+      "StartLine": 28711,
+      "EndLine": 28853,
+      "LineCount": 142,
+      "Confidence": 0.92,
+      "Preview": "and is poisoned for 24 hours. On a successful save, the creature takes half damage and isn\u0027t poisoned."
+    },
+    {
+      "SectionIndex": 246,
+      "Title": "Page 257",
+      "StartLine": 28854,
+      "EndLine": 28934,
+      "LineCount": 80,
+      "Confidence": 0.92,
+      "Preview": "the extraordinarily horrific nature of the threats the adventurers face."
+    },
+    {
+      "SectionIndex": 247,
+      "Title": "Page 258",
+      "StartLine": 28935,
+      "EndLine": 29070,
+      "LineCount": 135,
+      "Confidence": 0.92,
+      "Preview": "**LONG-TERM** **MADNESS**"
+    },
+    {
+      "SectionIndex": 248,
+      "Title": "Page 259",
+      "StartLine": 29071,
+      "EndLine": 29142,
+      "LineCount": 71,
+      "Confidence": 0.92,
+      "Preview": "NONCOMBAT CHALLE .. GES ------:You decide whether to award experience to characters for overcoming challenges out ide combat. If the"
+    },
+    {
+      "SectionIndex": 249,
+      "Title": "Page 261",
+      "StartLine": 29143,
+      "EndLine": 29301,
+      "LineCount": 158,
+      "Confidence": 0.92,
+      "Preview": "**CHAPTER** **9:** **DuNGEON** **MASTER\u0027s WoRKSHOP**"
+    },
+    {
+      "SectionIndex": 250,
+      "Title": "Page 262",
+      "StartLine": 29302,
+      "EndLine": 29442,
+      "LineCount": 140,
+      "Confidence": 0.92,
+      "Preview": "This option removes skills from the game and doesn\u0027t allow for much distinction among characters."
+    },
+    {
+      "SectionIndex": 251,
+      "Title": "Page 263",
+      "StartLine": 29443,
+      "EndLine": 29534,
+      "LineCount": 91,
+      "Confidence": 0.92,
+      "Preview": "Honor measures not only a character\u0027s devotion to a code but also the character\u0027s understand ing of it. The"
+    },
+    {
+      "SectionIndex": 252,
+      "Title": "Page 264",
+      "StartLine": 29535,
+      "EndLine": 29601,
+      "LineCount": 66,
+      "Confidence": 0.92,
+      "Preview": "A fa iled Sanity save might result in short-term, longterm, or indefinite madness, as described in chapter 8, \u0022Running the Game.\u0022 Any time a character suffers from"
+    },
+    {
+      "SectionIndex": 253,
+      "Title": "Page 265",
+      "StartLine": 29602,
+      "EndLine": 29741,
+      "LineCount": 139,
+      "Confidence": 0.92,
+      "Preview": "A character who uses a healing surge ca n\u0027t do so again until he or she finishes a short or long rest."
+    },
+    {
+      "SectionIndex": 254,
+      "Title": "Page 266",
+      "StartLine": 29742,
+      "EndLine": 29873,
+      "LineCount": 131,
+      "Confidence": 0.92,
+      "Preview": "A character can bind sticks of dynamite together so they explode at the same time. Each additional stick"
+    },
+    {
+      "SectionIndex": 255,
+      "Title": "Page 267",
+      "StartLine": 29874,
+      "EndLine": 29940,
+      "LineCount": 66,
+      "Confidence": 0.92,
+      "Preview": "**PLOT** POINTS"
+    },
+    {
+      "SectionIndex": 256,
+      "Title": "Page 268",
+      "StartLine": 29941,
+      "EndLine": 30007,
+      "LineCount": 66,
+      "Confidence": 0.92,
+      "Preview": "For this approach to work, it\u0027s a good idea to establish some shared assumptions about the campaign so that"
+    },
+    {
+      "SectionIndex": 257,
+      "Title": "Page 269",
+      "StartLine": 30008,
+      "EndLine": 30176,
+      "LineCount": 168,
+      "Confidence": 0.92,
+      "Preview": "_Initiative Modifiers._ Modifiers might apply to a -eature\u0027s initiative depending on its size and the action"
+    },
+    {
+      "SectionIndex": 258,
+      "Title": "Page 270",
+      "StartLine": 30177,
+      "EndLine": 30308,
+      "LineCount": 131,
+      "Confidence": 0.92,
+      "Preview": "OVERRUN When a creature tries to move through a hostile"
+    },
+    {
+      "SectionIndex": 259,
+      "Title": "Page 271",
+      "StartLine": 30309,
+      "EndLine": 30457,
+      "LineCount": 148,
+      "Confidence": 0.92,
+      "Preview": "Instead of using the effect described in the table, you can put the responsibility of representing a character\u0027s"
+    },
+    {
+      "SectionIndex": 260,
+      "Title": "Page 272",
+      "StartLine": 30458,
+      "EndLine": 30556,
+      "LineCount": 98,
+      "Confidence": 0.92,
+      "Preview": "consequences of switching from a one-handed weapon want to create something more akin to the monster to a two-handed weapon, or vice versa. For example, a stat blocks in the _Monster Manual,_ skip ahead to the"
+    },
+    {
+      "SectionIndex": 261,
+      "Title": "Page 273",
+      "StartLine": 30557,
+      "EndLine": 30706,
+      "LineCount": 149,
+      "Confidence": 0.92,
+      "Preview": "~75"
+    },
+    {
+      "SectionIndex": 262,
+      "Title": "Page 274",
+      "StartLine": 30707,
+      "EndLine": 30774,
+      "LineCount": 67,
+      "Confidence": 0.92,
+      "Preview": "challenge rating 1 monster is 13, but if your monster is well armored, raise its AC accordingly. Don\u0027t worry if"
+    },
+    {
+      "SectionIndex": 263,
+      "Title": "Page 275",
+      "StartLine": 30775,
+      "EndLine": 30912,
+      "LineCount": 137,
+      "Confidence": 0.92,
+      "Preview": "STEP 9. DAMAGE VuL \u0022ER..\u0027\\BI LITI ES, RESISTANCES, AND hnn ; . \u0022ITIE"
+    },
+    {
+      "SectionIndex": 264,
+      "Title": "Page 276",
+      "StartLine": 30913,
+      "EndLine": 31033,
+      "LineCount": 120,
+      "Confidence": 0.92,
+      "Preview": "I,"
+    },
+    {
+      "SectionIndex": 265,
+      "Title": "Page 277",
+      "StartLine": 31034,
+      "EndLine": 31166,
+      "LineCount": 132,
+      "Confidence": 0.92,
+      "Preview": "The Monster Features table list \\\u00B7arious features that you can plunder from the _Monster j\\tfanual._ The table"
+    },
+    {
+      "SectionIndex": 266,
+      "Title": "Page 278",
+      "StartLine": 31167,
+      "EndLine": 31277,
+      "LineCount": 110,
+      "Confidence": 0.92,
+      "Preview": "**MONSTER** **FEATURES**"
+    },
+    {
+      "SectionIndex": 267,
+      "Title": "Page 279",
+      "StartLine": 31278,
+      "EndLine": 31446,
+      "LineCount": 168,
+      "Confidence": 0.92,
+      "Preview": "Effect on Challenge Rating"
+    },
+    {
+      "SectionIndex": 268,
+      "Title": "Page 280",
+      "StartLine": 31447,
+      "EndLine": 31593,
+      "LineCount": 146,
+      "Confidence": 0.92,
+      "Preview": "If you want to take an NPC stat block and adapt it for a specific monster race, apply the ability modifiers and"
+    },
+    {
+      "SectionIndex": 269,
+      "Title": "Page 281",
+      "StartLine": 31594,
+      "EndLine": 31688,
+      "LineCount": 94,
+      "Confidence": 0.92,
+      "Preview": "The NPC Features table summarizes the ability modifiers and features of variou nonh uman races, as"
+    },
+    {
+      "SectionIndex": 270,
+      "Title": "Page 282",
+      "StartLine": 31689,
+      "EndLine": 31757,
+      "LineCount": 68,
+      "Confidence": 0.92,
+      "Preview": "**SPELL** **DAMAGE**"
+    },
+    {
+      "SectionIndex": 271,
+      "Title": "Page 283",
+      "StartLine": 31758,
+      "EndLine": 31897,
+      "LineCount": 139,
+      "Confidence": 0.92,
+      "Preview": "The simpler your approach. the easier it is for a character to use the item in play. Giving the item"
+    },
+    {
+      "SectionIndex": 272,
+      "Title": "Page 284",
+      "StartLine": 31898,
+      "EndLine": 31988,
+      "LineCount": 90,
+      "Confidence": 0.92,
+      "Preview": "limited use of the _misty step_ spell. Since _misty step_ is a 2nd-level spell, this ability is potent enough that the"
+    },
+    {
+      "SectionIndex": 273,
+      "Title": "Page 285",
+      "StartLine": 31989,
+      "EndLine": 32125,
+      "LineCount": 136,
+      "Confidence": 0.92,
+      "Preview": "_**Age.**_ Aasimar mature at the arne rate as humans but live a few years longer."
+    },
+    {
+      "SectionIndex": 274,
+      "Title": "Page 286",
+      "StartLine": 32126,
+      "EndLine": 32239,
+      "LineCount": 113,
+      "Confidence": 0.92,
+      "Preview": "Once you have the concept for the class option in mind, it\u0027s time to design the specifics. If you\u0027re not sure"
+    },
+    {
+      "SectionIndex": 275,
+      "Title": "Page 287",
+      "StartLine": 32240,
+      "EndLine": 32362,
+      "LineCount": 122,
+      "Confidence": 0.92,
+      "Preview": "**SPELL** **POINTS** **BY** **LEVEL**"
+    },
+    {
+      "SectionIndex": 276,
+      "Title": "Page 288",
+      "StartLine": 32363,
+      "EndLine": 32533,
+      "LineCount": 170,
+      "Confidence": 0.92,
+      "Preview": "**APPENDIX A:** **RANDOM** **DUNGEONS**"
+    },
+    {
+      "SectionIndex": 277,
+      "Title": "Page 289",
+      "StartLine": 32534,
+      "EndLine": 32733,
+      "LineCount": 199,
+      "Confidence": 0.92,
+      "Preview": "**DOORS**"
+    },
+    {
+      "SectionIndex": 278,
+      "Title": "Page 290",
+      "StartLine": 32734,
+      "EndLine": 32811,
+      "LineCount": 77,
+      "Confidence": 0.92,
+      "Preview": "**CONNECTING AREAS** When your map is done, consider adding doors between"
+    },
+    {
+      "SectionIndex": 279,
+      "Title": "Page 291",
+      "StartLine": 32812,
+      "EndLine": 33074,
+      "LineCount": 262,
+      "Confidence": 0.92,
+      "Preview": "**DUNGEO N:** LAIR"
+    },
+    {
+      "SectionIndex": 280,
+      "Title": "Page 292",
+      "StartLine": 33075,
+      "EndLine": 33306,
+      "LineCount": 231,
+      "Confidence": 0.92,
+      "Preview": "**DUNGEON:** **STRONGHOLD**"
+    },
+    {
+      "SectionIndex": 281,
+      "Title": "Page 293",
+      "StartLine": 33307,
+      "EndLine": 33474,
+      "LineCount": 167,
+      "Confidence": 0.92,
+      "Preview": "**DUNGEON:** **TOMB**"
+    },
+    {
+      "SectionIndex": 282,
+      "Title": "Page 294",
+      "StartLine": 33475,
+      "EndLine": 33622,
+      "LineCount": 147,
+      "Confidence": 0.92,
+      "Preview": "**CHAMBER** **CONTENTS**"
+    },
+    {
+      "SectionIndex": 283,
+      "Title": "Page 295",
+      "StartLine": 33623,
+      "EndLine": 33861,
+      "LineCount": 238,
+      "Confidence": 0.92,
+      "Preview": "d20 Obstacle"
+    },
+    {
+      "SectionIndex": 284,
+      "Title": "Page 296",
+      "StartLine": 33862,
+      "EndLine": 34009,
+      "LineCount": 147,
+      "Confidence": 0.92,
+      "Preview": "**TRICK** **OBJECTS** **RANDOM TREASURES** **d20** **Object** **d20** **Object** Use the tables and guidelines in chapter 7, \u0022Treasure\u0022 to"
+    },
+    {
+      "SectionIndex": 285,
+      "Title": "Page 297",
+      "StartLine": 34010,
+      "EndLine": 34700,
+      "LineCount": 690,
+      "Confidence": 0.92,
+      "Preview": "**AIR**"
+    },
+    {
+      "SectionIndex": 286,
+      "Title": "Page 298",
+      "StartLine": 34701,
+      "EndLine": 35292,
+      "LineCount": 591,
+      "Confidence": 0.92,
+      "Preview": "**RELIGIOUS** **ARTICLES** **AND** **FURNISHINGS**"
+    },
+    {
+      "SectionIndex": 287,
+      "Title": "Page 299",
+      "StartLine": 35293,
+      "EndLine": 35364,
+      "LineCount": 71,
+      "Confidence": 0.92,
+      "Preview": "**CONTAINER** **CONTENTS**"
+    },
+    {
+      "SectionIndex": 288,
+      "Title": "Page 300",
+      "StartLine": 35365,
+      "EndLine": 35487,
+      "LineCount": 122,
+      "Confidence": 0.92,
+      "Preview": "**APPENDIX** **B:** **MONSTER LISTS**"
+    },
+    {
+      "SectionIndex": 289,
+      "Title": "Page 301",
+      "StartLine": 35488,
+      "EndLine": 35556,
+      "LineCount": 68,
+      "Confidence": 0.92,
+      "Preview": "**Monsters** **Challenge** **Rating** **(XP)**"
+    },
+    {
+      "SectionIndex": 290,
+      "Title": "Page 302",
+      "StartLine": 35557,
+      "EndLine": 35840,
+      "LineCount": 283,
+      "Confidence": 0.92,
+      "Preview": "**HILL** **MONSTERS**"
+    },
+    {
+      "SectionIndex": 291,
+      "Title": "Page 303",
+      "StartLine": 35841,
+      "EndLine": 35930,
+      "LineCount": 89,
+      "Confidence": 0.92,
+      "Preview": "**UNDERDARK** **MONSTERS** **UNDERWATER** **MONSTERS**"
+    },
+    {
+      "SectionIndex": 292,
+      "Title": "Page 304",
+      "StartLine": 35931,
+      "EndLine": 36253,
+      "LineCount": 322,
+      "Confidence": 0.92,
+      "Preview": "**CHALLENGE** **1/2** **(100** **XP)**"
+    },
+    {
+      "SectionIndex": 293,
+      "Title": "Page 305",
+      "StartLine": 36254,
+      "EndLine": 36497,
+      "LineCount": 243,
+      "Confidence": 0.92,
+      "Preview": "Nightmare"
+    },
+    {
+      "SectionIndex": 294,
+      "Title": "Page 306",
+      "StartLine": 36498,
+      "EndLine": 36735,
+      "LineCount": 237,
+      "Confidence": 0.92,
+      "Preview": "**CHALLENGE** **6 (2,300 XP)**"
+    },
+    {
+      "SectionIndex": 295,
+      "Title": "Page 307",
+      "StartLine": 36736,
+      "EndLine": 36809,
+      "LineCount": 73,
+      "Confidence": 0.92,
+      "Preview": "**CHALLENGE** **11** **(7,200 XP)** Vampire Mummy lord (in lair) **CHALLENGE** **21** **(33,000 XP)**"
+    },
+    {
+      "SectionIndex": 296,
+      "Title": "Page 308",
+      "StartLine": 36810,
+      "EndLine": 36834,
+      "LineCount": 24,
+      "Confidence": 0.92,
+      "Preview": "**APPENDIX** **C:** **MAPS**"
+    },
+    {
+      "SectionIndex": 297,
+      "Title": "Page 310",
+      "StartLine": 36835,
+      "EndLine": 36838,
+      "LineCount": 3,
+      "Confidence": 0.92,
+      "Preview": "APPENDIX C I MAPS"
+    },
+    {
+      "SectionIndex": 298,
+      "Title": "Page 311",
+      "StartLine": 36839,
+      "EndLine": 36840,
+      "LineCount": 1,
+      "Confidence": 0.84,
+      "Preview": ""
+    },
+    {
+      "SectionIndex": 299,
+      "Title": "I\u2022",
+      "StartLine": 36841,
+      "EndLine": 36846,
+      "LineCount": 5,
+      "Confidence": 0.92,
+      "Preview": "I"
+    },
+    {
+      "SectionIndex": 300,
+      "Title": "Page 312",
+      "StartLine": 36847,
+      "EndLine": 36850,
+      "LineCount": 3,
+      "Confidence": 0.92,
+      "Preview": "APPENDiX C I MAPS"
+    },
+    {
+      "SectionIndex": 301,
+      "Title": "Page 313",
+      "StartLine": 36851,
+      "EndLine": 36860,
+      "LineCount": 9,
+      "Confidence": 0.92,
+      "Preview": "N W.E"
+    },
+    {
+      "SectionIndex": 302,
+      "Title": "Page 314",
+      "StartLine": 36861,
+      "EndLine": 36870,
+      "LineCount": 9,
+      "Confidence": 0.92,
+      "Preview": "**APPENDIX D:** **DUNGEON MASTER INSPIRATION**"
+    },
+    {
+      "SectionIndex": 303,
+      "Title": "J more ~ inspirational reading, see appendix E of the Cordingly, David. Under the Black Flag.",
+      "StartLine": 36871,
+      "EndLine": 36947,
+      "LineCount": 76,
+      "Confidence": 0.92,
+      "Preview": "ERE ARE SEVE RAL INSPIRI NG WORKS T HAT CAN help you become a better storyteller, writer,"
+    },
+    {
+      "SectionIndex": 304,
+      "Title": "Page 315",
+      "StartLine": 36948,
+      "EndLine": 37022,
+      "LineCount": 74,
+      "Confidence": 0.92,
+      "Preview": "**INDEX** bringing back the dead, 24 creating a campaign _(cont.)_ creating an encounter, 81-85, brown mold, 105 s tor y, 125 102"
+    },
+    {
+      "SectionIndex": 305,
+      "Title": "Page 316",
+      "StartLine": 37023,
+      "EndLine": 37096,
+      "LineCount": 73,
+      "Confidence": 0.92,
+      "Preview": "creating a wi lderness, 14, El emental Chaos, 52-53 greater deity, 11 magic, 9-10, 23-24. _See_ 25-26, 73, 106-112, Elemental Planes. _See_ Inner Great Wheel, 44 _also_ creating a magic item;"
+    },
+    {
+      "SectionIndex": 306,
+      "Title": "Page 317",
+      "StartLine": 37097,
+      "EndLine": 37313,
+      "LineCount": 216,
+      "Confidence": 0.92,
+      "Preview": "monsters _(cont.)_"
+    },
+    {
+      "SectionIndex": 307,
+      "Title": "Page 318",
+      "StartLine": 37314,
+      "EndLine": 37351,
+      "LineCount": 37,
+      "Confidence": 0.92,
+      "Preview": "shipwrecks, 118 structure (ad venture), 72 training, 131, 231 short rest, 84, 267 stuck doors, 103 to gain levels, 131"
+    }
+  ]
+}
