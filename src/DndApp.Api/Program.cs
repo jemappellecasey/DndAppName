@@ -1,10 +1,12 @@
 using DndApp.Api.CustomContent;
 using DndApp.Api.Items;
+using DndApp.Api.Mechanics;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<ICustomContentValidationService, CustomContentValidationService>();
 builder.Services.AddSingleton<IItemEffectPipelineService, ItemEffectPipelineService>();
+builder.Services.AddSingleton<ICalculationEngineService, CalculationEngineService>();
 
 var app = builder.Build();
 
@@ -93,6 +95,30 @@ app.MapPost(
             result.DerivedStats,
             result.Breakdown
         });
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/compute/check",
+    (Guid characterId, ComputeCheckRequest request, ICalculationEngineService calculations) =>
+    {
+        var result = calculations.ComputeCheck(request);
+        return Results.Ok(new { characterId, result });
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/compute/save",
+    (Guid characterId, ComputeSaveRequest request, ICalculationEngineService calculations) =>
+    {
+        var result = calculations.ComputeSave(request);
+        return Results.Ok(new { characterId, result });
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/compute/attack",
+    (Guid characterId, ComputeAttackRequest request, ICalculationEngineService calculations) =>
+    {
+        var result = calculations.ComputeAttack(request);
+        return Results.Ok(new { characterId, result });
     });
 
 app.Run();
