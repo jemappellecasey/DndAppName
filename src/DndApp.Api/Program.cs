@@ -1,8 +1,10 @@
 using DndApp.Api.CustomContent;
+using DndApp.Api.Items;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<ICustomContentValidationService, CustomContentValidationService>();
+builder.Services.AddSingleton<IItemEffectPipelineService, ItemEffectPipelineService>();
 
 var app = builder.Build();
 
@@ -78,6 +80,19 @@ app.MapPost(
         };
 
         return Results.Ok(response);
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/items/apply-effects",
+    (Guid characterId, ApplyItemEffectsRequest request, IItemEffectPipelineService pipeline) =>
+    {
+        var result = pipeline.ApplyEffects(request);
+        return Results.Ok(new
+        {
+            characterId,
+            result.DerivedStats,
+            result.Breakdown
+        });
     });
 
 app.Run();
