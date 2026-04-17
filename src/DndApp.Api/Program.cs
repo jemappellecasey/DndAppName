@@ -44,6 +44,7 @@ builder.Services.AddSingleton<ICalculationEngineService, CalculationEngineServic
 builder.Services.AddSingleton<IMixedRulesResolutionService, MixedRulesResolutionService>();
 builder.Services.AddSingleton<ICharacterWizardService, CharacterWizardService>();
 builder.Services.AddSingleton<ILocalAuthService, LocalAuthService>();
+builder.Services.AddScoped<ICharacterBuildService, CharacterBuildService>();
 
 var app = builder.Build();
 
@@ -390,6 +391,47 @@ app.MapPost(
     {
         var result = wizardService.CopyToRuleset(characterId, request);
         return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/build",
+    async (Guid characterId, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
+    {
+        var build = await buildService.GetBuildAsync(characterId, cancellationToken);
+        return build is null ? Results.NotFound() : Results.Ok(build);
+    });
+
+app.MapPut(
+    "/characters/{characterId:guid}/build",
+    async (Guid characterId, UpsertCharacterBuildRequest request, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
+    {
+        var result = await buildService.UpsertBuildAsync(characterId, request, cancellationToken);
+        return result.Errors.Count > 0
+            ? Results.BadRequest(new { errors = result.Errors })
+            : Results.Ok(result.Data);
+    });
+
+app.MapPatch(
+    "/characters/{characterId:guid}/build",
+    async (Guid characterId, PatchCharacterBuildRequest request, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
+    {
+        var result = await buildService.PatchBuildAsync(characterId, request, cancellationToken);
+        if (result.Data is null && result.Errors.Count == 1 && string.Equals(result.Errors[0], "Character build was not found.", StringComparison.Ordinal))
+        {
+            return Results.NotFound(new { errors = result.Errors });
+        }
+
+        return result.Errors.Count > 0
+            ? Results.BadRequest(new { errors = result.Errors })
+            : Results.Ok(result.Data);
+    });
+
+app.MapDelete(
+    "/characters/{characterId:guid}/build",
+    async (Guid characterId, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
+    {
+        var deleted = await buildService.DeleteBuildAsync(characterId, cancellationToken);
+        return deleted ? Results.NoContent() : Results.NotFound();
     });
 
 app.Run();

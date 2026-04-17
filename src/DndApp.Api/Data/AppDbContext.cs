@@ -21,6 +21,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<ConstraintEntity> Constraints => Set<ConstraintEntity>();
     public DbSet<ItemDefinitionEntity> ItemDefinitions => Set<ItemDefinitionEntity>();
     public DbSet<ItemEffectEntity> ItemEffects => Set<ItemEffectEntity>();
+    public DbSet<CharacterSheetEntity> CharacterSheets => Set<CharacterSheetEntity>();
+    public DbSet<CharacterAbilityScoreEntity> CharacterAbilityScores => Set<CharacterAbilityScoreEntity>();
+    public DbSet<CharacterSkillProficiencyEntity> CharacterSkillProficiencies => Set<CharacterSkillProficiencyEntity>();
     public DbSet<IngestionRunEntity> IngestionRuns => Set<IngestionRunEntity>();
     public DbSet<ReviewQueueEntity> ReviewQueue => Set<ReviewQueueEntity>();
     public DbSet<CorrectionOverrideEntity> CorrectionOverrides => Set<CorrectionOverrideEntity>();
@@ -192,6 +195,43 @@ public sealed class AppDbContext : DbContext
             entity.HasOne<ItemDefinitionEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.ItemDefinitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterSheetEntity>(entity =>
+        {
+            entity.ToTable("character_sheet");
+            entity.HasKey(x => x.CharacterId);
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.CharacterName).HasMaxLength(160);
+            entity.Property(x => x.BaseRuleSystem).HasMaxLength(24);
+            entity.Property(x => x.BuildMethod).HasMaxLength(24);
+            entity.Property(x => x.ClassModuleId).HasMaxLength(64);
+            entity.Property(x => x.ClassName).HasMaxLength(160);
+            entity.HasIndex(x => x.ClassModuleId);
+        });
+
+        modelBuilder.Entity<CharacterAbilityScoreEntity>(entity =>
+        {
+            entity.ToTable("character_ability_score");
+            entity.HasKey(x => new { x.CharacterId, x.AbilityName });
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.AbilityName).HasMaxLength(24);
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterSkillProficiencyEntity>(entity =>
+        {
+            entity.ToTable("character_skill_proficiency");
+            entity.HasKey(x => new { x.CharacterId, x.SkillName });
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.SkillName).HasMaxLength(64);
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -146,6 +146,12 @@ Outputs are written under:
 5. `POST /characters/{characterId}/compute/save`
 6. `POST /characters/{characterId}/compute/attack`
 
+### Persistent character build (phase 2)
+1. `GET /characters/{characterId}/build`
+2. `PUT /characters/{characterId}/build`
+3. `PATCH /characters/{characterId}/build`
+4. `DELETE /characters/{characterId}/build`
+
 ### Content catalogs (database-backed)
 1. `GET /catalog/classes?ruleSystem={Rules2014|Rules2024}`
 2. `GET /catalog/items`
