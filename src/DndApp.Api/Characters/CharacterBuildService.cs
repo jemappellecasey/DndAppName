@@ -25,10 +25,12 @@ public sealed class CharacterBuildService : ICharacterBuildService
     };
 
     private readonly AppDbContext _db;
+    private readonly IRuleValidationService _validation;
 
-    public CharacterBuildService(AppDbContext db)
+    public CharacterBuildService(AppDbContext db, IRuleValidationService validation)
     {
         _db = db;
+        _validation = validation;
     }
 
     public Task<CharacterBuildData?> GetBuildAsync(Guid characterId, CancellationToken cancellationToken)
@@ -52,6 +54,17 @@ public sealed class CharacterBuildService : ICharacterBuildService
         if (errors.Count > 0)
         {
             return (null, errors);
+        }
+
+        var ruleErrors = await _validation.ValidateClassSelectionAsync(
+            request.ClassModuleId,
+            request.BaseRuleSystem,
+            request.AbilityScores,
+            request.Level,
+            cancellationToken);
+        if (ruleErrors.Count > 0)
+        {
+            return (null, ruleErrors);
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -106,6 +119,8 @@ public sealed class CharacterBuildService : ICharacterBuildService
             .ToArrayAsync(cancellationToken);
 
         var mergedCharacterName = request.CharacterName?.Trim() ?? sheet.CharacterName;
+        var mergedBaseRuleSystem = request.BaseRuleSystem ?? Enum.Parse<RuleSystemMode>(sheet.BaseRuleSystem, ignoreCase: true);
+        var mergedBuildMethod = request.BuildMethod ?? Enum.Parse<CharacterBuildMethod>(sheet.BuildMethod, ignoreCase: true);
         var mergedClassModuleId = request.ClassModuleId?.Trim() ?? sheet.ClassModuleId;
         var mergedClassName = request.ClassName?.Trim() ?? sheet.ClassName;
         var mergedLevel = request.Level ?? sheet.Level;
@@ -126,11 +141,22 @@ public sealed class CharacterBuildService : ICharacterBuildService
             return (null, errors);
         }
 
+        var ruleErrors = await _validation.ValidateClassSelectionAsync(
+            mergedClassModuleId,
+            mergedBaseRuleSystem,
+            mergedAbilities,
+            mergedLevel,
+            cancellationToken);
+        if (ruleErrors.Count > 0)
+        {
+            return (null, ruleErrors);
+        }
+
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
         sheet.CharacterName = mergedCharacterName;
-        sheet.BaseRuleSystem = (request.BaseRuleSystem ?? Enum.Parse<RuleSystemMode>(sheet.BaseRuleSystem, ignoreCase: true)).ToString();
-        sheet.BuildMethod = (request.BuildMethod ?? Enum.Parse<CharacterBuildMethod>(sheet.BuildMethod, ignoreCase: true)).ToString();
+        sheet.BaseRuleSystem = mergedBaseRuleSystem.ToString();
+        sheet.BuildMethod = mergedBuildMethod.ToString();
         sheet.ClassModuleId = mergedClassModuleId;
         sheet.ClassName = mergedClassName;
         sheet.Level = mergedLevel;

@@ -47,6 +47,7 @@ builder.Services.AddSingleton<ILocalAuthService, LocalAuthService>();
 builder.Services.AddScoped<ICharacterBuildService, CharacterBuildService>();
 builder.Services.AddScoped<ICharacterInventoryService, CharacterInventoryService>();
 builder.Services.AddScoped<ICharacterComputationService, CharacterComputationService>();
+builder.Services.AddScoped<IRuleValidationService, RuleValidationService>();
 
 var app = builder.Build();
 

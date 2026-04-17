@@ -16,7 +16,7 @@ public sealed class CharacterInventoryServiceTests
         SeedCharacterBuild(fixture.Db, characterId);
         SeedItemDefinition(fixture.Db, "item-cloak", true, "Cloak");
         await fixture.Db.SaveChangesAsync();
-        var service = new CharacterInventoryService(fixture.Db, new ItemEffectPipelineService());
+        var service = new CharacterInventoryService(fixture.Db, new ItemEffectPipelineService(), new RuleValidationService(fixture.Db));
 
         var added = await service.AddItemAsync(characterId, new AddInventoryItemRequest("item-cloak"), CancellationToken.None);
 
@@ -38,7 +38,7 @@ public sealed class CharacterInventoryServiceTests
         SeedItemDefinition(fixture.Db, "item-3", true, "Item 3");
         SeedItemDefinition(fixture.Db, "item-4", true, "Item 4");
         await fixture.Db.SaveChangesAsync();
-        var service = new CharacterInventoryService(fixture.Db, new ItemEffectPipelineService());
+        var service = new CharacterInventoryService(fixture.Db, new ItemEffectPipelineService(), new RuleValidationService(fixture.Db));
 
         var i1 = (await service.AddItemAsync(characterId, new AddInventoryItemRequest("item-1"), CancellationToken.None)).State!.Items[0];
         var i2 = (await service.AddItemAsync(characterId, new AddInventoryItemRequest("item-2"), CancellationToken.None)).State!.Items[1];
@@ -55,6 +55,31 @@ public sealed class CharacterInventoryServiceTests
         Assert.Contains(fourth.State.Errors, x => x.Contains("Attunement cap", StringComparison.OrdinalIgnoreCase));
         var fourthItem = fourth.State.Items.Single(x => x.InventoryItemId == i4.InventoryItemId);
         Assert.False(fourthItem.IsAttuned);
+    }
+
+    [Fact]
+    public async Task AddItem_RejectsIncompatibleRuleSource()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var characterId = Guid.NewGuid();
+        SeedCharacterBuild(fixture.Db, characterId);
+        fixture.Db.RuleSystems.Add(new RuleSystemEntity { Id = "rules-2014", Name = "Rules 2014" });
+        fixture.Db.ContentSources.Add(new ContentSourceEntity
+        {
+            Id = "content-source-2014",
+            RuleSystemId = "rules-2014",
+            Code = "PHB2014",
+            Name = "Test Source 2014",
+        });
+        SeedItemDefinition(fixture.Db, "item-legacy", true, "Legacy Item", "content-source-2014");
+        await fixture.Db.SaveChangesAsync();
+        var service = new CharacterInventoryService(fixture.Db, new ItemEffectPipelineService(), new RuleValidationService(fixture.Db));
+
+        var added = await service.AddItemAsync(characterId, new AddInventoryItemRequest("item-legacy"), CancellationToken.None);
+
+        Assert.Null(added.State);
+        Assert.NotEmpty(added.Errors);
+        Assert.Contains(added.Errors, x => x.Contains("incompatible", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void SeedCharacterBuild(AppDbContext db, Guid characterId)
@@ -84,13 +109,18 @@ public sealed class CharacterInventoryServiceTests
         });
     }
 
-    private static void SeedItemDefinition(AppDbContext db, string itemId, bool requiresAttunement, string moduleDisplayName)
+    private static void SeedItemDefinition(
+        AppDbContext db,
+        string itemId,
+        bool requiresAttunement,
+        string moduleDisplayName,
+        string sourceId = "content-source-test")
     {
         var moduleId = $"module-{itemId}";
         db.RuleModules.Add(new RuleModuleEntity
         {
             Id = moduleId,
-            ContentSourceId = "content-source-test",
+            ContentSourceId = sourceId,
             ModuleType = "item",
             Slug = itemId,
             DisplayName = moduleDisplayName,

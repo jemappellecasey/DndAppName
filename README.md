@@ -164,6 +164,10 @@ Outputs are written under:
 3. `POST /characters/{characterId}/compute/save/persisted`
 4. `POST /characters/{characterId}/compute/attack/persisted`
 
+### Rule validation (phase 5)
+1. `PUT /characters/{characterId}/build` and `PATCH /characters/{characterId}/build` now validate class-module compatibility and prerequisite predicates from `prerequisite`.
+2. `POST /characters/{characterId}/inventory/items` now validates item source compatibility and prerequisite predicates before persisting.
+
 ### Content catalogs (database-backed)
 1. `GET /catalog/classes?ruleSystem={Rules2014|Rules2024}`
 2. `GET /catalog/items`

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DndApp.Api.Data;
 using DndApp.Api.Items;
+using DndApp.Api.MixedRules;
 using Microsoft.EntityFrameworkCore;
 
 namespace DndApp.Api.Characters;
@@ -17,11 +18,13 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
 {
     private readonly AppDbContext _db;
     private readonly IItemEffectPipelineService _pipeline;
+    private readonly IRuleValidationService _validation;
 
-    public CharacterInventoryService(AppDbContext db, IItemEffectPipelineService pipeline)
+    public CharacterInventoryService(AppDbContext db, IItemEffectPipelineService pipeline, IRuleValidationService validation)
     {
         _db = db;
         _pipeline = pipeline;
+        _validation = validation;
     }
 
     public Task<CharacterInventoryState?> GetInventoryAsync(Guid characterId, CancellationToken cancellationToken)
@@ -40,11 +43,14 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
         }
 
         var characterIdText = characterId.ToString();
-        var hasBuild = await _db.CharacterSheets.AnyAsync(x => x.CharacterId == characterIdText, cancellationToken);
-        if (!hasBuild)
+        var sheet = await _db.CharacterSheets.AsNoTracking().SingleOrDefaultAsync(x => x.CharacterId == characterIdText, cancellationToken);
+        if (sheet is null)
         {
             return (null, new[] { "Character build was not found. Create character build before inventory operations." });
         }
+        var abilityScores = await _db.CharacterAbilityScores.AsNoTracking()
+            .Where(x => x.CharacterId == characterIdText)
+            .ToDictionaryAsync(x => x.AbilityName, x => x.Score, cancellationToken);
 
         var itemDefinition = await _db.ItemDefinitions
             .AsNoTracking()
@@ -52,6 +58,18 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
         if (itemDefinition is null)
         {
             return (null, new[] { $"Item definition '{request.ItemDefinitionId}' was not found." });
+        }
+
+        var baseRuleSystem = Enum.Parse<RuleSystemMode>(sheet.BaseRuleSystem, ignoreCase: true);
+        var validationErrors = await _validation.ValidateInventoryItemAsync(
+            request.ItemDefinitionId,
+            baseRuleSystem,
+            abilityScores,
+            sheet.Level,
+            cancellationToken);
+        if (validationErrors.Count > 0)
+        {
+            return (null, validationErrors);
         }
 
         var itemName = await (
