@@ -158,6 +158,12 @@ Outputs are written under:
 3. `PATCH /characters/{characterId}/inventory/items/{inventoryItemId}`
 4. `DELETE /characters/{characterId}/inventory/items/{inventoryItemId}`
 
+### Persisted calculations (phase 4)
+1. `GET /characters/{characterId}/compute/derived-stats`
+2. `POST /characters/{characterId}/compute/check/persisted`
+3. `POST /characters/{characterId}/compute/save/persisted`
+4. `POST /characters/{characterId}/compute/attack/persisted`
+
 ### Content catalogs (database-backed)
 1. `GET /catalog/classes?ruleSystem={Rules2014|Rules2024}`
 2. `GET /catalog/items`

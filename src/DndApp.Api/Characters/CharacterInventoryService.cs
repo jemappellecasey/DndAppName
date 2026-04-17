@@ -300,7 +300,7 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
                 return null;
             }
 
-            return doc.RootElement.EnumerateObject().ToDictionary(x => x.Name, x => x.Value, StringComparer.OrdinalIgnoreCase);
+            return doc.RootElement.EnumerateObject().ToDictionary(x => x.Name, x => x.Value.Clone(), StringComparer.OrdinalIgnoreCase);
         }
         catch
         {

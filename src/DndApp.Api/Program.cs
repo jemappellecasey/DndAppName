@@ -46,6 +46,7 @@ builder.Services.AddSingleton<ICharacterWizardService, CharacterWizardService>()
 builder.Services.AddSingleton<ILocalAuthService, LocalAuthService>();
 builder.Services.AddScoped<ICharacterBuildService, CharacterBuildService>();
 builder.Services.AddScoped<ICharacterInventoryService, CharacterInventoryService>();
+builder.Services.AddScoped<ICharacterComputationService, CharacterComputationService>();
 
 var app = builder.Build();
 
@@ -336,6 +337,46 @@ app.MapPost(
     {
         var result = calculations.ComputeAttack(request);
         return Results.Ok(new { characterId, result });
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/compute/derived-stats",
+    async (Guid characterId, ICharacterComputationService computations, CancellationToken cancellationToken) =>
+    {
+        var result = await computations.GetDerivedStatsAsync(characterId, cancellationToken);
+        return result.Errors.Count > 0
+            ? Results.BadRequest(new { errors = result.Errors })
+            : Results.Ok(result.Result);
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/compute/check/persisted",
+    async (Guid characterId, PersistedComputeCheckRequest request, ICharacterComputationService computations, CancellationToken cancellationToken) =>
+    {
+        var result = await computations.ComputeCheckAsync(characterId, request, cancellationToken);
+        return result.Errors.Count > 0
+            ? Results.BadRequest(new { errors = result.Errors })
+            : Results.Ok(new { characterId, result = result.Result });
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/compute/save/persisted",
+    async (Guid characterId, PersistedComputeSaveRequest request, ICharacterComputationService computations, CancellationToken cancellationToken) =>
+    {
+        var result = await computations.ComputeSaveAsync(characterId, request, cancellationToken);
+        return result.Errors.Count > 0
+            ? Results.BadRequest(new { errors = result.Errors })
+            : Results.Ok(new { characterId, result = result.Result });
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/compute/attack/persisted",
+    async (Guid characterId, PersistedComputeAttackRequest request, ICharacterComputationService computations, CancellationToken cancellationToken) =>
+    {
+        var result = await computations.ComputeAttackAsync(characterId, request, cancellationToken);
+        return result.Errors.Count > 0
+            ? Results.BadRequest(new { errors = result.Errors })
+            : Results.Ok(new { characterId, result = result.Result });
     });
 
 app.MapPost(
