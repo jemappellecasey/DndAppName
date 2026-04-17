@@ -6,3 +6,6 @@
 3. Production appsettings file.
 4. Request logging middleware for basic latency/status observability.
 5. README container launch steps.
+
+## Runtime target
+- API container listens on port `8080` with `ASPNETCORE_URLS=http://+:8080`.
