@@ -21,6 +21,10 @@ public sealed class AppDbContext : DbContext
     public DbSet<ConstraintEntity> Constraints => Set<ConstraintEntity>();
     public DbSet<ItemDefinitionEntity> ItemDefinitions => Set<ItemDefinitionEntity>();
     public DbSet<ItemEffectEntity> ItemEffects => Set<ItemEffectEntity>();
+    public DbSet<IngestionRunEntity> IngestionRuns => Set<IngestionRunEntity>();
+    public DbSet<ReviewQueueEntity> ReviewQueue => Set<ReviewQueueEntity>();
+    public DbSet<CorrectionOverrideEntity> CorrectionOverrides => Set<CorrectionOverrideEntity>();
+    public DbSet<ImportReportEntity> ImportReports => Set<ImportReportEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -188,6 +192,65 @@ public sealed class AppDbContext : DbContext
             entity.HasOne<ItemDefinitionEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.ItemDefinitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<IngestionRunEntity>(entity =>
+        {
+            entity.ToTable("ingestion_run");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.SourceCode).HasMaxLength(40);
+            entity.Property(x => x.VersionTag).HasMaxLength(40);
+            entity.Property(x => x.Status).HasMaxLength(40);
+            entity.Property(x => x.Checksum).HasMaxLength(128);
+            entity.HasIndex(x => new { x.SourceCode, x.VersionTag, x.StartedAtUtc });
+        });
+
+        modelBuilder.Entity<ReviewQueueEntity>(entity =>
+        {
+            entity.ToTable("review_queue");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.IngestionRunId).HasMaxLength(64);
+            entity.Property(x => x.QueueType).HasMaxLength(40);
+            entity.Property(x => x.ReferenceId).HasMaxLength(128);
+            entity.Property(x => x.Confidence).HasPrecision(5, 4);
+            entity.Property(x => x.Notes).HasColumnType("TEXT");
+            entity.Property(x => x.Status).HasMaxLength(40);
+            entity.HasIndex(x => new { x.IngestionRunId, x.Status });
+            entity.HasOne<IngestionRunEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.IngestionRunId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CorrectionOverrideEntity>(entity =>
+        {
+            entity.ToTable("correction_override");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ReviewQueueId).HasMaxLength(64);
+            entity.Property(x => x.OverrideJson).HasColumnType("TEXT");
+            entity.Property(x => x.AppliedBy).HasMaxLength(80);
+            entity.HasIndex(x => x.ReviewQueueId);
+            entity.HasOne<ReviewQueueEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ReviewQueueId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ImportReportEntity>(entity =>
+        {
+            entity.ToTable("import_report");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.IngestionRunId).HasMaxLength(64);
+            entity.Property(x => x.ReportJson).HasColumnType("TEXT");
+            entity.HasIndex(x => x.IngestionRunId);
+            entity.HasOne<IngestionRunEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.IngestionRunId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
