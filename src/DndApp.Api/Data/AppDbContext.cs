@@ -15,6 +15,12 @@ public sealed class AppDbContext : DbContext
     public DbSet<SourceChapterEntity> SourceChapters => Set<SourceChapterEntity>();
     public DbSet<SourceSectionEntity> SourceSections => Set<SourceSectionEntity>();
     public DbSet<SourceBlockEntity> SourceBlocks => Set<SourceBlockEntity>();
+    public DbSet<RuleModuleEntity> RuleModules => Set<RuleModuleEntity>();
+    public DbSet<RuleVariantEntity> RuleVariants => Set<RuleVariantEntity>();
+    public DbSet<PrerequisiteEntity> Prerequisites => Set<PrerequisiteEntity>();
+    public DbSet<ConstraintEntity> Constraints => Set<ConstraintEntity>();
+    public DbSet<ItemDefinitionEntity> ItemDefinitions => Set<ItemDefinitionEntity>();
+    public DbSet<ItemEffectEntity> ItemEffects => Set<ItemEffectEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -93,6 +99,95 @@ public sealed class AppDbContext : DbContext
             entity.HasOne<SourceSectionEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.SourceSectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RuleModuleEntity>(entity =>
+        {
+            entity.ToTable("rule_module");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.ModuleType).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.DisplayName).HasMaxLength(300);
+            entity.Property(x => x.VersionTag).HasMaxLength(40);
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug, x.VersionTag }).IsUnique();
+            entity.HasOne<ContentSourceEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ContentSourceId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<RuleVariantEntity>(entity =>
+        {
+            entity.ToTable("rule_variant");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.RuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.RuleSystemId).HasMaxLength(40);
+            entity.Property(x => x.CompatibilityTagsJson).HasColumnType("TEXT");
+            entity.Property(x => x.PayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.RuleModuleId, x.RuleSystemId }).IsUnique();
+            entity.HasOne<RuleModuleEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RuleModuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<RuleSystemEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RuleSystemId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PrerequisiteEntity>(entity =>
+        {
+            entity.ToTable("prerequisite");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.RuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.PredicateJson).HasColumnType("TEXT");
+            entity.HasOne<RuleModuleEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RuleModuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ConstraintEntity>(entity =>
+        {
+            entity.ToTable("constraint");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.Scope).HasMaxLength(80);
+            entity.Property(x => x.ConstraintJson).HasColumnType("TEXT");
+        });
+
+        modelBuilder.Entity<ItemDefinitionEntity>(entity =>
+        {
+            entity.ToTable("item_definition");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.RuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.ItemType).HasMaxLength(80);
+            entity.Property(x => x.Rarity).HasMaxLength(40);
+            entity.Property(x => x.ChargesModelJson).HasColumnType("TEXT");
+            entity.HasOne<RuleModuleEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RuleModuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ItemEffectEntity>(entity =>
+        {
+            entity.ToTable("item_effect");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ItemDefinitionId).HasMaxLength(64);
+            entity.Property(x => x.EffectType).HasMaxLength(80);
+            entity.Property(x => x.EffectPayloadJson).HasColumnType("TEXT");
+            entity.Property(x => x.ConditionJson).HasColumnType("TEXT");
+            entity.HasOne<ItemDefinitionEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ItemDefinitionId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
