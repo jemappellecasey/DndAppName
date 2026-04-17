@@ -152,6 +152,12 @@ Outputs are written under:
 3. `PATCH /characters/{characterId}/build`
 4. `DELETE /characters/{characterId}/build`
 
+### Persistent inventory (phase 3)
+1. `GET /characters/{characterId}/inventory`
+2. `POST /characters/{characterId}/inventory/items`
+3. `PATCH /characters/{characterId}/inventory/items/{inventoryItemId}`
+4. `DELETE /characters/{characterId}/inventory/items/{inventoryItemId}`
+
 ### Content catalogs (database-backed)
 1. `GET /catalog/classes?ruleSystem={Rules2014|Rules2024}`
 2. `GET /catalog/items`

@@ -24,6 +24,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<CharacterSheetEntity> CharacterSheets => Set<CharacterSheetEntity>();
     public DbSet<CharacterAbilityScoreEntity> CharacterAbilityScores => Set<CharacterAbilityScoreEntity>();
     public DbSet<CharacterSkillProficiencyEntity> CharacterSkillProficiencies => Set<CharacterSkillProficiencyEntity>();
+    public DbSet<CharacterInventoryItemEntity> CharacterInventoryItems => Set<CharacterInventoryItemEntity>();
     public DbSet<IngestionRunEntity> IngestionRuns => Set<IngestionRunEntity>();
     public DbSet<ReviewQueueEntity> ReviewQueue => Set<ReviewQueueEntity>();
     public DbSet<CorrectionOverrideEntity> CorrectionOverrides => Set<CorrectionOverrideEntity>();
@@ -233,6 +234,26 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.CharacterId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterInventoryItemEntity>(entity =>
+        {
+            entity.ToTable("character_inventory_item");
+            entity.HasKey(x => x.InventoryItemId);
+            entity.Property(x => x.InventoryItemId).HasMaxLength(64);
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.ItemDefinitionId).HasMaxLength(64);
+            entity.Property(x => x.ItemName).HasMaxLength(300);
+            entity.HasIndex(x => x.CharacterId);
+            entity.HasIndex(x => x.ItemDefinitionId);
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ItemDefinitionEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ItemDefinitionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<IngestionRunEntity>(entity =>

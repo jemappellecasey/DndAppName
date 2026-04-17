@@ -45,6 +45,7 @@ builder.Services.AddSingleton<IMixedRulesResolutionService, MixedRulesResolution
 builder.Services.AddSingleton<ICharacterWizardService, CharacterWizardService>();
 builder.Services.AddSingleton<ILocalAuthService, LocalAuthService>();
 builder.Services.AddScoped<ICharacterBuildService, CharacterBuildService>();
+builder.Services.AddScoped<ICharacterInventoryService, CharacterInventoryService>();
 
 var app = builder.Build();
 
@@ -271,6 +272,46 @@ app.MapPost(
     {
         var result = pipeline.UpdateItemState(request);
         return Results.Ok(new { characterId, result });
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/inventory",
+    async (Guid characterId, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
+    {
+        var state = await inventoryService.GetInventoryAsync(characterId, cancellationToken);
+        return state is null ? Results.NotFound() : Results.Ok(state);
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/inventory/items",
+    async (Guid characterId, AddInventoryItemRequest request, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
+    {
+        var result = await inventoryService.AddItemAsync(characterId, request, cancellationToken);
+        if (result.State is null && result.Errors.Count > 0)
+        {
+            return Results.BadRequest(new { errors = result.Errors });
+        }
+        return Results.Ok(result.State);
+    });
+
+app.MapPatch(
+    "/characters/{characterId:guid}/inventory/items/{inventoryItemId}",
+    async (Guid characterId, string inventoryItemId, PatchInventoryItemStateRequest request, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
+    {
+        var result = await inventoryService.UpdateItemStateAsync(characterId, inventoryItemId, request, cancellationToken);
+        if (result.State is null && result.Errors.Count > 0)
+        {
+            return Results.BadRequest(new { errors = result.Errors });
+        }
+        return Results.Ok(result.State);
+    });
+
+app.MapDelete(
+    "/characters/{characterId:guid}/inventory/items/{inventoryItemId}",
+    async (Guid characterId, string inventoryItemId, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
+    {
+        var removed = await inventoryService.RemoveItemAsync(characterId, inventoryItemId, cancellationToken);
+        return removed ? Results.NoContent() : Results.NotFound();
     });
 
 app.MapPost(

@@ -26,3 +26,16 @@ public sealed class CharacterSkillProficiencyEntity
     public string CharacterId { get; set; } = string.Empty;
     public string SkillName { get; set; } = string.Empty;
 }
+
+public sealed class CharacterInventoryItemEntity
+{
+    public string InventoryItemId { get; set; } = string.Empty;
+    public string CharacterId { get; set; } = string.Empty;
+    public string ItemDefinitionId { get; set; } = string.Empty;
+    public string ItemName { get; set; } = string.Empty;
+    public bool RequiresAttunement { get; set; }
+    public bool IsEquipped { get; set; }
+    public bool IsAttuned { get; set; }
+    public DateTimeOffset AddedAtUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
