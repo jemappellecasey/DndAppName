@@ -76,6 +76,11 @@ Import generated section artifacts into SQLite raw tables:
 dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.csproj -- --import-db
 ```
 
+Normalize imported raw sections into core domain entities (`rule_system`, `content_source`, `rule_module`, `rule_variant`):
+```powershell
+dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.csproj -- --normalize-db
+```
+
 Outputs are written under:
 - `data\ingested\phb2014\v1\sections.json`
 - `data\ingested\phb2024\v1\sections.json`

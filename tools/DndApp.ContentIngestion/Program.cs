@@ -15,6 +15,12 @@ if (args.Any(a => string.Equals(a, "--import-db", StringComparison.OrdinalIgnore
     return;
 }
 
+if (args.Any(a => string.Equals(a, "--normalize-db", StringComparison.OrdinalIgnoreCase)))
+{
+    await NormalizeCoreEntitiesAsync(repoRoot);
+    return;
+}
+
 var sources = new[]
 {
     new SourceSpec("phb2014", "DnDPHB2014.md"),
@@ -221,10 +227,148 @@ static async Task ImportSectionsToDatabaseAsync(string repoRoot, DateTimeOffset 
     Console.WriteLine($"SQLite file: {sqlitePath}");
 }
 
+static async Task NormalizeCoreEntitiesAsync(string repoRoot)
+{
+    var sqlitePath = Path.Combine(repoRoot, "src", "DndApp.Api", "dndapp-dev.sqlite");
+    var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
+        .UseSqlite($"Data Source={sqlitePath}")
+        .Options;
+
+    await using var db = new AppDbContext(dbOptions);
+    await db.Database.MigrateAsync();
+
+    var systems = new[]
+    {
+        new RuleSystemEntity { Id = "rules-2014", Name = "2014" },
+        new RuleSystemEntity { Id = "rules-2024", Name = "2024" },
+    };
+    foreach (var system in systems)
+    {
+        if (!db.RuleSystems.Any(x => x.Id == system.Id))
+        {
+            db.RuleSystems.Add(system);
+        }
+    }
+
+    var sources = new[]
+    {
+        new ContentSourceEntity { Id = "PHB2014", RuleSystemId = "rules-2014", Code = "PHB2014", Name = "Player's Handbook 2014" },
+        new ContentSourceEntity { Id = "PHB2024", RuleSystemId = "rules-2024", Code = "PHB2024", Name = "Player's Handbook 2024" },
+        new ContentSourceEntity { Id = "DMG2014", RuleSystemId = "rules-2014", Code = "DMG2014", Name = "Dungeon Master's Guide 2014" },
+        new ContentSourceEntity { Id = "DMG2024", RuleSystemId = "rules-2024", Code = "DMG2024", Name = "Dungeon Master's Guide 2024" },
+    };
+    foreach (var source in sources)
+    {
+        if (!db.ContentSources.Any(x => x.Id == source.Id))
+        {
+            db.ContentSources.Add(source);
+        }
+    }
+    await db.SaveChangesAsync();
+
+    var existingVariants = db.RuleVariants.ToList();
+    if (existingVariants.Count > 0)
+    {
+        db.RuleVariants.RemoveRange(existingVariants);
+    }
+
+    var existingModules = db.RuleModules.ToList();
+    if (existingModules.Count > 0)
+    {
+        db.RuleModules.RemoveRange(existingModules);
+    }
+    await db.SaveChangesAsync();
+
+    var sectionRows = await (
+        from book in db.SourceBooks
+        join chapter in db.SourceChapters on book.Id equals chapter.SourceBookId
+        join section in db.SourceSections on chapter.Id equals section.SourceChapterId
+        select new
+        {
+            book.SourceCode,
+            book.VersionTag,
+            section.Id,
+            section.Title,
+            section.SectionOrder,
+            section.StartLine,
+            section.EndLine,
+        })
+        .OrderBy(x => x.SourceCode)
+        .ThenBy(x => x.SectionOrder)
+        .ToListAsync();
+
+    var moduleCount = 0;
+    var variantCount = 0;
+
+    foreach (var row in sectionRows)
+    {
+        var contentSourceId = ResolveContentSourceId(row.SourceCode);
+        var ruleSystemId = contentSourceId.EndsWith("2014", StringComparison.OrdinalIgnoreCase)
+            ? "rules-2014"
+            : "rules-2024";
+
+        var slug = $"{Slugify(row.Title)}-{row.SectionOrder}";
+        var moduleId = Guid.NewGuid().ToString("N");
+        var module = new RuleModuleEntity
+        {
+            Id = moduleId,
+            ContentSourceId = contentSourceId,
+            ModuleType = "section",
+            Slug = slug,
+            DisplayName = row.Title,
+            VersionTag = row.VersionTag
+        };
+        db.RuleModules.Add(module);
+        moduleCount++;
+
+        var variant = new RuleVariantEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            RuleModuleId = moduleId,
+            RuleSystemId = ruleSystemId,
+            CompatibilityTagsJson = JsonSerializer.Serialize(new[] { ruleSystemId == "rules-2014" ? "compatible-2014" : "compatible-2024" }),
+            PayloadJson = JsonSerializer.Serialize(new
+            {
+                sourceSectionId = row.Id,
+                startLine = row.StartLine,
+                endLine = row.EndLine
+            })
+        };
+        db.RuleVariants.Add(variant);
+        variantCount++;
+    }
+
+    await db.SaveChangesAsync();
+
+    Console.WriteLine("Normalization complete.");
+    Console.WriteLine($"Rule modules created: {moduleCount}");
+    Console.WriteLine($"Rule variants created: {variantCount}");
+    Console.WriteLine($"SQLite file: {sqlitePath}");
+}
+
 static string ComputeSha256(string value)
 {
     var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
     return Convert.ToHexString(bytes);
+}
+
+static string Slugify(string value)
+{
+    var lower = value.Trim().ToLowerInvariant();
+    var slug = Regex.Replace(lower, @"[^a-z0-9]+", "-");
+    return slug.Trim('-');
+}
+
+static string ResolveContentSourceId(string sourceCode)
+{
+    return sourceCode.ToLowerInvariant() switch
+    {
+        "phb2014" => "PHB2014",
+        "phb2024" => "PHB2024",
+        "dmg2014" => "DMG2014",
+        "dmg2024" => "DMG2024",
+        _ => throw new InvalidOperationException($"Unknown source code '{sourceCode}'.")
+    };
 }
 
 static string ResolveRepoRoot(string[] args)
