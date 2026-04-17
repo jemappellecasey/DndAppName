@@ -77,6 +77,81 @@ app.MapGet(
         return Results.Ok(new { canConnect });
     });
 
+app.MapGet(
+    "/catalog/classes",
+    async (RuleSystemMode ruleSystem, AppDbContext db, CancellationToken cancellationToken) =>
+    {
+        var classes = await (
+            from module in db.RuleModules
+            where EF.Functions.Like(module.ModuleType, "%class%")
+            join source in db.ContentSources on module.ContentSourceId equals source.Id into sourceJoin
+            from source in sourceJoin.DefaultIfEmpty()
+            where source == null
+                || (ruleSystem == RuleSystemMode.Rules2014
+                    ? source.RuleSystemId == "rules-2014"
+                    : source.RuleSystemId == "rules-2024")
+            orderby module.DisplayName
+            select new ClassCatalogItem(
+                module.Id,
+                module.DisplayName,
+                source != null ? source.Code : module.ContentSourceId,
+                module.VersionTag))
+            .ToArrayAsync(cancellationToken);
+
+        return Results.Ok(classes);
+    });
+
+app.MapGet(
+    "/catalog/items",
+    async (AppDbContext db, CancellationToken cancellationToken) =>
+    {
+        var itemRows = await (
+            from item in db.ItemDefinitions
+            join module in db.RuleModules on item.RuleModuleId equals module.Id into moduleJoin
+            from module in moduleJoin.DefaultIfEmpty()
+            join source in db.ContentSources on module.ContentSourceId equals source.Id into sourceJoin
+            from source in sourceJoin.DefaultIfEmpty()
+            orderby module != null ? module.DisplayName : item.Id
+            select new ItemCatalogItem(
+                item.Id,
+                module != null ? module.DisplayName : item.Id,
+                source != null ? source.Code : string.Empty,
+                item.ItemType,
+                item.Rarity,
+                item.RequiresAttunement,
+                Array.Empty<ItemCatalogEffect>()))
+            .ToArrayAsync(cancellationToken);
+
+        var itemIds = itemRows.Select(x => x.ItemId).ToArray();
+        var effectRows = await db.ItemEffects
+            .Where(x => itemIds.Contains(x.ItemDefinitionId))
+            .Select(x => new
+            {
+                x.ItemDefinitionId,
+                Effect = new ItemCatalogEffect(
+                    x.Id,
+                    x.EffectType,
+                    x.EffectPayloadJson,
+                    x.ConditionJson)
+            })
+            .ToArrayAsync(cancellationToken);
+
+        var effectsByItem = effectRows
+            .GroupBy(x => x.ItemDefinitionId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => (IReadOnlyList<ItemCatalogEffect>)x.Select(y => y.Effect).ToArray(), StringComparer.OrdinalIgnoreCase);
+
+        var items = itemRows
+            .Select(x => x with
+            {
+                Effects = effectsByItem.TryGetValue(x.ItemId, out var effects)
+                    ? effects
+                    : Array.Empty<ItemCatalogEffect>()
+            })
+            .ToArray();
+
+        return Results.Ok(items);
+    });
+
 app.MapPost(
     "/auth/local/login",
     (LocalLoginRequest request, ILocalAuthService auth) => Results.Ok(auth.Login(request)));
@@ -318,3 +393,24 @@ app.MapPost(
     });
 
 app.Run();
+
+public sealed record ClassCatalogItem(
+    string ModuleId,
+    string ClassName,
+    string SourceCode,
+    string VersionTag);
+
+public sealed record ItemCatalogEffect(
+    string EffectId,
+    string EffectType,
+    string EffectPayloadJson,
+    string ConditionJson);
+
+public sealed record ItemCatalogItem(
+    string ItemId,
+    string ItemName,
+    string SourceCode,
+    string ItemType,
+    string Rarity,
+    bool RequiresAttunement,
+    IReadOnlyList<ItemCatalogEffect> Effects);

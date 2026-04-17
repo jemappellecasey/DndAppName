@@ -1,5 +1,26 @@
 export type RuleSystemMode = 'Rules2014' | 'Rules2024'
 export type AdvantageState = 'None' | 'Advantage' | 'Disadvantage'
+export type AbilityName = 'Strength' | 'Dexterity' | 'Constitution' | 'Intelligence' | 'Wisdom' | 'Charisma'
+export type BuildMethod = 'PointBuy' | 'Manual' | 'Roll'
+export type SkillName =
+  | 'Acrobatics'
+  | 'Animal Handling'
+  | 'Arcana'
+  | 'Athletics'
+  | 'Deception'
+  | 'History'
+  | 'Insight'
+  | 'Intimidation'
+  | 'Investigation'
+  | 'Medicine'
+  | 'Nature'
+  | 'Perception'
+  | 'Performance'
+  | 'Persuasion'
+  | 'Religion'
+  | 'Sleight of Hand'
+  | 'Stealth'
+  | 'Survival'
 
 export interface LocalSession {
   sessionToken: string
@@ -57,4 +78,96 @@ export interface ValidationResult {
   isValid: boolean
   errors: string[]
   warnings: string[]
+}
+
+export interface ClassCatalogItem {
+  moduleId: string
+  className: string
+  sourceCode: string
+  versionTag: string
+}
+
+export interface ItemCatalogEffect {
+  effectId: string
+  effectType: string
+  effectPayloadJson: string
+  conditionJson: string
+}
+
+export interface ItemCatalogItem {
+  itemId: string
+  itemName: string
+  sourceCode: string
+  itemType: string
+  rarity: string
+  requiresAttunement: boolean
+  effects: ItemCatalogEffect[]
+}
+
+export interface ItemEffectInput {
+  type: 'AcBonus' | 'MoveSpeedBonus' | 'SavingThrowBonus' | 'AbilityCheckBonus' | 'GrantSpell'
+  target: string | null
+  numericValue: number
+  grantedSpell: string | null
+  description: string
+}
+
+export interface CharacterItemState {
+  itemId: string
+  itemName: string
+  requiresAttunement: boolean
+  isEquipped: boolean
+  isAttuned: boolean
+  effects: ItemEffectInput[]
+}
+
+export interface BaseStatsPayload {
+  armorClass: number
+  moveSpeed: number
+  savingThrows: Record<string, number>
+  abilityChecks: Record<string, number>
+  availableSpells: string[]
+}
+
+export interface UpdateInventoryItemStatePayload {
+  baseStats: BaseStatsPayload
+  items: CharacterItemState[]
+  itemId: string
+  isEquipped?: boolean
+  isAttuned?: boolean
+}
+
+export interface InventoryStateUpdateResult {
+  items: CharacterItemState[]
+  pipelineResult: {
+    derivedStats: {
+      armorClass: number
+      moveSpeed: number
+      savingThrows: Record<string, number>
+      abilityChecks: Record<string, number>
+      availableSpells: string[]
+    }
+    breakdown: Array<{
+      itemName: string
+      effectType: string
+      target: string
+      value: number
+      description: string
+    }>
+  }
+  activeAttunementCount: number
+  attunementCap: number
+  warnings: string[]
+  errors: string[]
+}
+
+export interface ComputeCheckPayload {
+  skillName: SkillName
+  abilityModifier: number
+  proficiencyBonus: number
+  isProficient: boolean
+  hasExpertise: boolean
+  additionalModifier: number
+  advantageState: AdvantageState
+  rollDice: boolean
 }

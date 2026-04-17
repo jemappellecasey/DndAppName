@@ -1,11 +1,15 @@
 import type {
-  AdvantageState,
   CharacterHistoryEntry,
+  ClassCatalogItem,
+  ComputeCheckPayload,
   CharacterSummary,
   CharacterWizardResult,
+  InventoryStateUpdateResult,
+  ItemCatalogItem,
   LocalSession,
   RuleModuleSelection,
   RuleSystemMode,
+  UpdateInventoryItemStatePayload,
 } from './types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080'
@@ -44,6 +48,18 @@ export function loginLocal(userName: string) {
 
 export function getCharacters(includeArchived = true) {
   return request<CharacterSummary[]>(`/characters?includeArchived=${includeArchived}`)
+}
+
+export function getClassCatalog(ruleSystem: RuleSystemMode) {
+  return request<ClassCatalogItem[]>(`/catalog/classes?ruleSystem=${ruleSystem}`)
+}
+
+export function getItemCatalog() {
+  return request<ItemCatalogItem[]>('/catalog/items')
+}
+
+export function getAttunementGuidance() {
+  return request<{ attunementCap: number; rules: string[] }>('/inventory/attunement-guidance')
 }
 
 export function archiveCharacter(characterId: string) {
@@ -147,46 +163,19 @@ export function previewSpecies(payload: {
   })
 }
 
-export function updateInventoryItemState(characterId: string) {
-  return request(`/characters/${characterId}/inventory/update-item-state`, {
+export function updateInventoryItemState(
+  characterId: string,
+  payload: UpdateInventoryItemStatePayload,
+) {
+  return request<InventoryStateUpdateResult>(`/characters/${characterId}/inventory/update-item-state`, {
     method: 'POST',
-    body: JSON.stringify({
-      baseStats: {
-        armorClass: 15,
-        moveSpeed: 30,
-        savingThrows: { Dexterity: 2 },
-        abilityChecks: { Stealth: 3 },
-        availableSpells: ['Mage Hand'],
-      },
-      itemId: 'cloak-1',
-      isEquipped: true,
-      isAttuned: true,
-      items: [
-        {
-          itemId: 'cloak-1',
-          itemName: 'Cloak of Protection',
-          requiresAttunement: true,
-          isEquipped: true,
-          isAttuned: false,
-          effects: [{ type: 'AcBonus', target: null, numericValue: 1, grantedSpell: null, description: '+1 AC' }],
-        },
-      ],
-    }),
+    body: JSON.stringify(payload),
   })
 }
 
-export function computeCheck(characterId: string, advantageState: AdvantageState) {
+export function computeCheck(characterId: string, payload: ComputeCheckPayload) {
   return request(`/characters/${characterId}/compute/check`, {
     method: 'POST',
-    body: JSON.stringify({
-      skillName: 'Stealth',
-      abilityModifier: 3,
-      proficiencyBonus: 2,
-      isProficient: true,
-      hasExpertise: true,
-      additionalModifier: 0,
-      advantageState,
-      rollDice: true,
-    }),
+    body: JSON.stringify(payload),
   })
 }

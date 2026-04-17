@@ -49,16 +49,25 @@ DndAppName is a D&D character creation and management app focused on 2014/2024 r
 
 The web app defaults to `http://localhost:5080` for API calls. Override with `VITE_API_BASE_URL` if needed.
 
+### Frontend quality commands
+Run these from `src\DndApp.Web`:
+```powershell
+npm run lint
+npm run build
+```
+
 ## Frontend quick walkthrough (first-time user)
 1. In the **Local session** card, enter a username and click **Start Session**.
-2. In **Character wizard**, enter a character name, choose base rules, optionally enable mixed mode, then click **Start Wizard Draft**.
-3. Set `Step slot`, `Module id`, and `Source code`, then click **Submit Step**.
+2. In **Character build setup**, set the character name, rules mode, and ability-score method:
+   - **Point buy** (27-point budget),
+   - **Manual** score entry, or
+   - **Roll** (4d6 drop lowest).
+3. In **Character wizard and class module**, click **Start Wizard Draft**, pick a class from DB-backed class catalog, then click **Apply selected class to wizard**.
 4. Click **Finalize** to create the character record.
-5. In **Character library**, click **Refresh** and select your character.
-6. Use **History** to view revision events; use **Duplicate** or **Archive** as needed.
-7. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
-8. In **Inventory and attunement**, click **Apply item state update** to simulate equip/attune effects.
-9. In **Roll checks**, choose advantage mode and click **Roll Stealth Check**.
+5. In **Skills menu and check rolling**, choose any skill, set advantage/expertise, and roll checks from the full skill list.
+6. In **Inventory from database**, add item definitions from the DB catalog, then equip/attune/unattune/remove items. The UI sends current inventory state into `update-item-state` to compute derived effects.
+7. In **Character library**, click **Refresh** and select your character. Use **History**, **Duplicate**, or **Archive** as needed.
+8. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
 
 ### Troubleshooting (local run)
 1. If `dotnet build` fails with `DndApp.Api.exe ... file is being used by another process`, stop the running API (`Ctrl+C` in the terminal where `dotnet run` is active), then build again.
@@ -136,6 +145,13 @@ Outputs are written under:
 4. `POST /characters/{characterId}/compute/check`
 5. `POST /characters/{characterId}/compute/save`
 6. `POST /characters/{characterId}/compute/attack`
+
+### Content catalogs (database-backed)
+1. `GET /catalog/classes?ruleSystem={Rules2014|Rules2024}`
+2. `GET /catalog/items`
+
+## Documentation update policy
+For this repository, **README.md must be updated whenever behavior, setup steps, or user workflows change**. Treat README updates as part of done criteria for every future feature phase.
 
 ## Branching convention used
 A dedicated branch is created after each completed phase (phase-0, phase-1, etc.) and pushed to GitHub for review.
