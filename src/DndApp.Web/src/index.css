@@ -1,0 +1,13 @@
+:root {
+  font-family: Inter, Segoe UI, Arial, sans-serif;
+  color: #e2e8f0;
+  background: #020617;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}

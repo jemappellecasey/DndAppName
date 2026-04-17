@@ -25,7 +25,33 @@ DndAppName is a D&D character creation and management app focused on 2014/2024 r
    dotnet run --project src\DndApp.Api\DndApp.Api.csproj
    ```
 3. Health check:
-   - `GET http://localhost:5000/health` (or the port shown in console output)
+   - The default dev launch profile listens on `http://localhost:5080`
+   - Test:
+     ```powershell
+     Invoke-WebRequest http://localhost:5080/health
+     ```
+   - Root endpoint is also available at:
+     - `GET http://localhost:5080/`
+
+## Frontend launch (React)
+1. Start API in one terminal:
+   ```powershell
+   dotnet run --project src\DndApp.Api\DndApp.Api.csproj
+   ```
+2. Start web app in another terminal:
+   ```powershell
+   Set-Location src\DndApp.Web
+   npm install
+   npm run dev
+   ```
+3. Open:
+   - `http://localhost:5173`
+
+The web app defaults to `http://localhost:5080` for API calls. Override with `VITE_API_BASE_URL` if needed.
+
+### Troubleshooting (local run)
+1. If `dotnet build` fails with `DndApp.Api.exe ... file is being used by another process`, stop the running API (`Ctrl+C` in the terminal where `dotnet run` is active), then build again.
+2. `GET /` and `GET /health` should return `200`. If they do, the API is running correctly.
 
 ## Run ingestion pipeline
 Generate versioned JSON artifacts from PHB/DMG markdown sources:
@@ -82,6 +108,9 @@ A dedicated branch is created after each completed phase (phase-0, phase-1, etc.
 `POST /wizard/characters/start` expects a `sessionToken` from local login in addition to character name and rules profile.
 
 ## Container launch (deployment baseline)
+> Docker commands require Docker Desktop (or Docker Engine) to be running.
+> If you see `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`, start Docker Desktop first.
+
 1. Build image:
    ```powershell
    docker build -t dndappname-api .
@@ -89,4 +118,8 @@ A dedicated branch is created after each completed phase (phase-0, phase-1, etc.
 2. Run container:
    ```powershell
    docker run --rm -p 8080:8080 dndappname-api
+   ```
+3. Test container health:
+   ```powershell
+   Invoke-WebRequest http://localhost:8080/health
    ```

@@ -5,4 +5,6 @@ DNDDMG2024.md
 
 **/bin/
 **/obj/
+**/node_modules/
+**/dist/
 

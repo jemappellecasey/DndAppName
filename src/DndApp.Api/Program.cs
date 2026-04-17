@@ -7,6 +7,16 @@ using DndApp.Api.MixedRules;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("frontend-dev", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173", "http://localhost:4173")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 builder.Services.AddSingleton<ICustomContentValidationService, CustomContentValidationService>();
 builder.Services.AddSingleton<IItemEffectPipelineService, ItemEffectPipelineService>();
 builder.Services.AddSingleton<ICalculationEngineService, CalculationEngineService>();
@@ -20,6 +30,8 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.UseCors("frontend-dev");
 
 app.Use(async (context, next) =>
 {
@@ -35,6 +47,7 @@ app.Use(async (context, next) =>
 });
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/", () => Results.Ok(new { name = "DndApp.Api", status = "ok", health = "/health" }));
 
 app.MapPost(
     "/auth/local/login",
