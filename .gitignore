@@ -7,4 +7,5 @@ DNDDMG2024.md
 **/obj/
 **/node_modules/
 **/dist/
+*.sqlite
 

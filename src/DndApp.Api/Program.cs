@@ -4,9 +4,30 @@ using DndApp.Api.Auth;
 using DndApp.Api.Items;
 using DndApp.Api.Mechanics;
 using DndApp.Api.MixedRules;
+using DndApp.Api.Data;
+using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection("Database"));
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    var provider = (builder.Configuration["Database:Provider"] ?? "sqlite").Trim().ToLowerInvariant();
+    if (provider == "sqlite")
+    {
+        var connection = builder.Configuration["Database:ConnectionStrings:Sqlite"] ?? "Data Source=dndapp.sqlite";
+        options.UseSqlite(connection);
+        return;
+    }
+
+    throw new InvalidOperationException(
+        $"Unsupported database provider '{provider}'. This phase supports 'sqlite'. PostgreSQL provider wiring is planned next.");
+});
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("frontend-dev", policy =>
@@ -48,6 +69,13 @@ app.Use(async (context, next) =>
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapGet("/", () => Results.Ok(new { name = "DndApp.Api", status = "ok", health = "/health" }));
+app.MapGet(
+    "/db/health",
+    async (AppDbContext db, CancellationToken cancellationToken) =>
+    {
+        var canConnect = await db.Database.CanConnectAsync(cancellationToken);
+        return Results.Ok(new { canConnect });
+    });
 
 app.MapPost(
     "/auth/local/login",
