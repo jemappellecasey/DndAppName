@@ -1,9 +1,19 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DndApp.Api.Data;
+using Microsoft.EntityFrameworkCore;
 
 var repoRoot = ResolveRepoRoot(args);
 var outputRoot = Path.Combine(repoRoot, "data");
 var now = DateTimeOffset.UtcNow;
+
+if (args.Any(a => string.Equals(a, "--import-db", StringComparison.OrdinalIgnoreCase)))
+{
+    await ImportSectionsToDatabaseAsync(repoRoot, now);
+    return;
+}
 
 var sources = new[]
 {
@@ -68,11 +78,161 @@ foreach (var summary in summaries)
 
 return;
 
+static async Task ImportSectionsToDatabaseAsync(string repoRoot, DateTimeOffset startedAtUtc)
+{
+    var sqlitePath = Path.Combine(repoRoot, "src", "DndApp.Api", "dndapp-dev.sqlite");
+    var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
+        .UseSqlite($"Data Source={sqlitePath}")
+        .Options;
+
+    await using var db = new AppDbContext(dbOptions);
+    await db.Database.MigrateAsync();
+
+    var run = new IngestionRunEntity
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        SourceCode = "all",
+        VersionTag = "v1",
+        StartedAtUtc = startedAtUtc,
+        Status = "running",
+        Checksum = string.Empty
+    };
+    db.IngestionRuns.Add(run);
+    await db.SaveChangesAsync();
+
+    var sectionsFiles = Directory
+        .EnumerateFiles(Path.Combine(repoRoot, "data", "ingested"), "sections.json", SearchOption.AllDirectories)
+        .OrderBy(x => x)
+        .ToArray();
+
+    var importedSections = 0;
+    var importedBlocks = 0;
+    var reviewCount = 0;
+
+    foreach (var sectionsFile in sectionsFiles)
+    {
+        var json = await File.ReadAllTextAsync(sectionsFile);
+        var payload = JsonSerializer.Deserialize<IngestionPayload>(json);
+        if (payload is null)
+        {
+            continue;
+        }
+
+        var versionTag = "v1";
+        var book = db.SourceBooks.SingleOrDefault(x => x.SourceCode == payload.SourceCode && x.VersionTag == versionTag);
+        if (book is null)
+        {
+            book = new SourceBookEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                SourceCode = payload.SourceCode,
+                FileName = payload.SourceFile,
+                VersionTag = versionTag
+            };
+            db.SourceBooks.Add(book);
+        }
+
+        var existingChapters = db.SourceChapters.Where(x => x.SourceBookId == book.Id).ToList();
+        if (existingChapters.Count > 0)
+        {
+            db.SourceChapters.RemoveRange(existingChapters);
+            await db.SaveChangesAsync();
+        }
+
+        var chapter = new SourceChapterEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            SourceBookId = book.Id,
+            Title = "Imported Sections",
+            ChapterOrder = 1
+        };
+        db.SourceChapters.Add(chapter);
+        await db.SaveChangesAsync();
+
+        foreach (var section in payload.Sections.OrderBy(x => x.SectionIndex))
+        {
+            var sectionEntity = new SourceSectionEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                SourceChapterId = chapter.Id,
+                Title = section.Title,
+                SectionOrder = section.SectionIndex,
+                StartLine = section.StartLine,
+                EndLine = section.EndLine
+            };
+            db.SourceSections.Add(sectionEntity);
+
+            var block = new SourceBlockEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                SourceSectionId = sectionEntity.Id,
+                BlockType = "preview",
+                RawText = section.Preview,
+                ParseConfidence = section.Confidence
+            };
+            db.SourceBlocks.Add(block);
+
+            importedSections++;
+            importedBlocks++;
+
+            if (section.Confidence < 0.75m)
+            {
+                db.ReviewQueue.Add(new ReviewQueueEntity
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    IngestionRunId = run.Id,
+                    QueueType = "low-confidence-section",
+                    ReferenceId = sectionEntity.Id,
+                    Confidence = section.Confidence,
+                    Notes = $"Section '{section.Title}' from {payload.SourceCode}",
+                    Status = "pending"
+                });
+                reviewCount++;
+            }
+        }
+
+        await db.SaveChangesAsync();
+        run.Checksum += $"{payload.SourceCode}:{ComputeSha256(json)};";
+    }
+
+    run.CompletedAtUtc = DateTimeOffset.UtcNow;
+    run.Status = "completed";
+    run.Checksum = ComputeSha256(run.Checksum);
+
+    db.ImportReports.Add(new ImportReportEntity
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        IngestionRunId = run.Id,
+        CreatedAtUtc = DateTimeOffset.UtcNow,
+        ReportJson = JsonSerializer.Serialize(new
+        {
+            importedSections,
+            importedBlocks,
+            reviewCount
+        })
+    });
+
+    await db.SaveChangesAsync();
+
+    Console.WriteLine("Database import complete.");
+    Console.WriteLine($"Sections imported: {importedSections}");
+    Console.WriteLine($"Blocks imported: {importedBlocks}");
+    Console.WriteLine($"Review queue entries: {reviewCount}");
+    Console.WriteLine($"SQLite file: {sqlitePath}");
+}
+
+static string ComputeSha256(string value)
+{
+    var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+    return Convert.ToHexString(bytes);
+}
+
 static string ResolveRepoRoot(string[] args)
 {
-    if (args.Length > 0 && Directory.Exists(args[0]))
+    var firstArgDirectory = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
+    if (firstArgDirectory is not null && Directory.Exists(firstArgDirectory))
     {
-        return Path.GetFullPath(args[0]);
+        return Path.GetFullPath(firstArgDirectory);
     }
 
     var markerFiles = new[]

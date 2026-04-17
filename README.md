@@ -71,6 +71,11 @@ Generate versioned JSON artifacts from PHB/DMG markdown sources:
 dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.csproj
 ```
 
+Import generated section artifacts into SQLite raw tables:
+```powershell
+dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.csproj -- --import-db
+```
+
 Outputs are written under:
 - `data\ingested\phb2014\v1\sections.json`
 - `data\ingested\phb2024\v1\sections.json`
