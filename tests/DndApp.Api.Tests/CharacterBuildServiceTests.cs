@@ -17,6 +17,7 @@ public sealed class CharacterBuildServiceTests
 
         var upsert = await service.UpsertBuildAsync(
             characterId,
+            "local:test-owner",
             new UpsertCharacterBuildRequest(
                 CharacterName: "Tessa",
                 BaseRuleSystem: RuleSystemMode.Rules2024,
@@ -46,6 +47,13 @@ public sealed class CharacterBuildServiceTests
         Assert.Equal("class-fighter", fromDb.ClassModuleId);
         Assert.Equal(16, fromDb.AbilityScores["Strength"]);
         Assert.Contains("Athletics", fromDb.ProficientSkills);
+
+        var owner = await fixture.Db.CharacterSheets
+            .AsNoTracking()
+            .Where(x => x.CharacterId == characterId.ToString())
+            .Select(x => x.OwnerUserId)
+            .SingleOrDefaultAsync();
+        Assert.Equal("local:test-owner", owner);
     }
 
     [Fact]
@@ -57,6 +65,7 @@ public sealed class CharacterBuildServiceTests
 
         await service.UpsertBuildAsync(
             characterId,
+            "local:test-owner",
             new UpsertCharacterBuildRequest(
                 CharacterName: "Miri",
                 BaseRuleSystem: RuleSystemMode.Rules2014,
@@ -106,6 +115,7 @@ public sealed class CharacterBuildServiceTests
 
         var upsert = await service.UpsertBuildAsync(
             characterId,
+            "local:test-owner",
             new UpsertCharacterBuildRequest(
                 CharacterName: "Bad Source",
                 BaseRuleSystem: RuleSystemMode.Rules2024,

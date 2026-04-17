@@ -2,14 +2,14 @@
 
 DndAppName is a D&D character creation and management app focused on 2014/2024 rules support, mixed-rules compatibility, explainable calculations, custom lineage/origin creation, and item/attunement-aware character math.
 
-## Current v1 scope
-1. .NET 10 API foundation.
+## Current capabilities
+1. .NET 10 API + React frontend foundation.
 2. Rulebook markdown ingestion to versioned JSON artifacts.
-3. Character wizard draft flow with rules-mode constraints.
-4. Mixed-rules conflict resolution with base-rules precedence and explicit overrides.
-5. Custom origin/species endpoints (guided + fully custom).
-6. Item effect pipeline (equipped/attuned activation).
-7. Roll calculation endpoints for checks, saves, and attacks with advantage/disadvantage and optional random rolling.
+3. Character wizard flow with mixed-rules resolution and copy-to-ruleset support.
+4. Persistent character build model (class, build method, ability scores, skill proficiencies).
+5. Persistent inventory model with equip/attune/unattune and attunement-cap enforcement.
+6. Persisted calculations for checks/saves/attacks and derived stats.
+7. Custom origin/species validation and preview endpoints.
 
 ## Prerequisites
 1. .NET SDK 10.x
@@ -57,11 +57,11 @@ npm run build
 ```
 
 ## Frontend quick walkthrough (first-time user)
-1. In the **Local session** card, enter a username and click **Start Session**.
+1. In the **Local session** card, enter username + password. Use **Register new user** for first login, then start the session.
 2. In **Character build setup**, set the character name, rules mode, and ability-score method:
    - **Point buy** (27-point budget),
    - **Manual** score entry, or
-   - **Roll** (4d6 drop lowest).
+   - **Roll** (4d6 drop lowest) with drag/drop assignment from roll pool into each ability slot.
 3. In **Wizard + persistent build**, click **Start Wizard Draft**, pick a class from DB-backed class catalog, optionally apply to wizard, then click **Save build to persistent model**.
 4. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
 5. In **Skills menu and persisted checks**, choose any skill, set advantage/expertise, and roll checks via persisted-computation endpoint(s).
@@ -108,8 +108,8 @@ Outputs are written under:
    ```
 
 ### Database provider config
-- `Database:Provider` currently supports `sqlite` for this phase.
-- PostgreSQL connection string placeholders are present for planned provider switch work.
+- `Database:Provider` currently supports `sqlite`.
+- PostgreSQL connection string placeholders are present for future provider-switch work.
 
 ## Key API endpoints (current)
 ### Character wizard and rules
@@ -126,9 +126,10 @@ Outputs are written under:
 11. `POST /characters/{characterId}/duplicate`
 12. `GET /characters/{characterId}/history`
 
-### Local auth stub
-1. `POST /auth/local/login`
-2. `GET /auth/local/me?sessionToken={token}`
+### Local auth
+1. `POST /auth/local/register`
+2. `POST /auth/local/login`
+3. `GET /auth/local/me` (reads `X-Session-Token` header)
 
 ### Custom content
 1. `POST /characters/{characterId}/custom/origin`
@@ -146,29 +147,32 @@ Outputs are written under:
 5. `POST /characters/{characterId}/compute/save`
 6. `POST /characters/{characterId}/compute/attack`
 
-### Persistent character build (phase 2)
+### Persistent character build
 1. `GET /characters/{characterId}/build`
 2. `PUT /characters/{characterId}/build`
 3. `PATCH /characters/{characterId}/build`
 4. `DELETE /characters/{characterId}/build`
+5. Build endpoints now require `X-Session-Token` and enforce owner access.
 
-### Persistent inventory (phase 3)
+### Persistent inventory
 1. `GET /characters/{characterId}/inventory`
 2. `POST /characters/{characterId}/inventory/items`
 3. `PATCH /characters/{characterId}/inventory/items/{inventoryItemId}`
 4. `DELETE /characters/{characterId}/inventory/items/{inventoryItemId}`
+5. Inventory endpoints now require `X-Session-Token` and enforce owner access.
 
-### Persisted calculations (phase 4)
+### Persisted calculations
 1. `GET /characters/{characterId}/compute/derived-stats`
 2. `POST /characters/{characterId}/compute/check/persisted`
 3. `POST /characters/{characterId}/compute/save/persisted`
 4. `POST /characters/{characterId}/compute/attack/persisted`
+5. Persisted compute endpoints now require `X-Session-Token` and enforce owner access.
 
-### Rule validation (phase 5)
+### Rule validation
 1. `PUT /characters/{characterId}/build` and `PATCH /characters/{characterId}/build` now validate class-module compatibility and prerequisite predicates from `prerequisite`.
 2. `POST /characters/{characterId}/inventory/items` now validates item source compatibility and prerequisite predicates before persisting.
 
-### Frontend integration (phase 6)
+### Frontend integration
 The React app now uses persisted build/inventory/computation endpoints for core workflows instead of local simulation payloads.
 
 ### Content catalogs (database-backed)
@@ -177,9 +181,6 @@ The React app now uses persisted build/inventory/computation endpoints for core 
 
 ## Documentation update policy
 For this repository, **README.md must be updated whenever behavior, setup steps, or user workflows change**. Treat README updates as part of done criteria for every future feature phase.
-
-## Branching convention used
-A dedicated branch is created after each completed phase (phase-0, phase-1, etc.) and pushed to GitHub for review.
 
 ## Note on wizard start payload
 `POST /wizard/characters/start` expects a `sessionToken` from local login in addition to character name and rules profile.

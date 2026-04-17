@@ -3,6 +3,7 @@ namespace DndApp.Api.Data;
 public sealed class CharacterSheetEntity
 {
     public string CharacterId { get; set; } = string.Empty;
+    public string OwnerUserId { get; set; } = string.Empty;
     public string CharacterName { get; set; } = string.Empty;
     public string BaseRuleSystem { get; set; } = string.Empty;
     public string BuildMethod { get; set; } = string.Empty;

@@ -98,6 +98,31 @@ pre {
   background: #020617;
 }
 
+.roll-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.roll-chip {
+  min-width: 3rem;
+  text-align: center;
+  font-weight: 700;
+  border-style: dashed;
+}
+
+.roll-target {
+  min-height: 2.2rem;
+  border: 1px dashed #64748b;
+  border-radius: 6px;
+  padding: 0.35rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .skills-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

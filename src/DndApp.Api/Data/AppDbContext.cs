@@ -25,6 +25,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<CharacterAbilityScoreEntity> CharacterAbilityScores => Set<CharacterAbilityScoreEntity>();
     public DbSet<CharacterSkillProficiencyEntity> CharacterSkillProficiencies => Set<CharacterSkillProficiencyEntity>();
     public DbSet<CharacterInventoryItemEntity> CharacterInventoryItems => Set<CharacterInventoryItemEntity>();
+    public DbSet<UserAccountEntity> UserAccounts => Set<UserAccountEntity>();
+    public DbSet<UserSessionEntity> UserSessions => Set<UserSessionEntity>();
     public DbSet<IngestionRunEntity> IngestionRuns => Set<IngestionRunEntity>();
     public DbSet<ReviewQueueEntity> ReviewQueue => Set<ReviewQueueEntity>();
     public DbSet<CorrectionOverrideEntity> CorrectionOverrides => Set<CorrectionOverrideEntity>();
@@ -204,12 +206,14 @@ public sealed class AppDbContext : DbContext
             entity.ToTable("character_sheet");
             entity.HasKey(x => x.CharacterId);
             entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.OwnerUserId).HasMaxLength(64);
             entity.Property(x => x.CharacterName).HasMaxLength(160);
             entity.Property(x => x.BaseRuleSystem).HasMaxLength(24);
             entity.Property(x => x.BuildMethod).HasMaxLength(24);
             entity.Property(x => x.ClassModuleId).HasMaxLength(64);
             entity.Property(x => x.ClassName).HasMaxLength(160);
             entity.HasIndex(x => x.ClassModuleId);
+            entity.HasIndex(x => x.OwnerUserId);
         });
 
         modelBuilder.Entity<CharacterAbilityScoreEntity>(entity =>
@@ -254,6 +258,30 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.ItemDefinitionId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<UserAccountEntity>(entity =>
+        {
+            entity.ToTable("user_account");
+            entity.HasKey(x => x.UserId);
+            entity.Property(x => x.UserId).HasMaxLength(64);
+            entity.Property(x => x.UserName).HasMaxLength(120);
+            entity.Property(x => x.NormalizedUserName).HasMaxLength(120);
+            entity.Property(x => x.PasswordHash).HasMaxLength(512);
+            entity.HasIndex(x => x.NormalizedUserName).IsUnique();
+        });
+
+        modelBuilder.Entity<UserSessionEntity>(entity =>
+        {
+            entity.ToTable("user_session");
+            entity.HasKey(x => x.SessionToken);
+            entity.Property(x => x.SessionToken).HasMaxLength(128);
+            entity.Property(x => x.UserId).HasMaxLength(64);
+            entity.HasIndex(x => x.UserId);
+            entity.HasOne<UserAccountEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<IngestionRunEntity>(entity =>

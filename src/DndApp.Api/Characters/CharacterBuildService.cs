@@ -7,7 +7,7 @@ namespace DndApp.Api.Characters;
 public interface ICharacterBuildService
 {
     Task<CharacterBuildData?> GetBuildAsync(Guid characterId, CancellationToken cancellationToken);
-    Task<(CharacterBuildData? Data, IReadOnlyList<string> Errors)> UpsertBuildAsync(Guid characterId, UpsertCharacterBuildRequest request, CancellationToken cancellationToken);
+    Task<(CharacterBuildData? Data, IReadOnlyList<string> Errors)> UpsertBuildAsync(Guid characterId, string ownerUserId, UpsertCharacterBuildRequest request, CancellationToken cancellationToken);
     Task<(CharacterBuildData? Data, IReadOnlyList<string> Errors)> PatchBuildAsync(Guid characterId, PatchCharacterBuildRequest request, CancellationToken cancellationToken);
     Task<bool> DeleteBuildAsync(Guid characterId, CancellationToken cancellationToken);
 }
@@ -40,6 +40,7 @@ public sealed class CharacterBuildService : ICharacterBuildService
 
     public async Task<(CharacterBuildData? Data, IReadOnlyList<string> Errors)> UpsertBuildAsync(
         Guid characterId,
+        string ownerUserId,
         UpsertCharacterBuildRequest request,
         CancellationToken cancellationToken)
     {
@@ -76,6 +77,7 @@ public sealed class CharacterBuildService : ICharacterBuildService
             existing = new CharacterSheetEntity
             {
                 CharacterId = id,
+                OwnerUserId = ownerUserId,
                 CreatedAtUtc = now,
             };
             _db.CharacterSheets.Add(existing);
@@ -88,6 +90,10 @@ public sealed class CharacterBuildService : ICharacterBuildService
         existing.ClassName = request.ClassName.Trim();
         existing.Level = request.Level;
         existing.ProficiencyBonus = request.ProficiencyBonus;
+        if (string.IsNullOrWhiteSpace(existing.OwnerUserId))
+        {
+            existing.OwnerUserId = ownerUserId;
+        }
         existing.UpdatedAtUtc = now;
 
         await ReplaceAbilityScoresAsync(id, request.AbilityScores, cancellationToken);

@@ -14,11 +14,17 @@ import type {
 } from './types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080'
+let sessionToken: string | null = null
+
+export function setSessionToken(token: string | null) {
+  sessionToken = token
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(sessionToken ? { 'X-Session-Token': sessionToken } : {}),
       ...(init?.headers ?? {}),
     },
     ...init,
@@ -40,11 +46,22 @@ export function health() {
   return request<{ status: string; name?: string }>('/health')
 }
 
-export function loginLocal(userName: string) {
+export function registerLocal(userName: string, password: string) {
+  return request<LocalSession>('/auth/local/register', {
+    method: 'POST',
+    body: JSON.stringify({ userName, password }),
+  })
+}
+
+export function loginLocal(userName: string, password: string) {
   return request<LocalSession>('/auth/local/login', {
     method: 'POST',
-    body: JSON.stringify({ userName }),
+    body: JSON.stringify({ userName, password }),
   })
+}
+
+export function getLocalMe() {
+  return request<LocalSession>('/auth/local/me')
 }
 
 export function getCharacters(includeArchived = true) {

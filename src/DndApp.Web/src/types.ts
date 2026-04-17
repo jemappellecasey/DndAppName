@@ -27,6 +27,7 @@ export interface LocalSession {
   userId: string
   userName: string
   createdAtUtc: string
+  expiresAtUtc: string
 }
 
 export interface CharacterSummary {

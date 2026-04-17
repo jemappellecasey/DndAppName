@@ -26,7 +26,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     }
 
     throw new InvalidOperationException(
-        $"Unsupported database provider '{provider}'. This phase supports 'sqlite'. PostgreSQL provider wiring is planned next.");
+        $"Unsupported database provider '{provider}'. Supported provider: 'sqlite'.");
 });
 builder.Services.AddCors(options =>
 {
@@ -43,13 +43,19 @@ builder.Services.AddSingleton<IItemEffectPipelineService, ItemEffectPipelineServ
 builder.Services.AddSingleton<ICalculationEngineService, CalculationEngineService>();
 builder.Services.AddSingleton<IMixedRulesResolutionService, MixedRulesResolutionService>();
 builder.Services.AddSingleton<ICharacterWizardService, CharacterWizardService>();
-builder.Services.AddSingleton<ILocalAuthService, LocalAuthService>();
+builder.Services.AddScoped<ILocalAuthService, LocalAuthService>();
 builder.Services.AddScoped<ICharacterBuildService, CharacterBuildService>();
 builder.Services.AddScoped<ICharacterInventoryService, CharacterInventoryService>();
 builder.Services.AddScoped<ICharacterComputationService, CharacterComputationService>();
 builder.Services.AddScoped<IRuleValidationService, RuleValidationService>();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -157,14 +163,44 @@ app.MapGet(
     });
 
 app.MapPost(
+    "/auth/local/register",
+    async (LocalRegisterRequest request, ILocalAuthService auth, CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            return Results.Ok(await auth.RegisterAsync(request, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { errors = new[] { ex.Message } });
+        }
+    });
+
+app.MapPost(
     "/auth/local/login",
-    (LocalLoginRequest request, ILocalAuthService auth) => Results.Ok(auth.Login(request)));
+    async (LocalLoginRequest request, ILocalAuthService auth, CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            return Results.Ok(await auth.LoginAsync(request, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { errors = new[] { ex.Message } });
+        }
+    });
 
 app.MapGet(
     "/auth/local/me",
-    (string sessionToken, ILocalAuthService auth) =>
+    async (HttpContext httpContext, ILocalAuthService auth, CancellationToken cancellationToken) =>
     {
-        var session = auth.GetSession(sessionToken);
+        var sessionToken = EndpointAuth.ResolveSessionToken(httpContext);
+        if (string.IsNullOrWhiteSpace(sessionToken))
+        {
+            return Results.Unauthorized();
+        }
+
+        var session = await auth.GetSessionAsync(sessionToken, cancellationToken);
         return session is null ? Results.NotFound() : Results.Ok(session);
     });
 
@@ -278,16 +314,26 @@ app.MapPost(
 
 app.MapGet(
     "/characters/{characterId:guid}/inventory",
-    async (Guid characterId, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var state = await inventoryService.GetInventoryAsync(characterId, cancellationToken);
         return state is null ? Results.NotFound() : Results.Ok(state);
     });
 
 app.MapPost(
     "/characters/{characterId:guid}/inventory/items",
-    async (Guid characterId, AddInventoryItemRequest request, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
+    async (Guid characterId, AddInventoryItemRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var result = await inventoryService.AddItemAsync(characterId, request, cancellationToken);
         if (result.State is null && result.Errors.Count > 0)
         {
@@ -298,8 +344,13 @@ app.MapPost(
 
 app.MapPatch(
     "/characters/{characterId:guid}/inventory/items/{inventoryItemId}",
-    async (Guid characterId, string inventoryItemId, PatchInventoryItemStateRequest request, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
+    async (Guid characterId, string inventoryItemId, PatchInventoryItemStateRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var result = await inventoryService.UpdateItemStateAsync(characterId, inventoryItemId, request, cancellationToken);
         if (result.State is null && result.Errors.Count > 0)
         {
@@ -310,8 +361,13 @@ app.MapPatch(
 
 app.MapDelete(
     "/characters/{characterId:guid}/inventory/items/{inventoryItemId}",
-    async (Guid characterId, string inventoryItemId, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
+    async (Guid characterId, string inventoryItemId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterInventoryService inventoryService, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var removed = await inventoryService.RemoveItemAsync(characterId, inventoryItemId, cancellationToken);
         return removed ? Results.NoContent() : Results.NotFound();
     });
@@ -352,8 +408,13 @@ app.MapGet(
 
 app.MapPost(
     "/characters/{characterId:guid}/compute/check/persisted",
-    async (Guid characterId, PersistedComputeCheckRequest request, ICharacterComputationService computations, CancellationToken cancellationToken) =>
+    async (Guid characterId, PersistedComputeCheckRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterComputationService computations, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var result = await computations.ComputeCheckAsync(characterId, request, cancellationToken);
         return result.Errors.Count > 0
             ? Results.BadRequest(new { errors = result.Errors })
@@ -362,8 +423,13 @@ app.MapPost(
 
 app.MapPost(
     "/characters/{characterId:guid}/compute/save/persisted",
-    async (Guid characterId, PersistedComputeSaveRequest request, ICharacterComputationService computations, CancellationToken cancellationToken) =>
+    async (Guid characterId, PersistedComputeSaveRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterComputationService computations, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var result = await computations.ComputeSaveAsync(characterId, request, cancellationToken);
         return result.Errors.Count > 0
             ? Results.BadRequest(new { errors = result.Errors })
@@ -372,8 +438,13 @@ app.MapPost(
 
 app.MapPost(
     "/characters/{characterId:guid}/compute/attack/persisted",
-    async (Guid characterId, PersistedComputeAttackRequest request, ICharacterComputationService computations, CancellationToken cancellationToken) =>
+    async (Guid characterId, PersistedComputeAttackRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterComputationService computations, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var result = await computations.ComputeAttackAsync(characterId, request, cancellationToken);
         return result.Errors.Count > 0
             ? Results.BadRequest(new { errors = result.Errors })
@@ -478,17 +549,38 @@ app.MapPost(
 
 app.MapGet(
     "/characters/{characterId:guid}/build",
-    async (Guid characterId, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var build = await buildService.GetBuildAsync(characterId, cancellationToken);
         return build is null ? Results.NotFound() : Results.Ok(build);
     });
 
 app.MapPut(
     "/characters/{characterId:guid}/build",
-    async (Guid characterId, UpsertCharacterBuildRequest request, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
+    async (Guid characterId, UpsertCharacterBuildRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
     {
-        var result = await buildService.UpsertBuildAsync(characterId, request, cancellationToken);
+        var session = await EndpointAuth.RequireSessionAsync(httpContext, auth, cancellationToken);
+        if (session is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var existingOwnerId = await db.CharacterSheets
+            .AsNoTracking()
+            .Where(x => x.CharacterId == characterId.ToString())
+            .Select(x => x.OwnerUserId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(existingOwnerId) && !string.Equals(existingOwnerId, session.UserId, StringComparison.Ordinal))
+        {
+            return Results.Forbid();
+        }
+
+        var result = await buildService.UpsertBuildAsync(characterId, session.UserId, request, cancellationToken);
         return result.Errors.Count > 0
             ? Results.BadRequest(new { errors = result.Errors })
             : Results.Ok(result.Data);
@@ -496,8 +588,13 @@ app.MapPut(
 
 app.MapPatch(
     "/characters/{characterId:guid}/build",
-    async (Guid characterId, PatchCharacterBuildRequest request, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
+    async (Guid characterId, PatchCharacterBuildRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var result = await buildService.PatchBuildAsync(characterId, request, cancellationToken);
         if (result.Data is null && result.Errors.Count == 1 && string.Equals(result.Errors[0], "Character build was not found.", StringComparison.Ordinal))
         {
@@ -511,8 +608,13 @@ app.MapPatch(
 
 app.MapDelete(
     "/characters/{characterId:guid}/build",
-    async (Guid characterId, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
     {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
         var deleted = await buildService.DeleteBuildAsync(characterId, cancellationToken);
         return deleted ? Results.NoContent() : Results.NotFound();
     });
@@ -539,3 +641,65 @@ public sealed record ItemCatalogItem(
     string Rarity,
     bool RequiresAttunement,
     IReadOnlyList<ItemCatalogEffect> Effects);
+
+public static class EndpointAuth
+{
+    public static string? ResolveSessionToken(HttpContext httpContext)
+    {
+        if (httpContext.Request.Headers.TryGetValue("X-Session-Token", out var headerToken) &&
+            !string.IsNullOrWhiteSpace(headerToken))
+        {
+            return headerToken.ToString();
+        }
+
+        if (httpContext.Request.Query.TryGetValue("sessionToken", out var queryToken) &&
+            !string.IsNullOrWhiteSpace(queryToken))
+        {
+            return queryToken.ToString();
+        }
+
+        return null;
+    }
+
+    public static async Task<LocalSession?> RequireSessionAsync(
+        HttpContext httpContext,
+        ILocalAuthService auth,
+        CancellationToken cancellationToken)
+    {
+        var sessionToken = ResolveSessionToken(httpContext);
+        if (string.IsNullOrWhiteSpace(sessionToken))
+        {
+            return null;
+        }
+
+        return await auth.GetSessionAsync(sessionToken, cancellationToken);
+    }
+
+    public static async Task<IResult?> AuthorizeCharacterOwnerAsync(
+        HttpContext httpContext,
+        Guid characterId,
+        AppDbContext db,
+        ILocalAuthService auth,
+        CancellationToken cancellationToken)
+    {
+        var session = await RequireSessionAsync(httpContext, auth, cancellationToken);
+        if (session is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var ownerUserId = await db.CharacterSheets
+            .AsNoTracking()
+            .Where(x => x.CharacterId == characterId.ToString())
+            .Select(x => x.OwnerUserId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(ownerUserId))
+        {
+            return Results.NotFound();
+        }
+
+        return string.Equals(ownerUserId, session.UserId, StringComparison.Ordinal)
+            ? null
+            : Results.Forbid();
+    }
+}

@@ -16,10 +16,12 @@ import {
   getItemCatalog,
   health,
   loginLocal,
+  registerLocal,
   patchInventoryItem,
   previewOrigin,
   previewSpecies,
   removeInventoryItem,
+  setSessionToken,
   startWizard,
   submitWizardStep,
   upsertCharacterBuild,
@@ -99,25 +101,19 @@ function abilityModifier(score: number) {
   return Math.floor((score - 10) / 2)
 }
 
-function rollAbilitySet(): Record<AbilityName, number> {
-  const scores = ABILITIES.map(() => {
+function rollAbilityValues(): number[] {
+  return ABILITIES.map(() => {
     const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1).sort((a, b) => a - b)
     return rolls[1] + rolls[2] + rolls[3]
   }).sort((a, b) => b - a)
-  return {
-    Strength: scores[0],
-    Dexterity: scores[1],
-    Constitution: scores[2],
-    Intelligence: scores[3],
-    Wisdom: scores[4],
-    Charisma: scores[5],
-  }
 }
 
 function App() {
   const [status, setStatus] = useState('Checking API...')
   const [session, setSession] = useState<LocalSession | null>(null)
   const [loginName, setLoginName] = useState('casey')
+  const [loginPassword, setLoginPassword] = useState('password123')
+  const [isRegisterMode, setIsRegisterMode] = useState(false)
   const [characters, setCharacters] = useState<CharacterSummary[]>([])
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [history, setHistory] = useState<CharacterHistoryEntry[]>([])
@@ -139,7 +135,8 @@ function App() {
   const [buildMethod, setBuildMethod] = useState<BuildMethod>('PointBuy')
   const [manualScores, setManualScores] = useState<Record<AbilityName, number>>({ ...DEFAULT_SCORES })
   const [pointBuyScores, setPointBuyScores] = useState<Record<AbilityName, number>>({ ...DEFAULT_SCORES })
-  const [rolledScores, setRolledScores] = useState<Record<AbilityName, number> | null>(null)
+  const [rolledPool, setRolledPool] = useState<number[]>([])
+  const [rollAssignments, setRollAssignments] = useState<Partial<Record<AbilityName, number>>>({})
   const [proficiencyBonus, setProficiencyBonus] = useState(2)
   const [proficientSkills, setProficientSkills] = useState<SkillName[]>([])
   const [savedBuild, setSavedBuild] = useState<CharacterBuildData | null>(null)
@@ -164,9 +161,23 @@ function App() {
     [selectedCharacterId, activeDraft?.draft?.characterId],
   )
 
+  const rolledScores = useMemo<Record<AbilityName, number>>(
+    () =>
+      ABILITIES.reduce(
+        (acc, ability) => ({ ...acc, [ability]: rollAssignments[ability] ?? DEFAULT_SCORES[ability] }),
+        { ...DEFAULT_SCORES },
+      ),
+    [rollAssignments],
+  )
+
+  const isRollAssignmentComplete = useMemo(
+    () => ABILITIES.every((ability) => typeof rollAssignments[ability] === 'number') && rolledPool.length === 0,
+    [rollAssignments, rolledPool],
+  )
+
   const activeAbilityScores = useMemo<Record<AbilityName, number>>(() => {
     if (buildMethod === 'Manual') return manualScores
-    if (buildMethod === 'Roll') return rolledScores ?? DEFAULT_SCORES
+    if (buildMethod === 'Roll') return rolledScores
     return pointBuyScores
   }, [buildMethod, manualScores, pointBuyScores, rolledScores])
 
@@ -212,7 +223,8 @@ function App() {
       setProficientSkills(build.proficientSkills)
       setManualScores(build.abilityScores)
       setPointBuyScores(build.abilityScores)
-      setRolledScores(build.abilityScores)
+      setRollAssignments(build.abilityScores)
+      setRolledPool([])
       setBuildResult('Loaded persisted character build.')
     } catch {
       setSavedBuild(null)
@@ -246,8 +258,11 @@ function App() {
   async function handleLogin() {
     try {
       setError('')
-      const result = await loginLocal(loginName)
+      const result = isRegisterMode
+        ? await registerLocal(loginName, loginPassword)
+        : await loginLocal(loginName, loginPassword)
       setSession(result)
+      setSessionToken(result.sessionToken)
       await refreshCharacters()
       await loadCatalogData(baseRules)
     } catch (e) {
@@ -346,6 +361,10 @@ function App() {
       setError('Select or create a character first.')
       return
     }
+    if (buildMethod === 'Roll' && !isRollAssignmentComplete) {
+      setError('Assign all rolled values to abilities before saving.')
+      return
+    }
     const selectedClass = classCatalog.find((x) => x.moduleId === selectedClassModuleId)
     if (!selectedClass) {
       setError('Select a class before saving the build.')
@@ -416,6 +435,40 @@ function App() {
     const spent = ABILITIES.reduce((sum, key) => sum + POINT_BUY_COST[candidate[key]], 0)
     if (spent > 27) return
     setPointBuyScores(candidate)
+  }
+
+  function handleRollPoolGenerate() {
+    setRolledPool(rollAbilityValues())
+    setRollAssignments({})
+  }
+
+  function unassignRoll(ability: AbilityName) {
+    const assigned = rollAssignments[ability]
+    if (typeof assigned !== 'number') return
+    setRollAssignments((prev) => {
+      const next = { ...prev }
+      delete next[ability]
+      return next
+    })
+    setRolledPool((prev) => [...prev, assigned].sort((a, b) => b - a))
+  }
+
+  function assignRollToAbility(ability: AbilityName, value: number) {
+    const previousAssigned = rollAssignments[ability]
+    setRollAssignments((prev) => {
+      const next = { ...prev, [ability]: value }
+      return next
+    })
+    setRolledPool((prev) => {
+      const index = prev.indexOf(value)
+      if (index < 0) return prev
+      const next = [...prev]
+      next.splice(index, 1)
+      if (typeof previousAssigned === 'number') {
+        next.push(previousAssigned)
+      }
+      return next.sort((a, b) => b - a)
+    })
   }
 
   async function handleAddItemFromCatalog() {
@@ -501,7 +554,17 @@ function App() {
         <h2>1. Local session</h2>
         <div className="row">
           <input value={loginName} onChange={(e) => setLoginName(e.target.value)} placeholder="Username" />
-          <button onClick={handleLogin}>Start Session</button>
+          <input
+            type="password"
+            value={loginPassword}
+            onChange={(e) => setLoginPassword(e.target.value)}
+            placeholder="Password"
+          />
+          <label>
+            <input type="checkbox" checked={isRegisterMode} onChange={(e) => setIsRegisterMode(e.target.checked)} /> Register
+            new user
+          </label>
+          <button onClick={handleLogin}>{isRegisterMode ? 'Register + Start Session' : 'Start Session'}</button>
         </div>
         {session && <p>Session: {session.userName} ({session.sessionToken.slice(0, 10)}...)</p>}
       </section>
@@ -539,7 +602,30 @@ function App() {
         </div>
 
         {buildMethod === 'PointBuy' && <p>Point-buy spent: {pointBuySpent}/27</p>}
-        {buildMethod === 'Roll' && <button onClick={() => setRolledScores(rollAbilitySet())}>Roll 4d6 drop lowest (6 stats)</button>}
+        {buildMethod === 'Roll' && (
+          <>
+            <div className="row">
+              <button onClick={handleRollPoolGenerate}>Roll 4d6 drop lowest (6 stats)</button>
+              <p>{isRollAssignmentComplete ? 'All rolls assigned.' : 'Drag each roll to an ability to assign.'}</p>
+            </div>
+            <div className="roll-pool">
+              {rolledPool.length === 0 ? (
+                <small>No unassigned rolls. Roll to generate values.</small>
+              ) : (
+                rolledPool.map((value, idx) => (
+                  <button
+                    key={`${value}-${idx}`}
+                    className="roll-chip"
+                    draggable
+                    onDragStart={(event) => event.dataTransfer.setData('text/plain', String(value))}
+                  >
+                    {value}
+                  </button>
+                ))
+              )}
+            </div>
+          </>
+        )}
 
         <div className="scores-grid">
           {ABILITIES.map((ability) => (
@@ -560,7 +646,24 @@ function App() {
                   onChange={(e) => setManualAbilityScore(ability, Number(e.target.value))}
                 />
               ) : (
-                <strong>{(rolledScores ?? DEFAULT_SCORES)[ability]}</strong>
+                <div
+                  className="roll-target"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    const value = Number(event.dataTransfer.getData('text/plain'))
+                    if (!Number.isNaN(value)) {
+                      assignRollToAbility(ability, value)
+                    }
+                  }}
+                >
+                  <strong>{rolledScores[ability]}</strong>
+                  {typeof rollAssignments[ability] === 'number' && (
+                    <button type="button" onClick={() => unassignRoll(ability)}>
+                      Clear
+                    </button>
+                  )}
+                </div>
               )}
               <small>
                 mod {abilityModifier(activeAbilityScores[ability]) >= 0 ? '+' : ''}
@@ -591,7 +694,10 @@ function App() {
           <button onClick={handleApplySelectedClassToWizard} disabled={!activeDraft?.draft || classCatalog.length === 0}>
             Apply selected class to wizard
           </button>
-          <button onClick={handleSaveBuildToDb} disabled={!currentCharacterId || classCatalog.length === 0}>
+          <button
+            onClick={handleSaveBuildToDb}
+            disabled={!currentCharacterId || classCatalog.length === 0 || (buildMethod === 'Roll' && !isRollAssignmentComplete)}
+          >
             Save build to persistent model
           </button>
         </div>
