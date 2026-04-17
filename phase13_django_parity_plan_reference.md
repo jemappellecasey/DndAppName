@@ -29,3 +29,6 @@ Maintain a comparable Django build as an aside while .NET 10 API + React remains
 2. Implement read-only parity endpoints first (health, guidance, resolve).
 3. Implement mutable flows (wizard, inventory state, history).
 4. Run contract tests against both APIs with same fixtures.
+
+## Parity acceptance checkpoint
+- Django parity can be considered v1-complete when shared fixture-based contract tests pass for all listed parity scope endpoints.
