@@ -52,3 +52,18 @@ public sealed record DerivedStats(
 public sealed record ItemEffectPipelineResult(
     DerivedStats DerivedStats,
     IReadOnlyList<ItemEffectBreakdownEntry> Breakdown);
+
+public sealed record UpdateInventoryItemStateRequest(
+    BaseStats BaseStats,
+    IReadOnlyList<CharacterItemState> Items,
+    string ItemId,
+    bool? IsEquipped,
+    bool? IsAttuned);
+
+public sealed record InventoryStateUpdateResult(
+    IReadOnlyList<CharacterItemState> Items,
+    ItemEffectPipelineResult PipelineResult,
+    int ActiveAttunementCount,
+    int AttunementCap,
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<string> Errors);

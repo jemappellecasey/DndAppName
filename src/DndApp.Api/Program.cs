@@ -1,5 +1,6 @@
 using DndApp.Api.CustomContent;
 using DndApp.Api.Characters;
+using DndApp.Api.Auth;
 using DndApp.Api.Items;
 using DndApp.Api.Mechanics;
 using DndApp.Api.MixedRules;
@@ -11,6 +12,7 @@ builder.Services.AddSingleton<IItemEffectPipelineService, ItemEffectPipelineServ
 builder.Services.AddSingleton<ICalculationEngineService, CalculationEngineService>();
 builder.Services.AddSingleton<IMixedRulesResolutionService, MixedRulesResolutionService>();
 builder.Services.AddSingleton<ICharacterWizardService, CharacterWizardService>();
+builder.Services.AddSingleton<ILocalAuthService, LocalAuthService>();
 
 var app = builder.Build();
 
@@ -19,7 +21,32 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.Use(async (context, next) =>
+{
+    var started = DateTimeOffset.UtcNow;
+    await next();
+    var elapsedMs = (DateTimeOffset.UtcNow - started).TotalMilliseconds;
+    app.Logger.LogInformation(
+        "Request {Method} {Path} responded {StatusCode} in {ElapsedMs:0.00}ms",
+        context.Request.Method,
+        context.Request.Path,
+        context.Response.StatusCode,
+        elapsedMs);
+});
+
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+app.MapPost(
+    "/auth/local/login",
+    (LocalLoginRequest request, ILocalAuthService auth) => Results.Ok(auth.Login(request)));
+
+app.MapGet(
+    "/auth/local/me",
+    (string sessionToken, ILocalAuthService auth) =>
+    {
+        var session = auth.GetSession(sessionToken);
+        return session is null ? Results.NotFound() : Results.Ok(session);
+    });
 
 app.MapPost(
     "/characters/{characterId:guid}/custom/origin",
@@ -117,6 +144,18 @@ app.MapPost(
         });
     });
 
+app.MapGet(
+    "/inventory/attunement-guidance",
+    (IItemEffectPipelineService pipeline) => Results.Ok(pipeline.GetAttunementGuidance()));
+
+app.MapPost(
+    "/characters/{characterId:guid}/inventory/update-item-state",
+    (Guid characterId, UpdateInventoryItemStateRequest request, IItemEffectPipelineService pipeline) =>
+    {
+        var result = pipeline.UpdateItemState(request);
+        return Results.Ok(new { characterId, result });
+    });
+
 app.MapPost(
     "/characters/{characterId:guid}/compute/check",
     (Guid characterId, ComputeCheckRequest request, ICalculationEngineService calculations) =>
@@ -203,6 +242,14 @@ app.MapPost(
     {
         var result = wizardService.DuplicateCharacter(characterId, request);
         return result is null ? Results.NotFound() : Results.Ok(result);
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/history",
+    (Guid characterId, ICharacterWizardService wizardService) =>
+    {
+        var result = wizardService.GetCharacterHistory(characterId);
+        return Results.Ok(result);
     });
 
 app.MapPost(

@@ -8,6 +8,7 @@ public sealed record RulesProfile(
     IReadOnlyList<string> OverlaySources);
 
 public sealed record StartCharacterWizardRequest(
+    string SessionToken,
     string CharacterName,
     RulesProfile RulesProfile);
 
@@ -30,6 +31,7 @@ public sealed record CopyCharacterRulesetRequest(
 
 public sealed record CharacterWizardDraft(
     Guid CharacterId,
+    string OwnerUserId,
     string CharacterName,
     RulesProfile RulesProfile,
     bool IsFinalized,
@@ -54,3 +56,9 @@ public sealed record CharacterSummary(
 public sealed record UpdateCharacterRequest(string? CharacterName);
 
 public sealed record DuplicateCharacterRequest(string? NameSuffix);
+
+public sealed record CharacterRevisionEntry(
+    DateTimeOffset TimestampUtc,
+    string Action,
+    string ActorUserId,
+    string Details);

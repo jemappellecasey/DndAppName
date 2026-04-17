@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+.git
+.gitignore
+DnDPHB2014.md
+DnDPHB2024.md
+DnDDMG2014.md
+DNDDMG2024.md
+data/review/

@@ -53,6 +53,11 @@ Outputs are written under:
 9. `PATCH /characters/{characterId}`
 10. `POST /characters/{characterId}/archive`
 11. `POST /characters/{characterId}/duplicate`
+12. `GET /characters/{characterId}/history`
+
+### Local auth stub
+1. `POST /auth/local/login`
+2. `GET /auth/local/me?sessionToken={token}`
 
 ### Custom content
 1. `POST /characters/{characterId}/custom/origin`
@@ -64,9 +69,24 @@ Outputs are written under:
 
 ### Items and calculations
 1. `POST /characters/{characterId}/items/apply-effects`
-2. `POST /characters/{characterId}/compute/check`
-3. `POST /characters/{characterId}/compute/save`
-4. `POST /characters/{characterId}/compute/attack`
+2. `GET /inventory/attunement-guidance`
+3. `POST /characters/{characterId}/inventory/update-item-state`
+4. `POST /characters/{characterId}/compute/check`
+5. `POST /characters/{characterId}/compute/save`
+6. `POST /characters/{characterId}/compute/attack`
 
 ## Branching convention used
 A dedicated branch is created after each completed phase (phase-0, phase-1, etc.) and pushed to GitHub for review.
+
+## Note on wizard start payload
+`POST /wizard/characters/start` expects a `sessionToken` from local login in addition to character name and rules profile.
+
+## Container launch (deployment baseline)
+1. Build image:
+   ```powershell
+   docker build -t dndappname-api .
+   ```
+2. Run container:
+   ```powershell
+   docker run --rm -p 8080:8080 dndappname-api
+   ```

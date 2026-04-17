@@ -12,6 +12,7 @@ public interface ICharacterWizardService
     CharacterSummary? UpdateCharacter(Guid characterId, UpdateCharacterRequest request);
     CharacterSummary? ArchiveCharacter(Guid characterId);
     CharacterSummary? DuplicateCharacter(Guid characterId, DuplicateCharacterRequest request);
+    IReadOnlyList<CharacterRevisionEntry> GetCharacterHistory(Guid characterId);
     CharacterWizardResult SubmitStep(Guid characterId, SubmitWizardStepRequest request);
     CharacterWizardResult Finalize(Guid characterId, FinalizeWizardRequest request);
     CharacterWizardResult CopyToRuleset(Guid characterId, CopyCharacterRulesetRequest request);
@@ -21,6 +22,7 @@ public sealed class CharacterWizardService : ICharacterWizardService
 {
     private readonly ConcurrentDictionary<Guid, CharacterWizardDraft> _drafts = new();
     private readonly ConcurrentDictionary<Guid, CharacterRecord> _characters = new();
+    private readonly ConcurrentDictionary<Guid, List<CharacterRevisionEntry>> _history = new();
     private readonly IMixedRulesResolutionService _resolver;
 
     public CharacterWizardService(IMixedRulesResolutionService resolver)
@@ -35,6 +37,10 @@ public sealed class CharacterWizardService : ICharacterWizardService
         {
             errors.Add("Character name is required.");
         }
+        if (string.IsNullOrWhiteSpace(request.SessionToken))
+        {
+            errors.Add("Session token is required.");
+        }
 
         if (!request.RulesProfile.MixedModeEnabled && request.RulesProfile.OverlaySources.Count > 0)
         {
@@ -48,6 +54,7 @@ public sealed class CharacterWizardService : ICharacterWizardService
 
         var draft = new CharacterWizardDraft(
             Guid.NewGuid(),
+            request.SessionToken.Trim(),
             request.CharacterName.Trim(),
             request.RulesProfile,
             false,
@@ -55,6 +62,7 @@ public sealed class CharacterWizardService : ICharacterWizardService
             Array.Empty<string>());
 
         _drafts[draft.CharacterId] = draft;
+        AppendHistory(draft.CharacterId, "draft-started", draft.OwnerUserId, "Character wizard draft created.");
         return new CharacterWizardResult(true, draft, Array.Empty<string>(), Array.Empty<string>());
     }
 
@@ -92,6 +100,7 @@ public sealed class CharacterWizardService : ICharacterWizardService
         };
 
         _characters[characterId] = updated;
+        AppendHistory(characterId, "character-updated", character.OwnerUserId, $"Character renamed to '{updated.CharacterName}'.");
         return ToSummary(updated);
     }
 
@@ -109,6 +118,7 @@ public sealed class CharacterWizardService : ICharacterWizardService
         };
 
         _characters[characterId] = updated;
+        AppendHistory(characterId, "character-archived", character.OwnerUserId, "Character archived (soft delete).");
         return ToSummary(updated);
     }
 
@@ -123,6 +133,7 @@ public sealed class CharacterWizardService : ICharacterWizardService
         var now = DateTimeOffset.UtcNow;
         var duplicate = new CharacterRecord(
             Guid.NewGuid(),
+            character.OwnerUserId,
             $"{character.CharacterName} ({suffix})",
             character.RulesProfile,
             false,
@@ -130,7 +141,20 @@ public sealed class CharacterWizardService : ICharacterWizardService
             now);
 
         _characters[duplicate.CharacterId] = duplicate;
+        AppendHistory(duplicate.CharacterId, "character-duplicated", character.OwnerUserId, $"Duplicated from '{character.CharacterId}'.");
         return ToSummary(duplicate);
+    }
+
+    public IReadOnlyList<CharacterRevisionEntry> GetCharacterHistory(Guid characterId)
+    {
+        if (!_history.TryGetValue(characterId, out var entries))
+        {
+            return Array.Empty<CharacterRevisionEntry>();
+        }
+
+        return entries
+            .OrderByDescending(x => x.TimestampUtc)
+            .ToArray();
     }
 
     public CharacterWizardResult SubmitStep(Guid characterId, SubmitWizardStepRequest request)
@@ -197,12 +221,14 @@ public sealed class CharacterWizardService : ICharacterWizardService
         var now = DateTimeOffset.UtcNow;
         var character = new CharacterRecord(
             finalized.CharacterId,
+            finalized.OwnerUserId,
             finalized.CharacterName,
             finalized.RulesProfile,
             false,
             now,
             now);
         _characters[finalized.CharacterId] = character;
+        AppendHistory(finalized.CharacterId, "character-finalized", finalized.OwnerUserId, "Wizard draft finalized into character record.");
 
         return new CharacterWizardResult(true, finalized, Array.Empty<string>(), resolveResult.Warnings);
     }
@@ -231,6 +257,7 @@ public sealed class CharacterWizardService : ICharacterWizardService
 
         var copied = new CharacterWizardDraft(
             Guid.NewGuid(),
+            draft.OwnerUserId,
             $"{draft.CharacterName} (Copy)",
             new RulesProfile(request.TargetRuleSystem, request.TargetOverlaySources.Count > 0, request.TargetOverlaySources),
             false,
@@ -238,6 +265,7 @@ public sealed class CharacterWizardService : ICharacterWizardService
             warnings);
 
         _drafts[copied.CharacterId] = copied;
+        AppendHistory(copied.CharacterId, "draft-copied-ruleset", draft.OwnerUserId, $"Copied from '{draft.CharacterId}' to target ruleset '{request.TargetRuleSystem}'.");
         return new CharacterWizardResult(true, copied, Array.Empty<string>(), warnings);
     }
 
@@ -251,6 +279,16 @@ public sealed class CharacterWizardService : ICharacterWizardService
             character.IsArchived,
             character.CreatedAtUtc,
             character.UpdatedAtUtc);
+    }
+
+    private void AppendHistory(Guid characterId, string action, string actorUserId, string details)
+    {
+        var entry = new CharacterRevisionEntry(DateTimeOffset.UtcNow, action, actorUserId, details);
+        var list = _history.GetOrAdd(characterId, _ => new List<CharacterRevisionEntry>());
+        lock (list)
+        {
+            list.Add(entry);
+        }
     }
 
     private static List<string> ValidateSelectionsAgainstRulesMode(RulesProfile profile, IReadOnlyList<RuleModuleSelection> selections)
@@ -289,6 +327,7 @@ public sealed class CharacterWizardService : ICharacterWizardService
 
     private sealed record CharacterRecord(
         Guid CharacterId,
+        string OwnerUserId,
         string CharacterName,
         RulesProfile RulesProfile,
         bool IsArchived,
