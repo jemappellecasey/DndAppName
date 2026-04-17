@@ -1,15 +1,16 @@
 import type {
+  CharacterBuildData,
   CharacterHistoryEntry,
-  ClassCatalogItem,
-  ComputeCheckPayload,
+  CharacterInventoryState,
   CharacterSummary,
   CharacterWizardResult,
-  InventoryStateUpdateResult,
+  ClassCatalogItem,
   ItemCatalogItem,
   LocalSession,
+  PersistedComputeCheckPayload,
   RuleModuleSelection,
   RuleSystemMode,
-  UpdateInventoryItemStatePayload,
+  UpsertCharacterBuildPayload,
 } from './types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080'
@@ -163,18 +164,43 @@ export function previewSpecies(payload: {
   })
 }
 
-export function updateInventoryItemState(
-  characterId: string,
-  payload: UpdateInventoryItemStatePayload,
-) {
-  return request<InventoryStateUpdateResult>(`/characters/${characterId}/inventory/update-item-state`, {
-    method: 'POST',
+export function getCharacterBuild(characterId: string) {
+  return request<CharacterBuildData>(`/characters/${characterId}/build`)
+}
+
+export function upsertCharacterBuild(characterId: string, payload: UpsertCharacterBuildPayload) {
+  return request<CharacterBuildData>(`/characters/${characterId}/build`, {
+    method: 'PUT',
     body: JSON.stringify(payload),
   })
 }
 
-export function computeCheck(characterId: string, payload: ComputeCheckPayload) {
-  return request(`/characters/${characterId}/compute/check`, {
+export function getCharacterInventory(characterId: string) {
+  return request<CharacterInventoryState>(`/characters/${characterId}/inventory`)
+}
+
+export function addInventoryItem(characterId: string, itemDefinitionId: string) {
+  return request<CharacterInventoryState>(`/characters/${characterId}/inventory/items`, {
+    method: 'POST',
+    body: JSON.stringify({ itemDefinitionId }),
+  })
+}
+
+export function patchInventoryItem(characterId: string, inventoryItemId: string, payload: { isEquipped?: boolean; isAttuned?: boolean }) {
+  return request<CharacterInventoryState>(`/characters/${characterId}/inventory/items/${inventoryItemId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function removeInventoryItem(characterId: string, inventoryItemId: string) {
+  return request<void>(`/characters/${characterId}/inventory/items/${inventoryItemId}`, {
+    method: 'DELETE',
+  })
+}
+
+export function computePersistedCheck(characterId: string, payload: PersistedComputeCheckPayload) {
+  return request(`/characters/${characterId}/compute/check/persisted`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })

@@ -171,3 +171,57 @@ export interface ComputeCheckPayload {
   advantageState: AdvantageState
   rollDice: boolean
 }
+
+export interface CharacterBuildData {
+  characterId: string
+  characterName: string
+  baseRuleSystem: RuleSystemMode
+  buildMethod: BuildMethod
+  classModuleId: string
+  className: string
+  level: number
+  proficiencyBonus: number
+  abilityScores: Record<AbilityName, number>
+  proficientSkills: SkillName[]
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export interface UpsertCharacterBuildPayload {
+  characterName: string
+  baseRuleSystem: RuleSystemMode
+  buildMethod: BuildMethod
+  classModuleId: string
+  className: string
+  level: number
+  proficiencyBonus: number
+  abilityScores: Record<AbilityName, number>
+  proficientSkills: SkillName[]
+}
+
+export interface CharacterInventoryItemData {
+  inventoryItemId: string
+  itemDefinitionId: string
+  itemName: string
+  requiresAttunement: boolean
+  isEquipped: boolean
+  isAttuned: boolean
+}
+
+export interface CharacterInventoryState {
+  characterId: string
+  items: CharacterInventoryItemData[]
+  pipelineResult: InventoryStateUpdateResult['pipelineResult']
+  activeAttunementCount: number
+  attunementCap: number
+  warnings: string[]
+  errors: string[]
+}
+
+export interface PersistedComputeCheckPayload {
+  skillName: SkillName
+  advantageState: AdvantageState
+  rollDice: boolean
+  additionalModifier: number
+  hasExpertise: boolean
+}

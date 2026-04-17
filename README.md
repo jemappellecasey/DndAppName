@@ -62,10 +62,10 @@ npm run build
    - **Point buy** (27-point budget),
    - **Manual** score entry, or
    - **Roll** (4d6 drop lowest).
-3. In **Character wizard and class module**, click **Start Wizard Draft**, pick a class from DB-backed class catalog, then click **Apply selected class to wizard**.
-4. Click **Finalize** to create the character record.
-5. In **Skills menu and check rolling**, choose any skill, set advantage/expertise, and roll checks from the full skill list.
-6. In **Inventory from database**, add item definitions from the DB catalog, then equip/attune/unattune/remove items. The UI sends current inventory state into `update-item-state` to compute derived effects.
+3. In **Wizard + persistent build**, click **Start Wizard Draft**, pick a class from DB-backed class catalog, optionally apply to wizard, then click **Save build to persistent model**.
+4. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
+5. In **Skills menu and persisted checks**, choose any skill, set advantage/expertise, and roll checks via persisted-computation endpoint(s).
+6. In **Inventory from database (persisted)**, add item definitions from catalog, then equip/attune/unattune/remove through persisted inventory endpoints.
 7. In **Character library**, click **Refresh** and select your character. Use **History**, **Duplicate**, or **Archive** as needed.
 8. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
 
@@ -167,6 +167,9 @@ Outputs are written under:
 ### Rule validation (phase 5)
 1. `PUT /characters/{characterId}/build` and `PATCH /characters/{characterId}/build` now validate class-module compatibility and prerequisite predicates from `prerequisite`.
 2. `POST /characters/{characterId}/inventory/items` now validates item source compatibility and prerequisite predicates before persisting.
+
+### Frontend integration (phase 6)
+The React app now uses persisted build/inventory/computation endpoints for core workflows instead of local simulation payloads.
 
 ### Content catalogs (database-backed)
 1. `GET /catalog/classes?ruleSystem={Rules2014|Rules2024}`
