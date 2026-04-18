@@ -21,6 +21,16 @@ public sealed class AppDbContext : DbContext
     public DbSet<ConstraintEntity> Constraints => Set<ConstraintEntity>();
     public DbSet<ItemDefinitionEntity> ItemDefinitions => Set<ItemDefinitionEntity>();
     public DbSet<ItemEffectEntity> ItemEffects => Set<ItemEffectEntity>();
+    public DbSet<Race2014Entity> Races2014 => Set<Race2014Entity>();
+    public DbSet<Species2024Entity> Species2024 => Set<Species2024Entity>();
+    public DbSet<Background2014Entity> Backgrounds2014 => Set<Background2014Entity>();
+    public DbSet<Background2024Entity> Backgrounds2024 => Set<Background2024Entity>();
+    public DbSet<Feat2014Entity> Feats2014 => Set<Feat2014Entity>();
+    public DbSet<Feat2024Entity> Feats2024 => Set<Feat2024Entity>();
+    public DbSet<Spell2014Entity> Spells2014 => Set<Spell2014Entity>();
+    public DbSet<Spell2024Entity> Spells2024 => Set<Spell2024Entity>();
+    public DbSet<Item2014Entity> Items2014 => Set<Item2014Entity>();
+    public DbSet<Item2024Entity> Items2024 => Set<Item2024Entity>();
     public DbSet<CharacterSheetEntity> CharacterSheets => Set<CharacterSheetEntity>();
     public DbSet<CharacterAbilityScoreEntity> CharacterAbilityScores => Set<CharacterAbilityScoreEntity>();
     public DbSet<CharacterSkillProficiencyEntity> CharacterSkillProficiencies => Set<CharacterSkillProficiencyEntity>();
@@ -211,6 +221,200 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.ItemDefinitionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Race2014Entity>(entity =>
+        {
+            entity.ToTable("catalog_race_2014");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.ParentRaceSlug).HasMaxLength(160);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.AbilityBonusesJson).HasColumnType("TEXT");
+            entity.Property(x => x.LanguagesJson).HasColumnType("TEXT");
+            entity.Property(x => x.TraitsJson).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Species2024Entity>(entity =>
+        {
+            entity.ToTable("catalog_species_2024");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.AbilityBonusesJson).HasColumnType("TEXT");
+            entity.Property(x => x.LanguagesJson).HasColumnType("TEXT");
+            entity.Property(x => x.TraitsJson).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Background2014Entity>(entity =>
+        {
+            entity.ToTable("catalog_background_2014");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.SkillProficienciesJson).HasColumnType("TEXT");
+            entity.Property(x => x.ToolProficienciesJson).HasColumnType("TEXT");
+            entity.Property(x => x.LanguageChoicesJson).HasColumnType("TEXT");
+            entity.Property(x => x.EquipmentJson).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Background2024Entity>(entity =>
+        {
+            entity.ToTable("catalog_background_2024");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.SkillProficienciesJson).HasColumnType("TEXT");
+            entity.Property(x => x.ToolProficienciesJson).HasColumnType("TEXT");
+            entity.Property(x => x.LanguageChoicesJson).HasColumnType("TEXT");
+            entity.Property(x => x.GrantedFeatSlug).HasMaxLength(160);
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Feat2014Entity>(entity =>
+        {
+            entity.ToTable("catalog_feat_2014");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.PrerequisitesJson).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Feat2024Entity>(entity =>
+        {
+            entity.ToTable("catalog_feat_2024");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.Category).HasMaxLength(80);
+            entity.Property(x => x.PrerequisitesJson).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Spell2014Entity>(entity =>
+        {
+            entity.ToTable("catalog_spell_2014");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.School).HasMaxLength(40);
+            entity.Property(x => x.CastingTime).HasMaxLength(120);
+            entity.Property(x => x.RangeText).HasMaxLength(160);
+            entity.Property(x => x.Duration).HasMaxLength(160);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => new { x.Level, x.Name });
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Spell2024Entity>(entity =>
+        {
+            entity.ToTable("catalog_spell_2024");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.School).HasMaxLength(40);
+            entity.Property(x => x.CastingTime).HasMaxLength(120);
+            entity.Property(x => x.RangeText).HasMaxLength(160);
+            entity.Property(x => x.Duration).HasMaxLength(160);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => new { x.Level, x.Name });
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Item2014Entity>(entity =>
+        {
+            entity.ToTable("catalog_item_2014");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.LegacyItemDefinitionId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.ItemType).HasMaxLength(80);
+            entity.Property(x => x.Rarity).HasMaxLength(40);
+            entity.Property(x => x.GoldValue).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.Weight).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.DamageDice).HasMaxLength(40);
+            entity.Property(x => x.WeaponAbility).HasMaxLength(24);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+            entity.HasIndex(x => x.LegacyItemDefinitionId);
+        });
+
+        modelBuilder.Entity<Item2024Entity>(entity =>
+        {
+            entity.ToTable("catalog_item_2024");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.LegacyItemDefinitionId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.ItemType).HasMaxLength(80);
+            entity.Property(x => x.Rarity).HasMaxLength(40);
+            entity.Property(x => x.GoldValue).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.Weight).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.DamageDice).HasMaxLength(40);
+            entity.Property(x => x.WeaponAbility).HasMaxLength(24);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+            entity.HasIndex(x => x.LegacyItemDefinitionId);
         });
 
         modelBuilder.Entity<CharacterSheetEntity>(entity =>

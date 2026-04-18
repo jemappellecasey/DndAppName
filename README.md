@@ -117,6 +117,10 @@ dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.cspro
 
 Normalization now classifies modules into expandable categories (`class`, `subclass`, `race`, `background`, `feat`, `spell`, `item`, `section`) and creates item definitions for detected item modules.
 It also enriches class/background module payloads with proficiency metadata (`fixedSkillProficiencies`, `skillChoices`, `skillChoiceCount`, `expertiseChoiceCount`) used by the frontend skill planner.
+Normalization now dual-writes into split edition catalog tables:
+`catalog_race_2014`, `catalog_species_2024`, `catalog_background_2014`, `catalog_background_2024`,
+`catalog_feat_2014`, `catalog_feat_2024`, `catalog_spell_2014`, `catalog_spell_2024`,
+`catalog_item_2014`, and `catalog_item_2024`.
 
 Outputs are written under:
 - `data\ingested\phb2014\v1\sections.json`
@@ -134,6 +138,7 @@ Outputs are written under:
    dotnet ef migrations add <MigrationName> --project src\DndApp.Api\DndApp.Api.csproj --startup-project src\DndApp.Api\DndApp.Api.csproj --output-dir Data\Migrations
    dotnet ef database update --project src\DndApp.Api\DndApp.Api.csproj --startup-project src\DndApp.Api\DndApp.Api.csproj
    ```
+5. Edition-split catalog tables are additive and coexist with current `rule_module`/`rule_variant`/`item_definition` tables so existing endpoints remain operational during cutover.
 
 ### Database provider config
 - `Database:Provider` currently supports `sqlite`.
