@@ -196,6 +196,15 @@ function rulesetLabel(ruleSystem: RuleSystemMode): string {
   return ruleSystem === 'Rules2024' ? '2024 rules' : '2014 rules'
 }
 
+function sourceMatchesBaseRules(sourceCode: string, baseRules: RuleSystemMode): boolean {
+  if (!sourceCode) {
+    return true
+  }
+
+  const normalized = sourceCode.toLowerCase()
+  return baseRules === 'Rules2014' ? normalized.includes('2014') : normalized.includes('2024')
+}
+
 function App() {
   const [status, setStatus] = useState('Checking API...')
   const [session, setSession] = useState<LocalSession | null>(null)
@@ -286,8 +295,8 @@ function App() {
         return baseRules === 'Rules2014'
           ? x.sourceCode.toLowerCase().includes('2014')
           : x.sourceCode.toLowerCase().includes('2024')
-      }),
-    [baseRules, mixedMode, moduleCatalog],
+      }).filter((x) => x.minLevelRequirement <= primaryClassLevel),
+    [baseRules, mixedMode, moduleCatalog, primaryClassLevel],
   )
   const raceOptions = useMemo(
     () =>
@@ -352,8 +361,20 @@ function App() {
 
   const raceBonuses = useMemo(() => {
     const selected = raceOptions.find((x) => x.moduleId === effectiveSelectedRaceModuleId)
+    if (selected && mixedMode && !sourceMatchesBaseRules(selected.sourceCode, baseRules)) {
+      return {}
+    }
     return selected?.abilityBonuses ?? {}
-  }, [raceOptions, effectiveSelectedRaceModuleId])
+  }, [baseRules, effectiveSelectedRaceModuleId, mixedMode, raceOptions])
+
+  const crossRulesetLineageBonusSuppressed = useMemo(() => {
+    const selected = raceOptions.find((x) => x.moduleId === effectiveSelectedRaceModuleId)
+    if (!selected || !mixedMode) {
+      return false
+    }
+
+    return !sourceMatchesBaseRules(selected.sourceCode, baseRules)
+  }, [baseRules, effectiveSelectedRaceModuleId, mixedMode, raceOptions])
 
   const backgroundBonuses = useMemo(() => {
     const selected = backgroundOptions.find((x) => x.moduleId === effectiveSelectedBackgroundModuleId)
@@ -1464,10 +1485,21 @@ function App() {
         <div className="row">
           <small>Race/Species bonuses: {Object.entries(raceBonuses).map(([k, v]) => `${k}+${v}`).join(', ') || 'None'}</small>
         </div>
+        {crossRulesetLineageBonusSuppressed && (
+          <div className="row">
+            <small>
+              Mixed mode note: cross-ruleset lineage bonuses are not applied by default; base-ruleset mechanics still control
+              ability math.
+            </small>
+          </div>
+        )}
         <div className="row">
           <small>
             Background/Origin bonuses: {Object.entries(backgroundBonuses).map(([k, v]) => `${k}+${v}`).join(', ') || 'None'}
           </small>
+        </div>
+        <div className="row">
+          <small>Starting equipment rule: when using equipment mode, only the first class grants starting equipment.</small>
         </div>
 
         {buildMethod === 'PointBuy' && <p>Point-buy spent: {pointBuySpent}/27</p>}
@@ -1581,10 +1613,11 @@ function App() {
             <option value="">None</option>
             {subclassOptions.map((item) => (
               <option key={item.moduleId} value={item.moduleId}>
-                {item.displayName} ({item.sourceCode})
+                {item.displayName} ({item.sourceCode}){item.minLevelRequirement > 0 ? ` - level ${item.minLevelRequirement}+` : ''}
               </option>
             ))}
           </select>
+          <small>Subclass options appear only when class level prerequisites are met.</small>
           <button
             onClick={handleApplySelectedClassToWizard}
             disabled={!activeDraft?.draft || mainClassOptions.length === 0}

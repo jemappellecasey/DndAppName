@@ -105,6 +105,8 @@ export interface ModuleCatalogItem {
   skillChoices: SkillName[]
   skillChoiceCount: number
   expertiseChoiceCount: number
+  minLevelRequirement: number
+  abilityScoreRequirements: Record<string, number>
 }
 
 export interface ItemCatalogEffect {

@@ -253,6 +253,28 @@ app.MapGet(
             })
             .ToListAsync(cancellationToken);
 
+        var moduleIds = rows
+            .Select(x => x.Module.Id)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var prerequisiteRows = await db.Prerequisites
+            .AsNoTracking()
+            .Where(x => moduleIds.Contains(x.RuleModuleId))
+            .Select(x => new { x.RuleModuleId, x.PredicateJson })
+            .ToArrayAsync(cancellationToken);
+        var minLevelByModule = prerequisiteRows
+            .GroupBy(x => x.RuleModuleId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                x => x.Key,
+                x => CatalogParsing.ParseMinLevelRequirement(x.Select(y => y.PredicateJson)),
+                StringComparer.OrdinalIgnoreCase);
+        var abilityReqByModule = prerequisiteRows
+            .GroupBy(x => x.RuleModuleId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                x => x.Key,
+                x => CatalogParsing.ParseAbilityRequirements(x.Select(y => y.PredicateJson)),
+                StringComparer.OrdinalIgnoreCase);
+
         var filtered = rows
             .Where(x => requestedModuleTypes.Count == 0 || requestedModuleTypes.Contains(x.Module.ModuleType))
             .GroupBy(x => $"{x.Module.ModuleType}\u001F{x.Module.DisplayName}\u001F{x.Source.Code}".ToUpperInvariant())
@@ -268,7 +290,11 @@ app.MapGet(
                 CatalogParsing.ParseStringArray(x.VariantPayloadJson, "fixedSkillProficiencies"),
                 CatalogParsing.ParseStringArray(x.VariantPayloadJson, "skillChoices"),
                 CatalogParsing.ParseInt(x.VariantPayloadJson, "skillChoiceCount"),
-                CatalogParsing.ParseInt(x.VariantPayloadJson, "expertiseChoiceCount")))
+                CatalogParsing.ParseInt(x.VariantPayloadJson, "expertiseChoiceCount"),
+                minLevelByModule.TryGetValue(x.Module.Id, out var minLevel) ? minLevel : 0,
+                abilityReqByModule.TryGetValue(x.Module.Id, out var abilities)
+                    ? abilities
+                    : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)))
             .ToArray();
 
         return Results.Ok(filtered);
@@ -943,7 +969,9 @@ public sealed record ModuleCatalogItem(
     IReadOnlyList<string> FixedSkillProficiencies,
     IReadOnlyList<string> SkillChoices,
     int SkillChoiceCount,
-    int ExpertiseChoiceCount);
+    int ExpertiseChoiceCount,
+    int MinLevelRequirement,
+    IReadOnlyDictionary<string, int> AbilityScoreRequirements);
 
 public static class CatalogParsing
 {
@@ -1024,6 +1052,77 @@ public static class CatalogParsing
             JsonValueKind.String when int.TryParse(value.GetString(), out var n) => n,
             _ => 0
         };
+    }
+
+    public static int ParseMinLevelRequirement(IEnumerable<string?> predicateJsonValues)
+    {
+        var maxRequired = 0;
+        foreach (var predicateJson in predicateJsonValues)
+        {
+            var root = ParseRoot(predicateJson);
+            if (root is null || root.Value.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            if (root.Value.TryGetProperty("minLevel", out var minLevelElement) &&
+                minLevelElement.ValueKind == JsonValueKind.Number &&
+                minLevelElement.TryGetInt32(out var minLevel))
+            {
+                maxRequired = Math.Max(maxRequired, minLevel);
+            }
+        }
+
+        return maxRequired;
+    }
+
+    public static IReadOnlyDictionary<string, int> ParseAbilityRequirements(IEnumerable<string?> predicateJsonValues)
+    {
+        var requirements = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var predicateJson in predicateJsonValues)
+        {
+            var root = ParseRoot(predicateJson);
+            if (root is null || root.Value.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            if (root.Value.TryGetProperty("ability", out var abilityElement) &&
+                root.Value.TryGetProperty("minScore", out var minScoreElement) &&
+                abilityElement.ValueKind == JsonValueKind.String)
+            {
+                var abilityName = abilityElement.GetString();
+                if (!string.IsNullOrWhiteSpace(abilityName))
+                {
+                    var required = minScoreElement.ValueKind == JsonValueKind.Number && minScoreElement.TryGetInt32(out var score)
+                        ? score
+                        : 0;
+                    if (required > 0)
+                    {
+                        requirements[abilityName.Trim()] = Math.Max(requirements.GetValueOrDefault(abilityName.Trim(), 0), required);
+                    }
+                }
+            }
+
+            if (root.Value.TryGetProperty("abilities", out var abilitiesElement) &&
+                abilitiesElement.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var ability in abilitiesElement.EnumerateObject())
+                {
+                    if (ability.Value.ValueKind != JsonValueKind.Number || !ability.Value.TryGetInt32(out var requiredScore))
+                    {
+                        continue;
+                    }
+
+                    if (requiredScore > 0)
+                    {
+                        requirements[ability.Name] = Math.Max(requirements.GetValueOrDefault(ability.Name, 0), requiredScore);
+                    }
+                }
+            }
+        }
+
+        return requirements;
     }
 }
 
