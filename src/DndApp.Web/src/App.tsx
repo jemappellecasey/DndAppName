@@ -239,10 +239,14 @@ function App() {
   const [selectedClassModuleId, setSelectedClassModuleId] = useState('')
   const [selectedSubclassModuleId, setSelectedSubclassModuleId] = useState('')
   const [selectedRaceModuleId, setSelectedRaceModuleId] = useState('')
+  const [selectedSubraceModuleId, setSelectedSubraceModuleId] = useState('')
   const [selectedBackgroundModuleId, setSelectedBackgroundModuleId] = useState('')
   const [secondaryClassModuleId, setSecondaryClassModuleId] = useState('')
-  const [multiClassSelections, setMultiClassSelections] = useState<Array<{ moduleId: string; level: number }>>([])
+  const [multiClassSelections, setMultiClassSelections] = useState<
+    Array<{ moduleId: string; level: number; subclassModuleId?: string }>
+  >([])
   const [classCatalogResult, setClassCatalogResult] = useState('')
+  const [newCharacterStep, setNewCharacterStep] = useState(1)
 
   const [buildMethod, setBuildMethod] = useState<BuildMethod>('PointBuy')
   const [rerollOnes, setRerollOnes] = useState(false)
@@ -306,7 +310,25 @@ function App() {
       ),
     [moduleCatalog],
   )
-  const mainClassOptions = useMemo(() => classCatalog, [classCatalog])
+  const mainClassOptions = useMemo(() => {
+    const byClassName = new Map<string, ClassCatalogItem>()
+    for (const item of classCatalog) {
+      const key = item.className.trim().toLowerCase()
+      const current = byClassName.get(key)
+      if (!current) {
+        byClassName.set(key, item)
+        continue
+      }
+
+      const currentIsPhb = current.sourceCode.toLowerCase().includes('phb')
+      const nextIsPhb = item.sourceCode.toLowerCase().includes('phb')
+      if (!currentIsPhb && nextIsPhb) {
+        byClassName.set(key, item)
+      }
+    }
+
+    return Array.from(byClassName.values()).sort((a, b) => a.className.localeCompare(b.className))
+  }, [classCatalog])
   const subclassOptions = useMemo(
     () =>
       moduleCatalog.filter((x) => {
@@ -361,6 +383,22 @@ function App() {
   const selectedRaceOption = useMemo(
     () => raceOptions.find((x) => x.moduleId === effectiveSelectedRaceModuleId) ?? null,
     [raceOptions, effectiveSelectedRaceModuleId],
+  )
+  const subraceOptions = useMemo(
+    () =>
+      moduleCatalog.filter((x) => {
+        if (x.moduleType.toLowerCase() !== 'subrace') return false
+        if (!selectedRaceOption) return false
+        return x.displayName.toLowerCase().includes(selectedRaceOption.displayName.toLowerCase())
+      }),
+    [moduleCatalog, selectedRaceOption],
+  )
+  const effectiveSelectedSubraceModuleId = useMemo(
+    () =>
+      selectedSubraceModuleId && subraceOptions.some((x) => x.moduleId === selectedSubraceModuleId)
+        ? selectedSubraceModuleId
+        : '',
+    [selectedSubraceModuleId, subraceOptions],
   )
 
   const rolledScores = useMemo<Record<AbilityName, number>>(
@@ -501,6 +539,35 @@ function App() {
   const expertiseSlotsUsed = useMemo(
     () => ALL_SKILLS.filter((skill) => effectiveSkillTrainingBySkill[skill] === 'Expertise').length,
     [effectiveSkillTrainingBySkill],
+  )
+  const skillSections = useMemo(
+    () =>
+      [
+        {
+          key: 'class',
+          title: selectedClassOption ? `${selectedClassOption.displayName} skill proficiencies` : 'Class skill proficiencies',
+          fixed: selectedClassOption?.fixedSkillProficiencies ?? [],
+          choices: selectedClassOption?.skillChoices ?? [],
+          choiceCount: selectedClassOption?.skillChoiceCount ?? 0,
+        },
+        {
+          key: 'race',
+          title: selectedRaceOption ? `${selectedRaceOption.displayName} skill proficiencies` : 'Race skill proficiencies',
+          fixed: selectedRaceOption?.fixedSkillProficiencies ?? [],
+          choices: selectedRaceOption?.skillChoices ?? [],
+          choiceCount: selectedRaceOption?.skillChoiceCount ?? 0,
+        },
+        {
+          key: 'background',
+          title: selectedBackgroundOption
+            ? `${selectedBackgroundOption.displayName} skill proficiencies`
+            : 'Background skill proficiencies',
+          fixed: selectedBackgroundOption?.fixedSkillProficiencies ?? [],
+          choices: selectedBackgroundOption?.skillChoices ?? [],
+          choiceCount: selectedBackgroundOption?.skillChoiceCount ?? 0,
+        },
+      ].filter((section) => section.fixed.length > 0 || section.choices.length > 0),
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
   )
 
   const fixedTools = useMemo(
@@ -743,12 +810,17 @@ function App() {
       setSelectedClassModuleId(primaryPersistedClass.classModuleId)
       setPrimaryClassLevel(primaryPersistedClass.level)
       setMultiClassSelections(
-        persistedClassLevels
-          .slice(1)
-          .map((entry) => ({ moduleId: entry.classModuleId, level: entry.level })),
+        persistedClassLevels.slice(1).map((entry) => ({
+          moduleId: entry.classModuleId,
+          level: entry.level,
+          subclassModuleId:
+            build.selectedModules.find((x) => x.slot.toLowerCase() === `subclass:${entry.classModuleId.toLowerCase()}`)
+              ?.moduleId ?? '',
+        })),
       )
       const subclassModule = build.selectedModules.find((x) => x.slot.toLowerCase() === 'subclass')
       const raceModule = build.selectedModules.find((x) => x.slot.toLowerCase() === 'race' || x.slot.toLowerCase() === 'species')
+      const subraceModule = build.selectedModules.find((x) => x.slot.toLowerCase() === 'subrace')
       const backgroundModule = build.selectedModules.find(
         (x) => x.slot.toLowerCase() === 'background' || x.slot.toLowerCase() === 'origin',
       )
@@ -761,6 +833,7 @@ function App() {
       const equipmentMode = build.selectedModules.find((x) => x.slot.toLowerCase() === 'starting-equipment-mode')?.moduleId
       if (subclassModule) setSelectedSubclassModuleId(subclassModule.moduleId)
       if (raceModule) setSelectedRaceModuleId(raceModule.moduleId)
+      if (subraceModule) setSelectedSubraceModuleId(subraceModule.moduleId)
       if (backgroundModule) setSelectedBackgroundModuleId(backgroundModule.moduleId)
       setSelectedToolPicks(toolPicks)
       setSelectedLanguagePicks(languagePicks)
@@ -794,6 +867,7 @@ function App() {
       setBuildResult('No persisted build for selected character yet.')
       setSelectedToolPicks([])
       setSelectedLanguagePicks([])
+      setSelectedSubraceModuleId('')
       setStartingEquipmentMode('package')
       setStartingEquipmentModeLocked(false)
     }
@@ -893,6 +967,7 @@ function App() {
     setSavedBuild(null)
     setSelectedToolPicks([])
     setSelectedLanguagePicks([])
+    setSelectedSubraceModuleId('')
     setInventoryState(null)
     setCurrencyState(null)
     setCurrencyDraft({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 })
@@ -930,6 +1005,7 @@ function App() {
         overlaySources: mixedMode ? overlaySources : [],
       })
       setActiveDraft(result)
+      setNewCharacterStep(1)
       if (result.draft?.characterId) {
         setSelectedCharacterId(result.draft.characterId)
       }
@@ -975,6 +1051,21 @@ function App() {
               slot: 'race',
               moduleId: race.moduleId,
               sourceCode: race.sourceCode,
+              compatible2014: true,
+              compatible2024: true,
+            },
+          ])
+        }
+      }
+
+      if (effectiveSelectedSubraceModuleId) {
+        const subrace = subraceOptions.find((x) => x.moduleId === effectiveSelectedSubraceModuleId)
+        if (subrace) {
+          result = await submitWizardStep(activeDraft.draft.characterId, 'race', [
+            {
+              slot: 'subrace',
+              moduleId: subrace.moduleId,
+              sourceCode: subrace.sourceCode,
               compatible2014: true,
               compatible2024: true,
             },
@@ -1118,6 +1209,21 @@ function App() {
               })(),
             ]
           : []),
+        ...(effectiveSelectedSubraceModuleId
+          ? [
+              (() => {
+                const subrace = subraceOptions.find((x) => x.moduleId === effectiveSelectedSubraceModuleId)
+                return subrace
+                  ? {
+                      slot: 'subrace',
+                      moduleId: subrace.moduleId,
+                      displayName: subrace.displayName,
+                      sourceCode: subrace.sourceCode,
+                    }
+                  : null
+              })(),
+            ]
+          : []),
         ...(effectiveSelectedSubclassModuleId
           ? [
               (() => {
@@ -1133,6 +1239,19 @@ function App() {
               })(),
             ]
           : []),
+        ...multiClassSelections.map((entry) => {
+          const subclass = entry.subclassModuleId
+            ? subclassOptions.find((x) => x.moduleId === entry.subclassModuleId)
+            : null
+          return subclass
+            ? {
+                slot: `subclass:${entry.moduleId}`,
+                moduleId: subclass.moduleId,
+                displayName: subclass.displayName,
+                sourceCode: subclass.sourceCode,
+              }
+            : null
+        }),
         ...selectedToolPicks.map((tool) => ({
           slot: 'tool-proficiency',
           moduleId: tool,
@@ -1241,7 +1360,7 @@ function App() {
     if (!secondaryClassModuleId) return
     if (secondaryClassModuleId === effectiveSelectedClassModuleId) return
     if (multiClassSelections.some((x) => x.moduleId === secondaryClassModuleId)) return
-    setMultiClassSelections((prev) => [...prev, { moduleId: secondaryClassModuleId, level: 1 }])
+    setMultiClassSelections((prev) => [...prev, { moduleId: secondaryClassModuleId, level: 1, subclassModuleId: '' }])
   }
 
   function removeMultiClassSelection(moduleId: string) {
@@ -1251,6 +1370,45 @@ function App() {
   function setMultiClassLevel(moduleId: string, level: number) {
     const bounded = Math.max(1, Math.min(20, level))
     setMultiClassSelections((prev) => prev.map((x) => (x.moduleId === moduleId ? { ...x, level: bounded } : x)))
+  }
+
+  function setMultiClassSubclass(moduleId: string, subclassModuleId: string) {
+    setMultiClassSelections((prev) =>
+      prev.map((x) => (x.moduleId === moduleId ? { ...x, subclassModuleId } : x)),
+    )
+  }
+
+  function moveNewCharacterStep(delta: number) {
+    setNewCharacterStep((prev) => Math.max(1, Math.min(4, prev + delta)))
+  }
+
+  async function handleDiscardNewCharacter() {
+    const confirmed = window.confirm('Discard this character draft and exit character creation?')
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      if (currentCharacterId) {
+        await deleteCharacter(currentCharacterId)
+      }
+      setActiveDraft(null)
+      setSelectedCharacterId('')
+      setSelectedSubclassModuleId('')
+      setSelectedSubraceModuleId('')
+      setMultiClassSelections([])
+      setSelectedToolPicks([])
+      setSelectedLanguagePicks([])
+      setSpellEntries([])
+      setResourcePools([])
+      setInventoryState(null)
+      setCurrencyState(null)
+      setNewCharacterStep(1)
+      navigate('/characters')
+      await refreshCharacters()
+    } catch (e) {
+      setError(String(e))
+    }
   }
 
   function setSkillTraining(skill: SkillName, level: SkillTrainingLevel) {
@@ -1649,7 +1807,14 @@ function App() {
             <div className="row">
               <button onClick={() => navigate('/characters')}>Your characters</button>
               <button onClick={() => navigate('/characters/archived')}>Archived characters</button>
-              <button onClick={() => navigate('/characters/new')}>Create new character</button>
+              <button
+                onClick={() => {
+                  setNewCharacterStep(1)
+                  navigate('/characters/new')
+                }}
+              >
+                Create new character
+              </button>
             </div>
             <p>
               <strong>Getting started:</strong> pick a character (or start a wizard draft), then complete build setup and
@@ -1664,7 +1829,14 @@ function App() {
               <button onClick={() => void refreshCharacters()} disabled={!session}>
                 Refresh
               </button>
-              <button onClick={() => navigate('/characters/new')}>Create new character</button>
+              <button
+                onClick={() => {
+                  setNewCharacterStep(1)
+                  navigate('/characters/new')
+                }}
+              >
+                Create new character
+              </button>
               <button onClick={() => navigate('/characters/archived')}>Archived characters</button>
               <button onClick={handleCopyRuleset} disabled={!selectedCharacterId}>
                 Copy to other ruleset
@@ -1715,6 +1887,23 @@ function App() {
           {isNewCharacterRoute && (
             <>
             <section className="card">
+              <h2>Character creation flow</h2>
+              <p>
+                Page {newCharacterStep} of 4
+              </p>
+              <div className="row">
+                <button type="button" onClick={() => moveNewCharacterStep(-1)} disabled={newCharacterStep <= 1}>
+                  Back
+                </button>
+                <button type="button" onClick={() => moveNewCharacterStep(1)} disabled={newCharacterStep >= 4}>
+                  Next
+                </button>
+                <button type="button" onClick={() => void handleDiscardNewCharacter()}>
+                  Exit + discard
+                </button>
+              </div>
+            </section>
+            <section className="card" hidden={newCharacterStep > 2}>
         <h2>2. Character build setup</h2>
         <div className="grid">
           <label htmlFor="character-name">Character name</label>
@@ -1771,28 +1960,22 @@ function App() {
             />{' '}
             Mixed mode
           </label>
-          <label htmlFor="overlay-sources">Overlay sources</label>
-          <select id="overlay-sources" multiple value={overlaySources} onChange={handleOverlaySourcesChange} disabled={!mixedMode}>
-            {overlaySourceOptions.length === 0 ? (
-              <option value="">No overlay sources available</option>
-            ) : (
-              overlaySourceOptions.map((source) => (
-                <option key={source.sourceCode} value={source.sourceCode}>
-                  {source.sourceCode} - {source.sourceName}
-                </option>
-              ))
-            )}
-          </select>
-          <label htmlFor="primary-class-level">Primary class level</label>
-          <input
-            id="primary-class-level"
-            type="number"
-            min={1}
-            max={20}
-            value={primaryClassLevel}
-            onChange={(e) => setPrimaryClassLevel(Math.max(1, Math.min(20, Number(e.target.value))))}
-            placeholder="Primary class level"
-          />
+          {mixedMode && (
+            <>
+              <label htmlFor="overlay-sources">Allowed overlay rule sources</label>
+              <select id="overlay-sources" multiple value={overlaySources} onChange={handleOverlaySourcesChange}>
+                {overlaySourceOptions.length === 0 ? (
+                  <option value="">No overlay sources available</option>
+                ) : (
+                  overlaySourceOptions.map((source) => (
+                    <option key={source.sourceCode} value={source.sourceCode}>
+                      {source.sourceCode} - {source.sourceName}
+                    </option>
+                  ))
+                )}
+              </select>
+            </>
+          )}
         </div>
         <div className="row">
           <button onClick={() => void loadCatalogData(baseRules)} disabled={!session}>
@@ -1802,10 +1985,22 @@ function App() {
         {mixedMode && overlaySources.length === 0 && (
           <small>Select one or more overlay sources to include mixed-rule catalog modules.</small>
         )}
-        <p>
+        <p hidden={newCharacterStep !== 2}>
           Total level: {totalCharacterLevel} | Proficiency bonus: +{proficiencyBonus}
         </p>
-        <div className="grid">
+        <div className="grid" hidden={newCharacterStep !== 2}>
+          <label htmlFor="main-class-module-setup">Primary class</label>
+          <select id="main-class-module-setup" value={effectiveSelectedClassModuleId} onChange={(e) => setSelectedClassModuleId(e.target.value)}>
+            {mainClassOptions.length === 0 ? (
+              <option value="">No class modules found in DB</option>
+            ) : (
+              mainClassOptions.map((item) => (
+                <option key={item.moduleId} value={item.moduleId}>
+                  {item.className} ({item.sourceCode})
+                </option>
+              ))
+            )}
+          </select>
           <label htmlFor="race-module">Race / species</label>
           <select id="race-module" value={effectiveSelectedRaceModuleId} onChange={(e) => setSelectedRaceModuleId(e.target.value)}>
             {raceOptions.length === 0 ? (
@@ -1818,6 +2013,18 @@ function App() {
               ))
             )}
           </select>
+          <label htmlFor="subrace-module">Subrace (if available)</label>
+          <select id="subrace-module" value={effectiveSelectedSubraceModuleId} onChange={(e) => setSelectedSubraceModuleId(e.target.value)}>
+            <option value="">None</option>
+            {subraceOptions.map((item) => (
+              <option key={item.moduleId} value={item.moduleId}>
+                {item.displayName} ({item.sourceCode})
+              </option>
+            ))}
+          </select>
+          {selectedRaceOption && subraceOptions.length === 0 && (
+            <small>No linked subraces were found in the catalog for this race.</small>
+          )}
           <label htmlFor="background-module">Background / origin</label>
           <select id="background-module" value={effectiveSelectedBackgroundModuleId} onChange={(e) => setSelectedBackgroundModuleId(e.target.value)}>
             {backgroundOptions.length === 0 ? (
@@ -1849,6 +2056,10 @@ function App() {
           <div className="list">
             {multiClassSelections.map((entry) => {
               const option = classOptions.find((x) => x.moduleId === entry.moduleId)
+              const subclassChoices = subclassOptions
+              const unlockedSubclassChoices = subclassChoices.filter(
+                (item) => moduleCompatibilityIssues(item, entry.level).length === 0,
+              )
               return (
                 <div key={entry.moduleId} className="row">
                   <span>{option?.displayName ?? entry.moduleId}</span>
@@ -1861,39 +2072,65 @@ function App() {
                     value={entry.level}
                     onChange={(e) => setMultiClassLevel(entry.moduleId, Number(e.target.value))}
                   />
+                  {unlockedSubclassChoices.length > 0 || Boolean(entry.subclassModuleId) ? (
+                    <>
+                      <label htmlFor={`multiclass-subclass-${entry.moduleId}`}>Subclass</label>
+                      <select
+                        id={`multiclass-subclass-${entry.moduleId}`}
+                        value={entry.subclassModuleId ?? ''}
+                        onChange={(e) => setMultiClassSubclass(entry.moduleId, e.target.value)}
+                      >
+                        <option value="">None</option>
+                        {subclassChoices.map((item) => (
+                          <option
+                            key={item.moduleId}
+                            value={item.moduleId}
+                            disabled={moduleCompatibilityIssues(item, entry.level).length > 0}
+                          >
+                            {item.displayName} ({item.sourceCode})
+                            {moduleCompatibilityIssues(item, entry.level).length > 0
+                              ? ` - ${moduleCompatibilityIssues(item, entry.level).join(', ')}`
+                              : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <small>Subclass unlocks at a higher class level for this entry.</small>
+                  )}
                   <button onClick={() => removeMultiClassSelection(entry.moduleId)}>Remove</button>
                 </div>
               )
             })}
           </div>
         )}
-        <div className="row">
+        <div className="row" hidden={newCharacterStep !== 2}>
           <small>Mixed mode compatibility: incompatible options are marked and disabled with prerequisite reasons.</small>
         </div>
-        <div className="row">
+        <div className="row" hidden={newCharacterStep !== 2}>
           <small>Race/Species bonuses: {Object.entries(raceBonuses).map(([k, v]) => `${k}+${v}`).join(', ') || 'None'}</small>
         </div>
         {crossRulesetLineageBonusSuppressed && (
-          <div className="row">
+          <div className="row" hidden={newCharacterStep !== 2}>
             <small>
               Mixed mode note: cross-ruleset lineage bonuses are not applied by default; base-ruleset mechanics still control
               ability math.
             </small>
           </div>
         )}
-        <div className="row">
+        <div className="row" hidden={newCharacterStep !== 2}>
           <small>
             Background/Origin bonuses: {Object.entries(backgroundBonuses).map(([k, v]) => `${k}+${v}`).join(', ') || 'None'}
           </small>
         </div>
-        <div className="row">
+        <div className="row" hidden={newCharacterStep !== 2}>
           <small>Starting equipment rule: when using equipment mode, only the first class grants starting equipment.</small>
         </div>
 
-        {buildMethod === 'PointBuy' && <p>Point-buy spent: {pointBuySpent}/27</p>}
+        {buildMethod === 'PointBuy' && <p hidden={newCharacterStep !== 2}>Point-buy spent: {pointBuySpent}/27</p>}
         {buildMethod === 'Roll' && (
           <>
-            <div className="row">
+            <div className="row" hidden={newCharacterStep !== 2}>
               <label>
                 <input type="checkbox" checked={rerollOnes} onChange={(e) => setRerollOnes(e.target.checked)} /> Reroll 1s
                 once
@@ -1901,7 +2138,7 @@ function App() {
               <button onClick={handleRollPoolGenerate}>Roll 4d6 drop lowest (6 stats)</button>
               <p>{isRollAssignmentComplete ? 'All rolls assigned.' : 'Drag or tap to assign each roll to an ability.'}</p>
             </div>
-            <div className="roll-pool">
+            <div className="roll-pool" hidden={newCharacterStep !== 2}>
               {rolledPool.length === 0 ? (
                 <small>No unassigned rolls. Roll to generate values.</small>
               ) : (
@@ -1920,7 +2157,7 @@ function App() {
           </>
         )}
 
-        <div className="scores-grid">
+        <div className="scores-grid" hidden={newCharacterStep !== 2}>
           {ABILITIES.map((ability) => (
             <label key={ability} className="score-card">
               <span>{ability}</span>
@@ -1978,7 +2215,7 @@ function App() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card" hidden={newCharacterStep !== 3}>
         <h2>3. Wizard + persistent build</h2>
         <button onClick={handleStartWizard} disabled={!session}>
           Start Wizard Draft
@@ -1996,16 +2233,35 @@ function App() {
               ))
             )}
           </select>
-          <label htmlFor="subclass-module">Subclass</label>
-          <select id="subclass-module" value={effectiveSelectedSubclassModuleId} onChange={(e) => setSelectedSubclassModuleId(e.target.value)}>
-            <option value="">None</option>
-            {subclassOptions.map((item) => (
-              <option key={item.moduleId} value={item.moduleId} disabled={moduleCompatibilityIssues(item, primaryClassLevel).length > 0}>
-                {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, primaryClassLevel).length > 0 ? ` - ${moduleCompatibilityIssues(item, primaryClassLevel).join(', ')}` : ''}
-              </option>
-            ))}
-          </select>
-          <small>Subclass options appear only when class level prerequisites are met.</small>
+          <label htmlFor="primary-class-level">Primary class level</label>
+          <input
+            id="primary-class-level"
+            type="number"
+            min={1}
+            max={20}
+            value={primaryClassLevel}
+            onChange={(e) => setPrimaryClassLevel(Math.max(1, Math.min(20, Number(e.target.value))))}
+            placeholder="Primary class level"
+          />
+          {subclassOptions.some((item) => moduleCompatibilityIssues(item, primaryClassLevel).length === 0) ||
+          Boolean(effectiveSelectedSubclassModuleId) ? (
+            <>
+              <label htmlFor="subclass-module">Subclass</label>
+              <select id="subclass-module" value={effectiveSelectedSubclassModuleId} onChange={(e) => setSelectedSubclassModuleId(e.target.value)}>
+                <option value="">None</option>
+                {subclassOptions.map((item) => (
+                  <option key={item.moduleId} value={item.moduleId} disabled={moduleCompatibilityIssues(item, primaryClassLevel).length > 0}>
+                    {item.displayName} ({item.sourceCode})
+                    {moduleCompatibilityIssues(item, primaryClassLevel).length > 0
+                      ? ` - ${moduleCompatibilityIssues(item, primaryClassLevel).join(', ')}`
+                      : ''}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <small>Subclass unlocks at a higher class level.</small>
+          )}
           <button
             onClick={handleApplySelectedClassToWizard}
             disabled={!activeDraft?.draft || mainClassOptions.length === 0}
@@ -2058,7 +2314,7 @@ function App() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card" hidden={newCharacterStep !== 3}>
         <h2>4. Character sheet: vitals, spells, resources</h2>
         {sheetResult && <p>{sheetResult}</p>}
         <h3>Vitals</h3>
@@ -2231,7 +2487,7 @@ function App() {
         </ul>
       </section>
 
-      <section className="card">
+      <section className="card" hidden={newCharacterStep !== 3}>
         <h2>5. Skills menu and persisted checks</h2>
         <div className="row">
           <label htmlFor="selected-skill">Skill</label>
@@ -2287,6 +2543,50 @@ function App() {
             ))}
           </div>
         )}
+        {skillSections.map((section) => {
+          const sectionFixedLower = section.fixed.map((x) => x.toLowerCase())
+          const sectionChoiceLower = section.choices.map((x) => x.toLowerCase())
+          const sectionPicksUsed = section.choices.filter(
+            (skill) =>
+              !sectionFixedLower.includes(skill.toLowerCase()) &&
+              effectiveSkillTrainingBySkill[skill as SkillName] !== 'None',
+          ).length
+          return (
+            <div key={section.key}>
+              <h3>{section.title}</h3>
+              {section.choiceCount > 0 && (
+                <small>
+                  Choose {section.choiceCount} ({Math.max(0, section.choiceCount - sectionPicksUsed)} remaining)
+                </small>
+              )}
+              <div className="skills-grid">
+                {Array.from(new Set([...section.fixed, ...section.choices])).map((skillName) => {
+                  const skill = skillName as SkillName
+                  const isFixedFromThisSection = sectionFixedLower.includes(skill.toLowerCase())
+                  const isFixedFromOtherSection =
+                    autoGrantedSkills.some((x) => x.toLowerCase() === skill.toLowerCase()) && !isFixedFromThisSection
+                  const isChoice = sectionChoiceLower.includes(skill.toLowerCase())
+                  const checked = effectiveSkillTrainingBySkill[skill] !== 'None'
+                  const disableChoice =
+                    !checked && isChoice && section.choiceCount > 0 && sectionPicksUsed >= section.choiceCount
+                  return (
+                    <label key={`${section.key}-${skill}`} className="row">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={isFixedFromThisSection || isFixedFromOtherSection || disableChoice}
+                        onChange={() => setSkillTraining(skill, checked ? 'None' : 'Proficient')}
+                      />
+                      {skill} ({SKILL_ABILITY[skill].slice(0, 3)}) mod {skillModifier(skill) >= 0 ? '+' : ''}
+                      {skillModifier(skill)}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+        <h3>All skills (manual override)</h3>
         <div className="skills-grid">
           {ALL_SKILLS.map((skill) => (
             <label key={skill}>
@@ -2311,7 +2611,7 @@ function App() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card" hidden={newCharacterStep !== 4}>
         <h2>6. Inventory from database (persisted)</h2>
         <h3>Coin purse</h3>
         <div className="grid">
@@ -2446,7 +2746,7 @@ function App() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card" hidden={newCharacterStep !== 4}>
         <h2>7. Attacks</h2>
         <div className="row">
           <label htmlFor="attack-advantage-state">Roll mode</label>
@@ -2497,7 +2797,7 @@ function App() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card" hidden={newCharacterStep !== 3}>
         <h2>8. Custom builder previews</h2>
         <div className="row">
           <button onClick={handlePreviewOrigin}>Preview Origin</button>
