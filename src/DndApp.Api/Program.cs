@@ -875,6 +875,25 @@ app.MapPut(
     });
 
 app.MapGet(
+    "/characters/{characterId:guid}/spells/recommended",
+    async (Guid characterId, string classModuleId, int classLevel, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        if (string.IsNullOrWhiteSpace(classModuleId))
+        {
+            return Results.BadRequest(new { errors = new[] { "classModuleId is required." } });
+        }
+
+        var result = await progression.GetRecommendedSpellsAsync(characterId, classModuleId.Trim(), classLevel, cancellationToken);
+        return result is null ? Results.NotFound() : Results.Ok(result);
+    });
+
+app.MapGet(
     "/characters/{characterId:guid}/resources",
     async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
     {

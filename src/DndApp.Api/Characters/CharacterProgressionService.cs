@@ -7,6 +7,7 @@ public interface ICharacterProgressionService
 {
     Task<CharacterSpellsData?> GetSpellsAsync(Guid characterId, CancellationToken cancellationToken);
     Task<CharacterSpellsData> UpsertSpellsAsync(Guid characterId, UpsertCharacterSpellsRequest request, CancellationToken cancellationToken);
+    Task<RecommendedSpellsResult?> GetRecommendedSpellsAsync(Guid characterId, string classModuleId, int classLevel, CancellationToken cancellationToken);
     Task<CharacterResourcesData?> GetResourcesAsync(Guid characterId, CancellationToken cancellationToken);
     Task<CharacterResourcesData> UpsertResourcesAsync(Guid characterId, UpsertCharacterResourcesRequest request, CancellationToken cancellationToken);
     Task<CharacterVitalsData?> GetVitalsAsync(Guid characterId, CancellationToken cancellationToken);
@@ -61,6 +62,26 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
 
         await _db.SaveChangesAsync(cancellationToken);
         return await GetSpellsAsync(characterId, cancellationToken) ?? new CharacterSpellsData(characterId, Array.Empty<CharacterSpellEntryData>());
+    }
+
+    public async Task<RecommendedSpellsResult?> GetRecommendedSpellsAsync(Guid characterId, string classModuleId, int classLevel, CancellationToken cancellationToken)
+    {
+        var id = characterId.ToString();
+        var exists = await _db.CharacterSheets.AsNoTracking().AnyAsync(x => x.CharacterId == id, cancellationToken);
+        if (!exists)
+        {
+            return null;
+        }
+
+        // Recommended spells are advisory and require a future curated class/level source.
+        // We intentionally return a data-gap state until that source is available.
+        return new RecommendedSpellsResult(
+            characterId,
+            classModuleId,
+            Math.Max(1, classLevel),
+            Array.Empty<CharacterSpellEntryData>(),
+            "Recommended spells are advisory only and do not account for multiclassing.",
+            "Curated recommended spell list is not available yet for this class/level.");
     }
 
     public async Task<CharacterResourcesData?> GetResourcesAsync(Guid characterId, CancellationToken cancellationToken)

@@ -302,6 +302,15 @@ export interface CharacterSpellsData {
   entries: CharacterSpellEntryData[]
 }
 
+export interface RecommendedSpellsResult {
+  characterId: string
+  classModuleId: string
+  classLevel: number
+  recommendedSpells: CharacterSpellEntryData[]
+  advisoryMessage: string
+  dataGap: string | null
+}
+
 export interface CharacterResourcePoolData {
   resourceKey: string
   currentValue: number

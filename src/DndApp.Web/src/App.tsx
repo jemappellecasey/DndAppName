@@ -20,6 +20,7 @@ import {
   getCharacters,
   getClassCatalog,
   getContentSources,
+  getRecommendedSpells,
   getModuleCatalog,
   getItemCatalog,
   health,
@@ -262,6 +263,7 @@ function App() {
   const [attackAdvantageState, setAttackAdvantageState] = useState<AdvantageState>('None')
   const [attackResults, setAttackResults] = useState<Record<string, string>>({})
   const [spellEntries, setSpellEntries] = useState<CharacterSpellEntryData[]>([])
+  const [recommendedSpellsByClass, setRecommendedSpellsByClass] = useState<Record<string, string>>({})
   const [resourcePools, setResourcePools] = useState<CharacterResourcePoolData[]>([])
   const [vitals, setVitals] = useState<Omit<CharacterVitalsData, 'characterId' | 'updatedAtUtc'>>({
     ...DEFAULT_VITALS,
@@ -457,6 +459,25 @@ function App() {
       return { ...item, abilityName, toHit, damageBonus }
     })
   }, [inventoryState, proficiencyBonus, totalAbilityScores])
+
+  const classSections = useMemo(() => {
+    const primaryClass = classCatalog.find((x) => x.moduleId === effectiveSelectedClassModuleId)
+    const primaryName = primaryClass?.className ?? classOptions.find((x) => x.moduleId === effectiveSelectedClassModuleId)?.displayName
+    const primary = effectiveSelectedClassModuleId
+      ? [{ moduleId: effectiveSelectedClassModuleId, className: primaryName ?? effectiveSelectedClassModuleId, level: primaryClassLevel }]
+      : []
+
+    const secondary = multiClassSelections.map((entry) => {
+      const option = classOptions.find((x) => x.moduleId === entry.moduleId)
+      return {
+        moduleId: entry.moduleId,
+        className: option?.displayName ?? entry.moduleId,
+        level: entry.level,
+      }
+    })
+
+    return [...primary, ...secondary]
+  }, [classCatalog, classOptions, effectiveSelectedClassModuleId, multiClassSelections, primaryClassLevel])
 
   useEffect(() => {
     health()
@@ -685,6 +706,7 @@ function App() {
 
   async function handleSelectCharacter(characterId: string) {
     setSelectedCharacterId(characterId)
+    setRecommendedSpellsByClass({})
     await loadPersistedCharacterState(characterId)
   }
 
@@ -716,6 +738,7 @@ function App() {
     setActiveDraft(null)
     setSpellEntries([])
     setResourcePools([])
+    setRecommendedSpellsByClass({})
     setVitals({ ...DEFAULT_VITALS })
     setSheetResult('')
     setArchivedCharacters([])
@@ -1232,6 +1255,23 @@ function App() {
     setSpeciesPreview(JSON.stringify(result, null, 2))
   }
 
+  async function handleLoadRecommendedSpells(classModuleId: string, className: string, classLevel: number) {
+    if (!currentCharacterId) return
+    try {
+      const result = await getRecommendedSpells(currentCharacterId, classModuleId, classLevel)
+      const lines = [
+        `${className} level ${classLevel}: ${result.advisoryMessage}`,
+        result.dataGap ?? '',
+        result.recommendedSpells.length > 0
+          ? `Recommendations: ${result.recommendedSpells.map((x) => x.spellName).join(', ')}`
+          : 'Recommendations: none available from curated source.',
+      ].filter((x) => x.trim().length > 0)
+      setRecommendedSpellsByClass((prev) => ({ ...prev, [classModuleId]: lines.join('\n') }))
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
   function skillModifier(skill: SkillName) {
     const ability = SKILL_ABILITY[skill]
     const abilityMod = abilityModifier(totalAbilityScores[ability])
@@ -1635,6 +1675,20 @@ function App() {
             Save build to persistent model
           </button>
         </div>
+        {classSections.length > 0 && (
+          <div className="inventory-list">
+            {classSections.map((entry) => (
+              <div key={`${entry.moduleId}-${entry.level}`} className="row">
+                <strong>{entry.className}</strong>
+                <span>Level {entry.level}</span>
+                <button onClick={() => void handleLoadRecommendedSpells(entry.moduleId, entry.className, entry.level)} disabled={!currentCharacterId}>
+                  See recommended spells for this class
+                </button>
+                {recommendedSpellsByClass[entry.moduleId] && <small>{recommendedSpellsByClass[entry.moduleId]}</small>}
+              </div>
+            ))}
+          </div>
+        )}
         <div className="row">
           <button onClick={handleFinalizeWizard} disabled={!activeDraft?.draft}>
             Finalize

@@ -12,6 +12,14 @@ public sealed record CharacterSpellsData(
 public sealed record UpsertCharacterSpellsRequest(
     IReadOnlyList<CharacterSpellEntryData> Entries);
 
+public sealed record RecommendedSpellsResult(
+    Guid CharacterId,
+    string ClassModuleId,
+    int ClassLevel,
+    IReadOnlyList<CharacterSpellEntryData> RecommendedSpells,
+    string AdvisoryMessage,
+    string? DataGap);
+
 public sealed record CharacterResourcePoolData(
     string ResourceKey,
     int CurrentValue,

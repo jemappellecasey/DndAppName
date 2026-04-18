@@ -18,6 +18,7 @@ import type {
   PersistedComputeCheckPayload,
   RuleModuleSelection,
   RuleSystemMode,
+  RecommendedSpellsResult,
   UpsertCharacterBuildPayload,
 } from './types'
 
@@ -248,6 +249,13 @@ export function upsertCharacterSpells(characterId: string, entries: CharacterSpe
     method: 'PUT',
     body: JSON.stringify({ entries }),
   })
+}
+
+export function getRecommendedSpells(characterId: string, classModuleId: string, classLevel: number) {
+  const query = new URLSearchParams()
+  query.set('classModuleId', classModuleId)
+  query.set('classLevel', String(classLevel))
+  return request<RecommendedSpellsResult>(`/characters/${characterId}/spells/recommended?${query.toString()}`)
 }
 
 export function getCharacterResources(characterId: string) {
