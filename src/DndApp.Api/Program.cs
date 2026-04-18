@@ -43,7 +43,7 @@ builder.Services.AddSingleton<ICustomContentValidationService, CustomContentVali
 builder.Services.AddSingleton<IItemEffectPipelineService, ItemEffectPipelineService>();
 builder.Services.AddSingleton<ICalculationEngineService, CalculationEngineService>();
 builder.Services.AddSingleton<IMixedRulesResolutionService, MixedRulesResolutionService>();
-builder.Services.AddSingleton<ICharacterWizardService, CharacterWizardService>();
+builder.Services.AddScoped<ICharacterWizardService, CharacterWizardService>();
 builder.Services.AddScoped<ILocalAuthService, LocalAuthService>();
 builder.Services.AddScoped<ICharacterBuildService, CharacterBuildService>();
 builder.Services.AddScoped<ICharacterInventoryService, CharacterInventoryService>();
@@ -580,15 +580,15 @@ app.MapPost(
             return Results.BadRequest(new { errors = new[] { "Session token is invalid or expired." } });
         }
 
-        var result = wizardService.StartDraft(request with { SessionToken = session.UserId });
+        var result = await wizardService.StartDraftAsync(request with { SessionToken = session.UserId }, cancellationToken);
         return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
     });
 
 app.MapGet(
     "/wizard/characters/{characterId:guid}",
-    (Guid characterId, ICharacterWizardService wizardService) =>
+    async (Guid characterId, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.GetDraft(characterId);
+        var result = await wizardService.GetDraftAsync(characterId, cancellationToken);
         return result is null ? Results.NotFound() : Results.Ok(result);
     });
 
@@ -608,71 +608,71 @@ app.MapGet(
             ownerUserId = session.UserId;
         }
 
-        var result = wizardService.ListCharacters(includeArchived, ownerUserId);
+        var result = await wizardService.ListCharactersAsync(includeArchived, ownerUserId, cancellationToken);
         return Results.Ok(result);
     });
 
 app.MapGet(
     "/characters/{characterId:guid}",
-    (Guid characterId, ICharacterWizardService wizardService) =>
+    async (Guid characterId, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.GetCharacter(characterId);
+        var result = await wizardService.GetCharacterAsync(characterId, cancellationToken);
         return result is null ? Results.NotFound() : Results.Ok(result);
     });
 
 app.MapPatch(
     "/characters/{characterId:guid}",
-    (Guid characterId, UpdateCharacterRequest request, ICharacterWizardService wizardService) =>
+    async (Guid characterId, UpdateCharacterRequest request, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.UpdateCharacter(characterId, request);
+        var result = await wizardService.UpdateCharacterAsync(characterId, request, cancellationToken);
         return result is null ? Results.NotFound() : Results.Ok(result);
     });
 
 app.MapPost(
     "/characters/{characterId:guid}/archive",
-    (Guid characterId, ICharacterWizardService wizardService) =>
+    async (Guid characterId, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.ArchiveCharacter(characterId);
+        var result = await wizardService.ArchiveCharacterAsync(characterId, cancellationToken);
         return result is null ? Results.NotFound() : Results.Ok(result);
     });
 
 app.MapPost(
     "/characters/{characterId:guid}/duplicate",
-    (Guid characterId, DuplicateCharacterRequest request, ICharacterWizardService wizardService) =>
+    async (Guid characterId, DuplicateCharacterRequest request, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.DuplicateCharacter(characterId, request);
+        var result = await wizardService.DuplicateCharacterAsync(characterId, request, cancellationToken);
         return result is null ? Results.NotFound() : Results.Ok(result);
     });
 
 app.MapGet(
     "/characters/{characterId:guid}/history",
-    (Guid characterId, ICharacterWizardService wizardService) =>
+    async (Guid characterId, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.GetCharacterHistory(characterId);
+        var result = await wizardService.GetCharacterHistoryAsync(characterId, cancellationToken);
         return Results.Ok(result);
     });
 
 app.MapPost(
     "/wizard/characters/{characterId:guid}/steps",
-    (Guid characterId, SubmitWizardStepRequest request, ICharacterWizardService wizardService) =>
+    async (Guid characterId, SubmitWizardStepRequest request, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.SubmitStep(characterId, request);
+        var result = await wizardService.SubmitStepAsync(characterId, request, cancellationToken);
         return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
     });
 
 app.MapPost(
     "/wizard/characters/{characterId:guid}/finalize",
-    (Guid characterId, FinalizeWizardRequest request, ICharacterWizardService wizardService) =>
+    async (Guid characterId, FinalizeWizardRequest request, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.Finalize(characterId, request);
+        var result = await wizardService.FinalizeAsync(characterId, request, cancellationToken);
         return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
     });
 
 app.MapPost(
     "/characters/{characterId:guid}/copy-to-ruleset",
-    (Guid characterId, CopyCharacterRulesetRequest request, ICharacterWizardService wizardService) =>
+    async (Guid characterId, CopyCharacterRulesetRequest request, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.CopyToRuleset(characterId, request);
+        var result = await wizardService.CopyToRulesetAsync(characterId, request, cancellationToken);
         return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
     });
 

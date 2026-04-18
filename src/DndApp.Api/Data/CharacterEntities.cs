@@ -41,3 +41,41 @@ public sealed class CharacterInventoryItemEntity
     public DateTimeOffset AddedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
+
+public sealed class CharacterRecordEntity
+{
+    public string CharacterId { get; set; } = string.Empty;
+    public string OwnerUserId { get; set; } = string.Empty;
+    public string CharacterName { get; set; } = string.Empty;
+    public string BaseRuleSystem { get; set; } = string.Empty;
+    public bool MixedModeEnabled { get; set; }
+    public string OverlaySourcesJson { get; set; } = "[]";
+    public bool IsArchived { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class CharacterDraftEntity
+{
+    public string CharacterId { get; set; } = string.Empty;
+    public string OwnerUserId { get; set; } = string.Empty;
+    public string CharacterName { get; set; } = string.Empty;
+    public string BaseRuleSystem { get; set; } = string.Empty;
+    public bool MixedModeEnabled { get; set; }
+    public string OverlaySourcesJson { get; set; } = "[]";
+    public bool IsFinalized { get; set; }
+    public string StepsJson { get; set; } = "[]";
+    public string WarningsJson { get; set; } = "[]";
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class CharacterHistoryEntity
+{
+    public string EntryId { get; set; } = string.Empty;
+    public string CharacterId { get; set; } = string.Empty;
+    public DateTimeOffset TimestampUtc { get; set; }
+    public string Action { get; set; } = string.Empty;
+    public string ActorUserId { get; set; } = string.Empty;
+    public string Details { get; set; } = string.Empty;
+}

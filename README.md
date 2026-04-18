@@ -6,10 +6,11 @@ DndAppName is a D&D character creation and management app focused on 2014/2024 r
 1. .NET 10 API + React frontend foundation.
 2. Rulebook markdown ingestion to versioned JSON artifacts.
 3. Character wizard flow with mixed-rules resolution and copy-to-ruleset support.
-4. Persistent character build model (class, build method, ability scores, skill proficiencies).
-5. Persistent inventory model with equip/attune/unattune and attunement-cap enforcement.
-6. Persisted calculations for checks/saves/attacks and derived stats.
-7. Custom origin/species validation and preview endpoints.
+4. Persisted wizard drafts, character library summaries, and character history (survive API restarts).
+5. Persistent character build model (class, build method, ability scores, skill proficiencies).
+6. Persistent inventory model with equip/attune/unattune and attunement-cap enforcement.
+7. Persisted calculations for checks/saves/attacks and derived stats.
+8. Custom origin/species validation and preview endpoints.
 
 ## Prerequisites
 1. .NET SDK 10.x

@@ -25,6 +25,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<CharacterAbilityScoreEntity> CharacterAbilityScores => Set<CharacterAbilityScoreEntity>();
     public DbSet<CharacterSkillProficiencyEntity> CharacterSkillProficiencies => Set<CharacterSkillProficiencyEntity>();
     public DbSet<CharacterInventoryItemEntity> CharacterInventoryItems => Set<CharacterInventoryItemEntity>();
+    public DbSet<CharacterRecordEntity> CharacterRecords => Set<CharacterRecordEntity>();
+    public DbSet<CharacterDraftEntity> CharacterDrafts => Set<CharacterDraftEntity>();
+    public DbSet<CharacterHistoryEntity> CharacterHistoryEntries => Set<CharacterHistoryEntity>();
     public DbSet<UserAccountEntity> UserAccounts => Set<UserAccountEntity>();
     public DbSet<UserSessionEntity> UserSessions => Set<UserSessionEntity>();
     public DbSet<IngestionRunEntity> IngestionRuns => Set<IngestionRunEntity>();
@@ -263,6 +266,46 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.ItemDefinitionId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CharacterRecordEntity>(entity =>
+        {
+            entity.ToTable("character_record");
+            entity.HasKey(x => x.CharacterId);
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.OwnerUserId).HasMaxLength(64);
+            entity.Property(x => x.CharacterName).HasMaxLength(160);
+            entity.Property(x => x.BaseRuleSystem).HasMaxLength(24);
+            entity.Property(x => x.OverlaySourcesJson).HasColumnType("TEXT");
+            entity.HasIndex(x => x.OwnerUserId);
+            entity.HasIndex(x => x.UpdatedAtUtc);
+        });
+
+        modelBuilder.Entity<CharacterDraftEntity>(entity =>
+        {
+            entity.ToTable("character_draft");
+            entity.HasKey(x => x.CharacterId);
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.OwnerUserId).HasMaxLength(64);
+            entity.Property(x => x.CharacterName).HasMaxLength(160);
+            entity.Property(x => x.BaseRuleSystem).HasMaxLength(24);
+            entity.Property(x => x.OverlaySourcesJson).HasColumnType("TEXT");
+            entity.Property(x => x.StepsJson).HasColumnType("TEXT");
+            entity.Property(x => x.WarningsJson).HasColumnType("TEXT");
+            entity.HasIndex(x => x.OwnerUserId);
+            entity.HasIndex(x => x.UpdatedAtUtc);
+        });
+
+        modelBuilder.Entity<CharacterHistoryEntity>(entity =>
+        {
+            entity.ToTable("character_history");
+            entity.HasKey(x => x.EntryId);
+            entity.Property(x => x.EntryId).HasMaxLength(64);
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.Action).HasMaxLength(80);
+            entity.Property(x => x.ActorUserId).HasMaxLength(64);
+            entity.Property(x => x.Details).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.CharacterId, x.TimestampUtc });
         });
 
         modelBuilder.Entity<UserAccountEntity>(entity =>

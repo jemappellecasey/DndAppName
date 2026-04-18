@@ -1,36 +1,39 @@
-using System.Collections.Concurrent;
+using System.Text.Json;
+using DndApp.Api.Data;
 using DndApp.Api.MixedRules;
+using Microsoft.EntityFrameworkCore;
 
 namespace DndApp.Api.Characters;
 
 public interface ICharacterWizardService
 {
-    CharacterWizardResult StartDraft(StartCharacterWizardRequest request);
-    CharacterWizardDraft? GetDraft(Guid characterId);
-    IReadOnlyList<CharacterSummary> ListCharacters(bool includeArchived, string? ownerUserId = null);
-    CharacterSummary? GetCharacter(Guid characterId);
-    CharacterSummary? UpdateCharacter(Guid characterId, UpdateCharacterRequest request);
-    CharacterSummary? ArchiveCharacter(Guid characterId);
-    CharacterSummary? DuplicateCharacter(Guid characterId, DuplicateCharacterRequest request);
-    IReadOnlyList<CharacterRevisionEntry> GetCharacterHistory(Guid characterId);
-    CharacterWizardResult SubmitStep(Guid characterId, SubmitWizardStepRequest request);
-    CharacterWizardResult Finalize(Guid characterId, FinalizeWizardRequest request);
-    CharacterWizardResult CopyToRuleset(Guid characterId, CopyCharacterRulesetRequest request);
+    Task<CharacterWizardResult> StartDraftAsync(StartCharacterWizardRequest request, CancellationToken cancellationToken);
+    Task<CharacterWizardDraft?> GetDraftAsync(Guid characterId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(bool includeArchived, string? ownerUserId, CancellationToken cancellationToken);
+    Task<CharacterSummary?> GetCharacterAsync(Guid characterId, CancellationToken cancellationToken);
+    Task<CharacterSummary?> UpdateCharacterAsync(Guid characterId, UpdateCharacterRequest request, CancellationToken cancellationToken);
+    Task<CharacterSummary?> ArchiveCharacterAsync(Guid characterId, CancellationToken cancellationToken);
+    Task<CharacterSummary?> DuplicateCharacterAsync(Guid characterId, DuplicateCharacterRequest request, CancellationToken cancellationToken);
+    Task<IReadOnlyList<CharacterRevisionEntry>> GetCharacterHistoryAsync(Guid characterId, CancellationToken cancellationToken);
+    Task<CharacterWizardResult> SubmitStepAsync(Guid characterId, SubmitWizardStepRequest request, CancellationToken cancellationToken);
+    Task<CharacterWizardResult> FinalizeAsync(Guid characterId, FinalizeWizardRequest request, CancellationToken cancellationToken);
+    Task<CharacterWizardResult> CopyToRulesetAsync(Guid characterId, CopyCharacterRulesetRequest request, CancellationToken cancellationToken);
 }
 
 public sealed class CharacterWizardService : ICharacterWizardService
 {
-    private readonly ConcurrentDictionary<Guid, CharacterWizardDraft> _drafts = new();
-    private readonly ConcurrentDictionary<Guid, CharacterRecord> _characters = new();
-    private readonly ConcurrentDictionary<Guid, List<CharacterRevisionEntry>> _history = new();
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private readonly AppDbContext _db;
     private readonly IMixedRulesResolutionService _resolver;
 
-    public CharacterWizardService(IMixedRulesResolutionService resolver)
+    public CharacterWizardService(AppDbContext db, IMixedRulesResolutionService resolver)
     {
+        _db = db;
         _resolver = resolver;
     }
 
-    public CharacterWizardResult StartDraft(StartCharacterWizardRequest request)
+    public async Task<CharacterWizardResult> StartDraftAsync(StartCharacterWizardRequest request, CancellationToken cancellationToken)
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(request.CharacterName))
@@ -41,135 +44,170 @@ public sealed class CharacterWizardService : ICharacterWizardService
         {
             errors.Add("Session token is required.");
         }
-
         if (!request.RulesProfile.MixedModeEnabled && request.RulesProfile.OverlaySources.Count > 0)
         {
             errors.Add("Overlay sources can only be set when mixed mode is enabled.");
         }
-
         if (errors.Count > 0)
         {
             return new CharacterWizardResult(false, null, errors, Array.Empty<string>());
         }
 
-        var draft = new CharacterWizardDraft(
-            Guid.NewGuid(),
-            request.SessionToken.Trim(),
-            request.CharacterName.Trim(),
-            request.RulesProfile,
-            false,
-            Array.Empty<WizardStepState>(),
+        var now = DateTimeOffset.UtcNow;
+        var characterId = Guid.NewGuid();
+        var draftEntity = new CharacterDraftEntity
+        {
+            CharacterId = characterId.ToString(),
+            OwnerUserId = request.SessionToken.Trim(),
+            CharacterName = request.CharacterName.Trim(),
+            BaseRuleSystem = request.RulesProfile.BaseRuleSystem.ToString(),
+            MixedModeEnabled = request.RulesProfile.MixedModeEnabled,
+            OverlaySourcesJson = SerializeJson(request.RulesProfile.OverlaySources),
+            IsFinalized = false,
+            StepsJson = SerializeJson(Array.Empty<WizardStepState>()),
+            WarningsJson = SerializeJson(Array.Empty<string>()),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+
+        _db.CharacterDrafts.Add(draftEntity);
+        AppendHistory(characterId, "draft-started", draftEntity.OwnerUserId, "Character wizard draft created.");
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new CharacterWizardResult(
+            true,
+            ToDraft(draftEntity),
+            Array.Empty<string>(),
             Array.Empty<string>());
-
-        _drafts[draft.CharacterId] = draft;
-        AppendHistory(draft.CharacterId, "draft-started", draft.OwnerUserId, "Character wizard draft created.");
-        return new CharacterWizardResult(true, draft, Array.Empty<string>(), Array.Empty<string>());
     }
 
-    public CharacterWizardDraft? GetDraft(Guid characterId)
+    public async Task<CharacterWizardDraft?> GetDraftAsync(Guid characterId, CancellationToken cancellationToken)
     {
-        return _drafts.TryGetValue(characterId, out var draft) ? draft : null;
+        var entity = await _db.CharacterDrafts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CharacterId == characterId.ToString(), cancellationToken);
+        return entity is null ? null : ToDraft(entity);
     }
 
-    public IReadOnlyList<CharacterSummary> ListCharacters(bool includeArchived, string? ownerUserId = null)
+    public async Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(bool includeArchived, string? ownerUserId, CancellationToken cancellationToken)
     {
-        return _characters.Values
-            .Where(x => string.IsNullOrWhiteSpace(ownerUserId) || string.Equals(x.OwnerUserId, ownerUserId, StringComparison.Ordinal))
-            .Where(x => includeArchived || !x.IsArchived)
+        var query = _db.CharacterRecords.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(ownerUserId))
+        {
+            query = query.Where(x => x.OwnerUserId == ownerUserId);
+        }
+        if (!includeArchived)
+        {
+            query = query.Where(x => !x.IsArchived);
+        }
+
+        var entities = await query
             .OrderByDescending(x => x.UpdatedAtUtc)
-            .Select(ToSummary)
-            .ToArray();
+            .ToArrayAsync(cancellationToken);
+        return entities.Select(ToSummary).ToArray();
     }
 
-    public CharacterSummary? GetCharacter(Guid characterId)
+    public async Task<CharacterSummary?> GetCharacterAsync(Guid characterId, CancellationToken cancellationToken)
     {
-        return _characters.TryGetValue(characterId, out var character) ? ToSummary(character) : null;
+        var entity = await _db.CharacterRecords
+            .AsNoTracking()
+            .Where(x => x.CharacterId == characterId.ToString())
+            .FirstOrDefaultAsync(cancellationToken);
+        return entity is null ? null : ToSummary(entity);
     }
 
-    public CharacterSummary? UpdateCharacter(Guid characterId, UpdateCharacterRequest request)
+    public async Task<CharacterSummary?> UpdateCharacterAsync(Guid characterId, UpdateCharacterRequest request, CancellationToken cancellationToken)
     {
-        if (!_characters.TryGetValue(characterId, out var character))
+        var entity = await _db.CharacterRecords.FirstOrDefaultAsync(x => x.CharacterId == characterId.ToString(), cancellationToken);
+        if (entity is null)
         {
             return null;
         }
 
-        var name = string.IsNullOrWhiteSpace(request.CharacterName) ? character.CharacterName : request.CharacterName.Trim();
-        var updated = character with
+        if (!string.IsNullOrWhiteSpace(request.CharacterName))
         {
-            CharacterName = name,
-            UpdatedAtUtc = DateTimeOffset.UtcNow
-        };
-
-        _characters[characterId] = updated;
-        AppendHistory(characterId, "character-updated", character.OwnerUserId, $"Character renamed to '{updated.CharacterName}'.");
-        return ToSummary(updated);
+            entity.CharacterName = request.CharacterName.Trim();
+        }
+        entity.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        AppendHistory(characterId, "character-updated", entity.OwnerUserId, $"Character renamed to '{entity.CharacterName}'.");
+        await _db.SaveChangesAsync(cancellationToken);
+        return ToSummary(entity);
     }
 
-    public CharacterSummary? ArchiveCharacter(Guid characterId)
+    public async Task<CharacterSummary?> ArchiveCharacterAsync(Guid characterId, CancellationToken cancellationToken)
     {
-        if (!_characters.TryGetValue(characterId, out var character))
+        var entity = await _db.CharacterRecords.FirstOrDefaultAsync(x => x.CharacterId == characterId.ToString(), cancellationToken);
+        if (entity is null)
         {
             return null;
         }
 
-        var updated = character with
-        {
-            IsArchived = true,
-            UpdatedAtUtc = DateTimeOffset.UtcNow
-        };
-
-        _characters[characterId] = updated;
-        AppendHistory(characterId, "character-archived", character.OwnerUserId, "Character archived (soft delete).");
-        return ToSummary(updated);
+        entity.IsArchived = true;
+        entity.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        AppendHistory(characterId, "character-archived", entity.OwnerUserId, "Character archived (soft delete).");
+        await _db.SaveChangesAsync(cancellationToken);
+        return ToSummary(entity);
     }
 
-    public CharacterSummary? DuplicateCharacter(Guid characterId, DuplicateCharacterRequest request)
+    public async Task<CharacterSummary?> DuplicateCharacterAsync(Guid characterId, DuplicateCharacterRequest request, CancellationToken cancellationToken)
     {
-        if (!_characters.TryGetValue(characterId, out var character))
+        var source = await _db.CharacterRecords
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CharacterId == characterId.ToString(), cancellationToken);
+        if (source is null)
         {
             return null;
         }
 
+        var duplicateId = Guid.NewGuid();
         var suffix = string.IsNullOrWhiteSpace(request.NameSuffix) ? "Copy" : request.NameSuffix.Trim();
         var now = DateTimeOffset.UtcNow;
-        var duplicate = new CharacterRecord(
-            Guid.NewGuid(),
-            character.OwnerUserId,
-            $"{character.CharacterName} ({suffix})",
-            character.RulesProfile,
-            false,
-            now,
-            now);
+        var duplicate = new CharacterRecordEntity
+        {
+            CharacterId = duplicateId.ToString(),
+            OwnerUserId = source.OwnerUserId,
+            CharacterName = $"{source.CharacterName} ({suffix})",
+            BaseRuleSystem = source.BaseRuleSystem,
+            MixedModeEnabled = source.MixedModeEnabled,
+            OverlaySourcesJson = source.OverlaySourcesJson,
+            IsArchived = false,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
 
-        _characters[duplicate.CharacterId] = duplicate;
-        AppendHistory(duplicate.CharacterId, "character-duplicated", character.OwnerUserId, $"Duplicated from '{character.CharacterId}'.");
+        _db.CharacterRecords.Add(duplicate);
+        AppendHistory(duplicateId, "character-duplicated", source.OwnerUserId, $"Duplicated from '{source.CharacterId}'.");
+        await _db.SaveChangesAsync(cancellationToken);
         return ToSummary(duplicate);
     }
 
-    public IReadOnlyList<CharacterRevisionEntry> GetCharacterHistory(Guid characterId)
+    public async Task<IReadOnlyList<CharacterRevisionEntry>> GetCharacterHistoryAsync(Guid characterId, CancellationToken cancellationToken)
     {
-        if (!_history.TryGetValue(characterId, out var entries))
-        {
-            return Array.Empty<CharacterRevisionEntry>();
-        }
-
-        return entries
+        return await _db.CharacterHistoryEntries
+            .AsNoTracking()
+            .Where(x => x.CharacterId == characterId.ToString())
             .OrderByDescending(x => x.TimestampUtc)
-            .ToArray();
+            .Select(x => new CharacterRevisionEntry(
+                x.TimestampUtc,
+                x.Action,
+                x.ActorUserId,
+                x.Details))
+            .ToArrayAsync(cancellationToken);
     }
 
-    public CharacterWizardResult SubmitStep(Guid characterId, SubmitWizardStepRequest request)
+    public async Task<CharacterWizardResult> SubmitStepAsync(Guid characterId, SubmitWizardStepRequest request, CancellationToken cancellationToken)
     {
-        if (!_drafts.TryGetValue(characterId, out var draft))
+        var entity = await _db.CharacterDrafts.FirstOrDefaultAsync(x => x.CharacterId == characterId.ToString(), cancellationToken);
+        if (entity is null)
         {
             return new CharacterWizardResult(false, null, new[] { "Character draft not found." }, Array.Empty<string>());
         }
 
+        var draft = ToDraft(entity);
         if (draft.IsFinalized)
         {
             return new CharacterWizardResult(false, draft, new[] { "Character draft is already finalized." }, Array.Empty<string>());
         }
-
         if (string.IsNullOrWhiteSpace(request.StepName))
         {
             return new CharacterWizardResult(false, draft, new[] { "Step name is required." }, Array.Empty<string>());
@@ -184,20 +222,28 @@ public sealed class CharacterWizardService : ICharacterWizardService
         var nextSteps = draft.Steps
             .Where(s => !string.Equals(s.StepName, request.StepName, StringComparison.OrdinalIgnoreCase))
             .ToList();
-
         nextSteps.Add(new WizardStepState(request.StepName.Trim(), request.Selections, DateTimeOffset.UtcNow));
-        var updated = draft with { Steps = nextSteps };
-        _drafts[characterId] = updated;
-        return new CharacterWizardResult(true, updated, Array.Empty<string>(), Array.Empty<string>());
+
+        entity.StepsJson = SerializeJson(nextSteps);
+        entity.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new CharacterWizardResult(
+            true,
+            ToDraft(entity),
+            Array.Empty<string>(),
+            Array.Empty<string>());
     }
 
-    public CharacterWizardResult Finalize(Guid characterId, FinalizeWizardRequest request)
+    public async Task<CharacterWizardResult> FinalizeAsync(Guid characterId, FinalizeWizardRequest request, CancellationToken cancellationToken)
     {
-        if (!_drafts.TryGetValue(characterId, out var draft))
+        var entity = await _db.CharacterDrafts.FirstOrDefaultAsync(x => x.CharacterId == characterId.ToString(), cancellationToken);
+        if (entity is null)
         {
             return new CharacterWizardResult(false, null, new[] { "Character draft not found." }, Array.Empty<string>());
         }
 
+        var draft = ToDraft(entity);
         var allSelections = draft.Steps.SelectMany(s => s.Selections).ToList();
         var resolveResult = _resolver.Resolve(
             new MixedRulesResolveRequest(
@@ -206,47 +252,58 @@ public sealed class CharacterWizardService : ICharacterWizardService
                 draft.RulesProfile.OverlaySources,
                 allSelections,
                 request.ExplicitOverridesBySlot));
-
         if (resolveResult.Errors.Count > 0)
         {
             return new CharacterWizardResult(false, draft, resolveResult.Errors, resolveResult.Warnings);
         }
 
-        var finalized = draft with
+        entity.IsFinalized = true;
+        entity.WarningsJson = SerializeJson(resolveResult.Warnings);
+        entity.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        var character = await _db.CharacterRecords.FirstOrDefaultAsync(x => x.CharacterId == entity.CharacterId, cancellationToken);
+        if (character is null)
         {
-            IsFinalized = true,
-            Warnings = resolveResult.Warnings
-        };
-        _drafts[characterId] = finalized;
+            _db.CharacterRecords.Add(new CharacterRecordEntity
+            {
+                CharacterId = entity.CharacterId,
+                OwnerUserId = entity.OwnerUserId,
+                CharacterName = entity.CharacterName,
+                BaseRuleSystem = entity.BaseRuleSystem,
+                MixedModeEnabled = entity.MixedModeEnabled,
+                OverlaySourcesJson = entity.OverlaySourcesJson,
+                IsArchived = false,
+                CreatedAtUtc = entity.CreatedAtUtc,
+                UpdatedAtUtc = entity.UpdatedAtUtc
+            });
+        }
 
-        var now = DateTimeOffset.UtcNow;
-        var character = new CharacterRecord(
-            finalized.CharacterId,
-            finalized.OwnerUserId,
-            finalized.CharacterName,
-            finalized.RulesProfile,
-            false,
-            now,
-            now);
-        _characters[finalized.CharacterId] = character;
-        AppendHistory(finalized.CharacterId, "character-finalized", finalized.OwnerUserId, "Wizard draft finalized into character record.");
+        AppendHistory(characterId, "character-finalized", entity.OwnerUserId, "Wizard draft finalized into character record.");
+        await _db.SaveChangesAsync(cancellationToken);
 
-        return new CharacterWizardResult(true, finalized, Array.Empty<string>(), resolveResult.Warnings);
+        return new CharacterWizardResult(
+            true,
+            ToDraft(entity),
+            Array.Empty<string>(),
+            resolveResult.Warnings);
     }
 
-    public CharacterWizardResult CopyToRuleset(Guid characterId, CopyCharacterRulesetRequest request)
+    public async Task<CharacterWizardResult> CopyToRulesetAsync(Guid characterId, CopyCharacterRulesetRequest request, CancellationToken cancellationToken)
     {
-        if (!_drafts.TryGetValue(characterId, out var draft))
+        var source = await _db.CharacterDrafts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CharacterId == characterId.ToString(), cancellationToken);
+        if (source is null)
         {
             return new CharacterWizardResult(false, null, new[] { "Character draft not found." }, Array.Empty<string>());
         }
 
+        var sourceDraft = ToDraft(source);
         var warnings = new List<string>
         {
             "Base ruleset is locked after creation. This operation creates a copied character in the target ruleset."
         };
-
-        var copiedSteps = request.CarrySelectionsForward ? draft.Steps : Array.Empty<WizardStepState>();
+        var copiedSteps = request.CarrySelectionsForward ? sourceDraft.Steps : Array.Empty<WizardStepState>();
         if (!request.CarrySelectionsForward)
         {
             warnings.Add("Selections were not carried forward; review all wizard steps in the copied character.");
@@ -256,40 +313,89 @@ public sealed class CharacterWizardService : ICharacterWizardService
             warnings.Add("Selections were carried forward; review compatibility conflicts in the target ruleset.");
         }
 
-        var copied = new CharacterWizardDraft(
-            Guid.NewGuid(),
-            draft.OwnerUserId,
-            $"{draft.CharacterName} (Copy)",
-            new RulesProfile(request.TargetRuleSystem, request.TargetOverlaySources.Count > 0, request.TargetOverlaySources),
-            false,
-            copiedSteps,
-            warnings);
+        var copiedId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var copiedEntity = new CharacterDraftEntity
+        {
+            CharacterId = copiedId.ToString(),
+            OwnerUserId = source.OwnerUserId,
+            CharacterName = $"{source.CharacterName} (Copy)",
+            BaseRuleSystem = request.TargetRuleSystem.ToString(),
+            MixedModeEnabled = request.TargetOverlaySources.Count > 0,
+            OverlaySourcesJson = SerializeJson(request.TargetOverlaySources),
+            IsFinalized = false,
+            StepsJson = SerializeJson(copiedSteps),
+            WarningsJson = SerializeJson(warnings),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
 
-        _drafts[copied.CharacterId] = copied;
-        AppendHistory(copied.CharacterId, "draft-copied-ruleset", draft.OwnerUserId, $"Copied from '{draft.CharacterId}' to target ruleset '{request.TargetRuleSystem}'.");
-        return new CharacterWizardResult(true, copied, Array.Empty<string>(), warnings);
-    }
+        _db.CharacterDrafts.Add(copiedEntity);
+        AppendHistory(copiedId, "draft-copied-ruleset", source.OwnerUserId, $"Copied from '{source.CharacterId}' to target ruleset '{request.TargetRuleSystem}'.");
+        await _db.SaveChangesAsync(cancellationToken);
 
-    private static CharacterSummary ToSummary(CharacterRecord character)
-    {
-        return new CharacterSummary(
-            character.CharacterId,
-            character.CharacterName,
-            character.RulesProfile.BaseRuleSystem,
-            character.RulesProfile.MixedModeEnabled,
-            character.IsArchived,
-            character.CreatedAtUtc,
-            character.UpdatedAtUtc);
+        return new CharacterWizardResult(true, ToDraft(copiedEntity), Array.Empty<string>(), warnings);
     }
 
     private void AppendHistory(Guid characterId, string action, string actorUserId, string details)
     {
-        var entry = new CharacterRevisionEntry(DateTimeOffset.UtcNow, action, actorUserId, details);
-        var list = _history.GetOrAdd(characterId, _ => new List<CharacterRevisionEntry>());
-        lock (list)
+        _db.CharacterHistoryEntries.Add(new CharacterHistoryEntity
         {
-            list.Add(entry);
+            EntryId = Guid.NewGuid().ToString(),
+            CharacterId = characterId.ToString(),
+            TimestampUtc = DateTimeOffset.UtcNow,
+            Action = action,
+            ActorUserId = actorUserId,
+            Details = details
+        });
+    }
+
+    private static CharacterSummary ToSummary(CharacterRecordEntity entity)
+    {
+        return new CharacterSummary(
+            Guid.Parse(entity.CharacterId),
+            entity.CharacterName,
+            ParseRuleSystem(entity.BaseRuleSystem),
+            entity.MixedModeEnabled,
+            entity.IsArchived,
+            entity.CreatedAtUtc,
+            entity.UpdatedAtUtc);
+    }
+
+    private static CharacterWizardDraft ToDraft(CharacterDraftEntity entity)
+    {
+        return new CharacterWizardDraft(
+            Guid.Parse(entity.CharacterId),
+            entity.OwnerUserId,
+            entity.CharacterName,
+            new RulesProfile(
+                ParseRuleSystem(entity.BaseRuleSystem),
+                entity.MixedModeEnabled,
+                DeserializeJson<IReadOnlyList<string>>(entity.OverlaySourcesJson) ?? Array.Empty<string>()),
+            entity.IsFinalized,
+            DeserializeJson<IReadOnlyList<WizardStepState>>(entity.StepsJson) ?? Array.Empty<WizardStepState>(),
+            DeserializeJson<IReadOnlyList<string>>(entity.WarningsJson) ?? Array.Empty<string>());
+    }
+
+    private static RuleSystemMode ParseRuleSystem(string value)
+    {
+        return Enum.TryParse<RuleSystemMode>(value, ignoreCase: true, out var parsed)
+            ? parsed
+            : RuleSystemMode.Rules2024;
+    }
+
+    private static string SerializeJson<T>(T value)
+    {
+        return JsonSerializer.Serialize(value, JsonOptions);
+    }
+
+    private static T? DeserializeJson<T>(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return default;
         }
+        return JsonSerializer.Deserialize<T>(value, JsonOptions);
     }
 
     private static List<string> ValidateSelectionsAgainstRulesMode(RulesProfile profile, IReadOnlyList<RuleModuleSelection> selections)
@@ -325,13 +431,4 @@ public sealed class CharacterWizardService : ICharacterWizardService
 
         return errors;
     }
-
-    private sealed record CharacterRecord(
-        Guid CharacterId,
-        string OwnerUserId,
-        string CharacterName,
-        RulesProfile RulesProfile,
-        bool IsArchived,
-        DateTimeOffset CreatedAtUtc,
-        DateTimeOffset UpdatedAtUtc);
 }
