@@ -69,9 +69,10 @@ npm run build
 7. Race/species and background/origin ability bonuses (when available from catalog payload) are applied into total ability scores.
 8. In **Wizard + persistent build**, click **Start Wizard Draft**, apply class/race/background selections, then click **Save build to persistent model**.
 9. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
-10. In **Skills menu and persisted checks**, choose any skill, set advantage/expertise, and roll checks via persisted-computation endpoint(s).
-11. In **Inventory from database (persisted)**, add item definitions from catalog, then equip/attune/unattune/remove through persisted inventory endpoints.
-12. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
+10. In **Skills menu and persisted checks**, each skill has a `None/Proficient/Expertise` dropdown with live proficiency/expertise slot counters (negative values indicate over-allocation), plus persisted advantage/disadvantage check rolling.
+11. In **Inventory from database (persisted)**, add item definitions from catalog, set quantity, and manage equip/attune/unattune/remove states. Inventory rows show value, weight, attunement, equip status, and quantity.
+12. **Attacks** auto-builds from equipped weapon-style inventory entries (deduped by weapon details) and shows to-hit bonus, damage expression, and advantage/disadvantage rolling.
+13. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
 
 ### Troubleshooting (local run)
 1. If `dotnet build` fails with `DndApp.Api.exe ... file is being used by another process`, stop the running API (`Ctrl+C` in the terminal where `dotnet run` is active), then build again.
@@ -95,6 +96,7 @@ dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.cspro
 ```
 
 Normalization now classifies modules into expandable categories (`class`, `subclass`, `race`, `background`, `feat`, `spell`, `item`, `section`) and creates item definitions for detected item modules.
+It also enriches class/background module payloads with proficiency metadata (`fixedSkillProficiencies`, `skillChoices`, `skillChoiceCount`, `expertiseChoiceCount`) used by the frontend skill planner.
 
 Outputs are written under:
 - `data\ingested\phb2014\v1\sections.json`
