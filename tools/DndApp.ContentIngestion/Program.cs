@@ -22,6 +22,12 @@ if (args.Any(a => string.Equals(a, "--normalize-db", StringComparison.OrdinalIgn
     return;
 }
 
+if (args.Any(a => string.Equals(a, "--validate-catalog", StringComparison.OrdinalIgnoreCase)))
+{
+    await ValidateCatalogCoverageAsync(repoRoot);
+    return;
+}
+
 var sources = new[]
 {
     new SourceSpec("phb2014", "DnDPHB2014.md"),
@@ -388,6 +394,66 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
     Console.WriteLine($"Rule modules created: {moduleCount}");
     Console.WriteLine($"Rule variants created: {variantCount}");
     Console.WriteLine($"SQLite file: {sqlitePath}");
+}
+
+static async Task ValidateCatalogCoverageAsync(string repoRoot)
+{
+    var sqlitePath = Path.Combine(repoRoot, "src", "DndApp.Api", "dndapp-dev.sqlite");
+    var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
+        .UseSqlite($"Data Source={sqlitePath}")
+        .Options;
+
+    await using var db = new AppDbContext(dbOptions);
+    await db.Database.MigrateAsync();
+
+    var validations = new[]
+    {
+        ("rules-2014", "Rules2014"),
+        ("rules-2024", "Rules2024"),
+    };
+    var errors = new List<string>();
+
+    foreach (var (ruleSystemId, label) in validations)
+    {
+        var moduleRows = await (
+            from module in db.RuleModules
+            join source in db.ContentSources on module.ContentSourceId equals source.Id
+            where source.RuleSystemId == ruleSystemId
+            select module.ModuleType)
+            .ToArrayAsync();
+
+        var classCount = moduleRows.Count(x => string.Equals(x, "class", StringComparison.OrdinalIgnoreCase));
+        var speciesCount = moduleRows.Count(x =>
+            string.Equals(x, "race", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(x, "species", StringComparison.OrdinalIgnoreCase));
+        var backgroundCount = moduleRows.Count(x =>
+            string.Equals(x, "background", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(x, "origin", StringComparison.OrdinalIgnoreCase));
+        var spellCount = moduleRows.Count(x => string.Equals(x, "spell", StringComparison.OrdinalIgnoreCase));
+
+        var itemCount = await (
+            from item in db.ItemDefinitions
+            join module in db.RuleModules on item.RuleModuleId equals module.Id
+            join source in db.ContentSources on module.ContentSourceId equals source.Id
+            where source.RuleSystemId == ruleSystemId
+            select item.Id)
+            .CountAsync();
+
+        Console.WriteLine($"{label}: classes={classCount}, species={speciesCount}, backgrounds={backgroundCount}, spells={spellCount}, items={itemCount}");
+
+        if (classCount == 0) errors.Add($"{label}: missing class catalog entries.");
+        if (speciesCount == 0) errors.Add($"{label}: missing race/species catalog entries.");
+        if (backgroundCount == 0) errors.Add($"{label}: missing background/origin catalog entries.");
+        if (spellCount == 0) errors.Add($"{label}: missing spell catalog entries.");
+        if (itemCount == 0) errors.Add($"{label}: missing item catalog entries.");
+    }
+
+    if (errors.Count > 0)
+    {
+        throw new InvalidOperationException("Catalog validation failed: " + string.Join(" ", errors));
+    }
+
+    Console.WriteLine("Catalog validation passed.");
 }
 
 static string ComputeSha256(string value)

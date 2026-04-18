@@ -98,3 +98,31 @@ public sealed class CharacterSelectedModuleEntity
     public string DisplayName { get; set; } = string.Empty;
     public string SourceCode { get; set; } = string.Empty;
 }
+
+public sealed class CharacterSpellEntryEntity
+{
+    public string CharacterId { get; set; } = string.Empty;
+    public string SpellModuleId { get; set; } = string.Empty;
+    public string SpellName { get; set; } = string.Empty;
+    public string PreparationMode { get; set; } = string.Empty; // Known / Prepared / Cantrip
+}
+
+public sealed class CharacterResourcePoolEntity
+{
+    public string CharacterId { get; set; } = string.Empty;
+    public string ResourceKey { get; set; } = string.Empty;
+    public int CurrentValue { get; set; }
+    public int MaxValue { get; set; }
+    public string MetadataJson { get; set; } = "{}";
+}
+
+public sealed class CharacterVitalsEntity
+{
+    public string CharacterId { get; set; } = string.Empty;
+    public int MaxHitPoints { get; set; }
+    public int CurrentHitPoints { get; set; }
+    public int TempHitPoints { get; set; }
+    public int BaseMoveSpeed { get; set; }
+    public int BaseArmorClass { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}

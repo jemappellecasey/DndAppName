@@ -220,6 +220,68 @@ public sealed class CharacterComputationServiceTests
         Assert.Equal(5, computed.Result.TotalModifier);
     }
 
+    [Fact]
+    public async Task GetDerivedStats_UsesPersistedVitalsAndSpells()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var characterId = Guid.NewGuid();
+        var id = characterId.ToString();
+
+        fixture.Db.CharacterSheets.Add(new CharacterSheetEntity
+        {
+            CharacterId = id,
+            CharacterName = "Derived Tester",
+            BaseRuleSystem = "Rules2024",
+            BuildMethod = "Manual",
+            ClassModuleId = "class-fighter",
+            ClassName = "Fighter",
+            Level = 5,
+            ProficiencyBonus = 3,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        fixture.Db.CharacterAbilityScores.AddRange(new[]
+        {
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Strength", Score = 16 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Dexterity", Score = 14 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Constitution", Score = 14 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Intelligence", Score = 10 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Wisdom", Score = 10 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Charisma", Score = 8 },
+        });
+        fixture.Db.CharacterSpellEntries.Add(new CharacterSpellEntryEntity
+        {
+            CharacterId = id,
+            SpellModuleId = "spell-shield",
+            SpellName = "Shield",
+            PreparationMode = "Known",
+        });
+        fixture.Db.CharacterVitals.Add(new CharacterVitalsEntity
+        {
+            CharacterId = id,
+            MaxHitPoints = 38,
+            CurrentHitPoints = 31,
+            TempHitPoints = 5,
+            BaseMoveSpeed = 35,
+            BaseArmorClass = 16,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var service = new CharacterComputationService(
+            fixture.Db,
+            new ItemEffectPipelineService(),
+            new CalculationEngineService());
+        var result = await service.GetDerivedStatsAsync(characterId, CancellationToken.None);
+
+        Assert.Empty(result.Errors);
+        Assert.NotNull(result.Result);
+        Assert.Equal(16, result.Result.ArmorClass);
+        Assert.Equal(35, result.Result.MoveSpeed);
+        Assert.Equal(38, result.Result.MaxHitPoints);
+        Assert.Contains("Shield", result.Result.AvailableSpells);
+    }
+
     private static async Task<DbFixture> CreateFixtureAsync()
     {
         var connection = new SqliteConnection("Data Source=:memory:");

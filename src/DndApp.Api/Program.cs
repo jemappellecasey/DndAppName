@@ -48,6 +48,7 @@ builder.Services.AddScoped<ILocalAuthService, LocalAuthService>();
 builder.Services.AddScoped<ICharacterBuildService, CharacterBuildService>();
 builder.Services.AddScoped<ICharacterInventoryService, CharacterInventoryService>();
 builder.Services.AddScoped<ICharacterComputationService, CharacterComputationService>();
+builder.Services.AddScoped<ICharacterProgressionService, CharacterProgressionService>();
 builder.Services.AddScoped<IRuleValidationService, RuleValidationService>();
 
 var app = builder.Build();
@@ -676,6 +677,64 @@ app.MapPost(
         return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
     });
 
+app.MapPost(
+    "/admin/characters/reconcile",
+    async (AppDbContext db, CancellationToken cancellationToken) =>
+    {
+        var now = DateTimeOffset.UtcNow;
+        var sheets = await db.CharacterSheets.AsNoTracking().ToArrayAsync(cancellationToken);
+        var existingRecords = await db.CharacterRecords.AsNoTracking()
+            .Select(x => x.CharacterId)
+            .ToHashSetAsync(cancellationToken);
+        var existingDrafts = await db.CharacterDrafts.AsNoTracking()
+            .Select(x => x.CharacterId)
+            .ToHashSetAsync(cancellationToken);
+
+        var createdRecords = 0;
+        var createdDrafts = 0;
+        foreach (var sheet in sheets)
+        {
+            if (!existingRecords.Contains(sheet.CharacterId))
+            {
+                db.CharacterRecords.Add(new CharacterRecordEntity
+                {
+                    CharacterId = sheet.CharacterId,
+                    OwnerUserId = sheet.OwnerUserId,
+                    CharacterName = sheet.CharacterName,
+                    BaseRuleSystem = sheet.BaseRuleSystem,
+                    MixedModeEnabled = false,
+                    OverlaySourcesJson = "[]",
+                    IsArchived = false,
+                    CreatedAtUtc = sheet.CreatedAtUtc,
+                    UpdatedAtUtc = sheet.UpdatedAtUtc
+                });
+                createdRecords++;
+            }
+
+            if (!existingDrafts.Contains(sheet.CharacterId))
+            {
+                db.CharacterDrafts.Add(new CharacterDraftEntity
+                {
+                    CharacterId = sheet.CharacterId,
+                    OwnerUserId = sheet.OwnerUserId,
+                    CharacterName = sheet.CharacterName,
+                    BaseRuleSystem = sheet.BaseRuleSystem,
+                    MixedModeEnabled = false,
+                    OverlaySourcesJson = "[]",
+                    IsFinalized = true,
+                    StepsJson = "[]",
+                    WarningsJson = "[]",
+                    CreatedAtUtc = sheet.CreatedAtUtc,
+                    UpdatedAtUtc = now
+                });
+                createdDrafts++;
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.Ok(new { scannedSheets = sheets.Length, createdRecords, createdDrafts });
+    });
+
 app.MapGet(
     "/characters/{characterId:guid}/build",
     async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterBuildService buildService, CancellationToken cancellationToken) =>
@@ -746,6 +805,81 @@ app.MapDelete(
         }
         var deleted = await buildService.DeleteBuildAsync(characterId, cancellationToken);
         return deleted ? Results.NoContent() : Results.NotFound();
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/spells",
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+        var spells = await progression.GetSpellsAsync(characterId, cancellationToken);
+        return spells is null ? Results.NotFound() : Results.Ok(spells);
+    });
+
+app.MapPut(
+    "/characters/{characterId:guid}/spells",
+    async (Guid characterId, UpsertCharacterSpellsRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+        return Results.Ok(await progression.UpsertSpellsAsync(characterId, request, cancellationToken));
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/resources",
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+        var resources = await progression.GetResourcesAsync(characterId, cancellationToken);
+        return resources is null ? Results.NotFound() : Results.Ok(resources);
+    });
+
+app.MapPut(
+    "/characters/{characterId:guid}/resources",
+    async (Guid characterId, UpsertCharacterResourcesRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+        return Results.Ok(await progression.UpsertResourcesAsync(characterId, request, cancellationToken));
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/vitals",
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+        var vitals = await progression.GetVitalsAsync(characterId, cancellationToken);
+        return vitals is null ? Results.NotFound() : Results.Ok(vitals);
+    });
+
+app.MapPut(
+    "/characters/{characterId:guid}/vitals",
+    async (Guid characterId, UpsertCharacterVitalsRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+        return Results.Ok(await progression.UpsertVitalsAsync(characterId, request, cancellationToken));
     });
 
 app.Run();

@@ -30,6 +30,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<CharacterHistoryEntity> CharacterHistoryEntries => Set<CharacterHistoryEntity>();
     public DbSet<CharacterClassLevelEntity> CharacterClassLevels => Set<CharacterClassLevelEntity>();
     public DbSet<CharacterSelectedModuleEntity> CharacterSelectedModules => Set<CharacterSelectedModuleEntity>();
+    public DbSet<CharacterSpellEntryEntity> CharacterSpellEntries => Set<CharacterSpellEntryEntity>();
+    public DbSet<CharacterResourcePoolEntity> CharacterResourcePools => Set<CharacterResourcePoolEntity>();
+    public DbSet<CharacterVitalsEntity> CharacterVitals => Set<CharacterVitalsEntity>();
     public DbSet<UserAccountEntity> UserAccounts => Set<UserAccountEntity>();
     public DbSet<UserSessionEntity> UserSessions => Set<UserSessionEntity>();
     public DbSet<IngestionRunEntity> IngestionRuns => Set<IngestionRunEntity>();
@@ -334,6 +337,44 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.ModuleId).HasMaxLength(64);
             entity.Property(x => x.DisplayName).HasMaxLength(300);
             entity.Property(x => x.SourceCode).HasMaxLength(40);
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterSpellEntryEntity>(entity =>
+        {
+            entity.ToTable("character_spell_entry");
+            entity.HasKey(x => new { x.CharacterId, x.SpellModuleId, x.PreparationMode });
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.SpellModuleId).HasMaxLength(64);
+            entity.Property(x => x.SpellName).HasMaxLength(160);
+            entity.Property(x => x.PreparationMode).HasMaxLength(24);
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterResourcePoolEntity>(entity =>
+        {
+            entity.ToTable("character_resource_pool");
+            entity.HasKey(x => new { x.CharacterId, x.ResourceKey });
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.ResourceKey).HasMaxLength(64);
+            entity.Property(x => x.MetadataJson).HasColumnType("TEXT");
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterVitalsEntity>(entity =>
+        {
+            entity.ToTable("character_vitals");
+            entity.HasKey(x => x.CharacterId);
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
             entity.HasOne<CharacterSheetEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.CharacterId)

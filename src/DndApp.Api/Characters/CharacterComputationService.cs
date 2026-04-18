@@ -195,6 +195,9 @@ public sealed class CharacterComputationService : ICharacterComputationService
             characterId,
             loaded.Derived.ArmorClass,
             loaded.Derived.MoveSpeed,
+            loaded.MaxHitPoints,
+            loaded.CurrentHitPoints,
+            loaded.TempHitPoints,
             loaded.Derived.SavingThrows,
             loaded.Derived.AbilityChecks,
             loaded.Derived.AvailableSpells,
@@ -243,8 +246,22 @@ public sealed class CharacterComputationService : ICharacterComputationService
             classLevels = [new CharacterClassLevelData(sheet.ClassModuleId, sheet.ClassName, sheet.Level, 0)];
         }
         var saveProficiencies = CharacterBuildService.DeriveSaveProficiencies(classLevels);
+        var persistedSpells = await _db.CharacterSpellEntries.AsNoTracking()
+            .Where(x => x.CharacterId == id)
+            .Select(x => x.SpellName)
+            .Distinct()
+            .ToArrayAsync(cancellationToken);
+        var vitals = await _db.CharacterVitals.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.CharacterId == id, cancellationToken);
 
-        var baseStats = BuildBaseStats(abilityScores, skillTrainingBySkill, sheet.ProficiencyBonus, saveProficiencies);
+        var baseStats = BuildBaseStats(
+            abilityScores,
+            skillTrainingBySkill,
+            sheet.ProficiencyBonus,
+            saveProficiencies,
+            persistedSpells,
+            vitals?.BaseMoveSpeed ?? 0,
+            vitals?.BaseArmorClass ?? 0);
         var inventoryRows = await _db.CharacterInventoryItems.AsNoTracking()
             .Where(x => x.CharacterId == id)
             .ToListAsync(cancellationToken);
@@ -284,6 +301,9 @@ public sealed class CharacterComputationService : ICharacterComputationService
             ProficientSkills: proficientSkills,
             SkillTrainingBySkill: skillTrainingBySkill,
             SaveProficiencies: saveProficiencies,
+            MaxHitPoints: vitals?.MaxHitPoints ?? 0,
+            CurrentHitPoints: vitals?.CurrentHitPoints ?? 0,
+            TempHitPoints: vitals?.TempHitPoints ?? 0,
             Derived: pipelineResult.DerivedStats,
             ActiveInventoryItemIds: itemStates.Where(x => x.IsEquipped).Select(x => x.ItemId).ToArray(),
             Errors: Array.Empty<string>());
@@ -293,7 +313,10 @@ public sealed class CharacterComputationService : ICharacterComputationService
         IReadOnlyDictionary<string, int> abilityScores,
         IReadOnlyDictionary<string, string> skillTrainingBySkill,
         int proficiencyBonus,
-        IReadOnlyList<string> saveProficiencies)
+        IReadOnlyList<string> saveProficiencies,
+        IReadOnlyList<string> persistedSpells,
+        int baseMoveSpeed,
+        int baseArmorClass)
     {
         var abilityModifiers = abilityScores.ToDictionary(x => x.Key, x => Modifier(x.Value), StringComparer.OrdinalIgnoreCase);
         var abilityChecks = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -322,13 +345,16 @@ public sealed class CharacterComputationService : ICharacterComputationService
             }
         }
 
-        var armorClass = 10 + (abilityModifiers.TryGetValue("Dexterity", out var dex) ? dex : 0);
+        var armorClass = baseArmorClass > 0
+            ? baseArmorClass
+            : 10 + (abilityModifiers.TryGetValue("Dexterity", out var dex) ? dex : 0);
+        var moveSpeed = baseMoveSpeed > 0 ? baseMoveSpeed : 30;
         return new BaseStats(
             ArmorClass: armorClass,
-            MoveSpeed: 30,
+            MoveSpeed: moveSpeed,
             SavingThrows: savingThrows,
             AbilityChecks: abilityChecks,
-            AvailableSpells: Array.Empty<string>());
+            AvailableSpells: persistedSpells);
     }
 
     private static int Modifier(int score) => (int)Math.Floor((score - 10) / 2.0);
@@ -423,6 +449,9 @@ public sealed class CharacterComputationService : ICharacterComputationService
         IReadOnlyList<string> ProficientSkills,
         IReadOnlyDictionary<string, string> SkillTrainingBySkill,
         IReadOnlyList<string> SaveProficiencies,
+        int MaxHitPoints,
+        int CurrentHitPoints,
+        int TempHitPoints,
         DerivedStats Derived,
         IReadOnlyList<string> ActiveInventoryItemIds,
         IReadOnlyList<string> Errors)
@@ -435,6 +464,9 @@ public sealed class CharacterComputationService : ICharacterComputationService
                 Array.Empty<string>(),
                 new Dictionary<string, string>(),
                 Array.Empty<string>(),
+                0,
+                0,
+                0,
                 new DerivedStats(0, 0, new Dictionary<string, int>(), new Dictionary<string, int>(), Array.Empty<string>()),
                 Array.Empty<string>(),
                 new[] { error });

@@ -1,6 +1,7 @@
 # DndAppName
 
 DndAppName is a D&D character creation and management app focused on 2014/2024 rules support, mixed-rules compatibility, explainable calculations, custom lineage/origin creation, and item/attunement-aware character math.
+Repository folder names may vary (for example `CopilotTesting`), while the solution/project naming remains `DndAppName`.
 
 ## Current capabilities
 1. .NET 10 API + React frontend foundation.
@@ -97,6 +98,11 @@ Normalize imported raw sections into core domain entities (`rule_system`, `conte
 dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.csproj -- --normalize-db
 ```
 
+Validate normalized catalog coverage (classes, species/races, backgrounds/origins, spells, items) for both rulesets:
+```powershell
+dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.csproj -- --validate-catalog
+```
+
 Normalization now classifies modules into expandable categories (`class`, `subclass`, `race`, `background`, `feat`, `spell`, `item`, `section`) and creates item definitions for detected item modules.
 It also enriches class/background module payloads with proficiency metadata (`fixedSkillProficiencies`, `skillChoices`, `skillChoiceCount`, `expertiseChoiceCount`) used by the frontend skill planner.
 
@@ -120,6 +126,7 @@ Outputs are written under:
 ### Database provider config
 - `Database:Provider` currently supports `sqlite`.
 - PostgreSQL connection string placeholders are present for future provider-switch work.
+- Provider-switch strategy: keep all schema changes via EF migrations in `src\DndApp.Api\Data\Migrations`, then generate/apply provider-specific migrations when enabling PostgreSQL in configuration.
 
 ## Key API endpoints (current)
 ### Character wizard and rules
@@ -137,6 +144,7 @@ Outputs are written under:
 12. `POST /characters/{characterId}/archive`
 13. `POST /characters/{characterId}/duplicate`
 14. `GET /characters/{characterId}/history`
+15. `POST /admin/characters/reconcile` (repairs missing persisted wizard records/drafts from existing character sheets)
 
 ### Local auth
 1. `POST /auth/local/register`
@@ -164,7 +172,8 @@ Outputs are written under:
 2. `PUT /characters/{characterId}/build`
 3. `PATCH /characters/{characterId}/build`
 4. `DELETE /characters/{characterId}/build`
-5. Build endpoints now require `X-Session-Token` and enforce owner access.
+5. Build payload now supports persisted multiclass levels, selected modules (race/background/origin/species), and skill training tiers.
+6. Build endpoints now require `X-Session-Token` and enforce owner access.
 
 ### Persistent inventory
 1. `GET /characters/{characterId}/inventory`
@@ -178,7 +187,16 @@ Outputs are written under:
 2. `POST /characters/{characterId}/compute/check/persisted`
 3. `POST /characters/{characterId}/compute/save/persisted`
 4. `POST /characters/{characterId}/compute/attack/persisted`
-5. Persisted compute endpoints now require `X-Session-Token` and enforce owner access.
+5. Derived stats now include persisted vitals (HP values) and class-derived save proficiency context.
+6. Persisted compute endpoints now require `X-Session-Token` and enforce owner access.
+
+### Persisted spells, resources, and vitals
+1. `GET /characters/{characterId}/spells`
+2. `PUT /characters/{characterId}/spells`
+3. `GET /characters/{characterId}/resources`
+4. `PUT /characters/{characterId}/resources`
+5. `GET /characters/{characterId}/vitals`
+6. `PUT /characters/{characterId}/vitals`
 
 ### Rule validation
 1. `PUT /characters/{characterId}/build` and `PATCH /characters/{characterId}/build` now validate class-module compatibility and prerequisite predicates from `prerequisite`.
