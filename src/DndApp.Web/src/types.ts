@@ -288,3 +288,36 @@ export interface PersistedComputeCheckPayload {
   additionalModifier: number
   hasExpertise: boolean
 }
+
+export interface CharacterSpellEntryData {
+  spellModuleId: string
+  spellName: string
+  preparationMode: string
+}
+
+export interface CharacterSpellsData {
+  characterId: string
+  entries: CharacterSpellEntryData[]
+}
+
+export interface CharacterResourcePoolData {
+  resourceKey: string
+  currentValue: number
+  maxValue: number
+  metadataJson: string
+}
+
+export interface CharacterResourcesData {
+  characterId: string
+  resources: CharacterResourcePoolData[]
+}
+
+export interface CharacterVitalsData {
+  characterId: string
+  maxHitPoints: number
+  currentHitPoints: number
+  tempHitPoints: number
+  baseMoveSpeed: number
+  baseArmorClass: number
+  updatedAtUtc: string
+}

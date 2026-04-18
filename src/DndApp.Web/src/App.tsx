@@ -12,6 +12,9 @@ import {
   getCharacterBuild,
   getCharacterHistory,
   getCharacterInventory,
+  getCharacterResources,
+  getCharacterSpells,
+  getCharacterVitals,
   getCharacters,
   getClassCatalog,
   getContentSources,
@@ -27,7 +30,10 @@ import {
   setSessionToken,
   startWizard,
   submitWizardStep,
+  upsertCharacterResources,
   upsertCharacterBuild,
+  upsertCharacterSpells,
+  upsertCharacterVitals,
 } from './api'
 import type {
   AbilityName,
@@ -36,7 +42,10 @@ import type {
   CharacterBuildData,
   CharacterHistoryEntry,
   CharacterInventoryState,
+  CharacterResourcePoolData,
+  CharacterSpellEntryData,
   CharacterSummary,
+  CharacterVitalsData,
   CharacterWizardResult,
   ClassCatalogItem,
   ContentSourceCatalogItem,
@@ -103,6 +112,13 @@ const DEFAULT_SCORES: Record<AbilityName, number> = {
 }
 
 const POINT_BUY_COST: Record<number, number> = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 }
+const DEFAULT_VITALS: Omit<CharacterVitalsData, 'characterId' | 'updatedAtUtc'> = {
+  maxHitPoints: 1,
+  currentHitPoints: 1,
+  tempHitPoints: 0,
+  baseMoveSpeed: 30,
+  baseArmorClass: 10,
+}
 const KNOWN_CLASSES = new Set([
   'Artificer',
   'Barbarian',
@@ -167,11 +183,15 @@ function getDisplayItemName(itemName: string, itemId: string): string {
   return itemName
 }
 
+function rulesetLabel(ruleSystem: RuleSystemMode): string {
+  return ruleSystem === 'Rules2024' ? '2024 rules' : '2014 rules'
+}
+
 function App() {
   const [status, setStatus] = useState('Checking API...')
   const [session, setSession] = useState<LocalSession | null>(null)
-  const [loginName, setLoginName] = useState('casey')
-  const [loginPassword, setLoginPassword] = useState('password123')
+  const [loginName, setLoginName] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
   const [isRegisterMode, setIsRegisterMode] = useState(false)
   const [characters, setCharacters] = useState<CharacterSummary[]>([])
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
@@ -184,13 +204,11 @@ function App() {
   const [overlaySourceOptions, setOverlaySourceOptions] = useState<ContentSourceCatalogItem[]>([])
   const [overlaySources, setOverlaySources] = useState<string[]>([])
   const [activeDraft, setActiveDraft] = useState<CharacterWizardResult | null>(null)
-  const [selectionStepName, setSelectionStepName] = useState('class')
-  const [selectionModuleId, setSelectionModuleId] = useState('class-fighter')
-  const [selectionSourceCode, setSelectionSourceCode] = useState('PHB2024')
 
   const [classCatalog, setClassCatalog] = useState<ClassCatalogItem[]>([])
   const [moduleCatalog, setModuleCatalog] = useState<ModuleCatalogItem[]>([])
   const [selectedClassModuleId, setSelectedClassModuleId] = useState('')
+  const [selectedSubclassModuleId, setSelectedSubclassModuleId] = useState('')
   const [selectedRaceModuleId, setSelectedRaceModuleId] = useState('')
   const [selectedBackgroundModuleId, setSelectedBackgroundModuleId] = useState('')
   const [secondaryClassModuleId, setSecondaryClassModuleId] = useState('')
@@ -202,7 +220,7 @@ function App() {
   const [pointBuyScores, setPointBuyScores] = useState<Record<AbilityName, number>>({ ...DEFAULT_SCORES })
   const [rolledPool, setRolledPool] = useState<number[]>([])
   const [rollAssignments, setRollAssignments] = useState<Partial<Record<AbilityName, number>>>({})
-  const [characterLevel, setCharacterLevel] = useState(1)
+  const [primaryClassLevel, setPrimaryClassLevel] = useState(1)
   const [skillTrainingBySkill, setSkillTrainingBySkill] = useState<Record<SkillName, SkillTrainingLevel>>(
     () =>
       Object.fromEntries(ALL_SKILLS.map((skill) => [skill, 'None'])) as Record<SkillName, SkillTrainingLevel>,
@@ -222,6 +240,12 @@ function App() {
   const [rollResult, setRollResult] = useState('')
   const [attackAdvantageState, setAttackAdvantageState] = useState<AdvantageState>('None')
   const [attackResults, setAttackResults] = useState<Record<string, string>>({})
+  const [spellEntries, setSpellEntries] = useState<CharacterSpellEntryData[]>([])
+  const [resourcePools, setResourcePools] = useState<CharacterResourcePoolData[]>([])
+  const [vitals, setVitals] = useState<Omit<CharacterVitalsData, 'characterId' | 'updatedAtUtc'>>({
+    ...DEFAULT_VITALS,
+  })
+  const [sheetResult, setSheetResult] = useState('')
 
   const [originPreview, setOriginPreview] = useState('')
   const [speciesPreview, setSpeciesPreview] = useState('')
@@ -237,6 +261,18 @@ function App() {
         (x) => x.moduleType.toLowerCase() === 'class' && KNOWN_CLASSES.has(x.displayName),
       ),
     [moduleCatalog],
+  )
+  const mainClassOptions = useMemo(() => classCatalog, [classCatalog])
+  const subclassOptions = useMemo(
+    () =>
+      moduleCatalog.filter((x) => {
+        if (x.moduleType.toLowerCase() !== 'subclass') return false
+        if (mixedMode) return true
+        return baseRules === 'Rules2014'
+          ? x.sourceCode.toLowerCase().includes('2014')
+          : x.sourceCode.toLowerCase().includes('2024')
+      }),
+    [baseRules, mixedMode, moduleCatalog],
   )
   const raceOptions = useMemo(
     () =>
@@ -260,9 +296,23 @@ function App() {
     () => classOptions.find((x) => x.moduleId === selectedClassModuleId) ?? null,
     [classOptions, selectedClassModuleId],
   )
+  const effectiveSelectedRaceModuleId = useMemo(
+    () =>
+      selectedRaceModuleId && raceOptions.some((x) => x.moduleId === selectedRaceModuleId)
+        ? selectedRaceModuleId
+        : (raceOptions[0]?.moduleId ?? ''),
+    [selectedRaceModuleId, raceOptions],
+  )
+  const effectiveSelectedBackgroundModuleId = useMemo(
+    () =>
+      selectedBackgroundModuleId && backgroundOptions.some((x) => x.moduleId === selectedBackgroundModuleId)
+        ? selectedBackgroundModuleId
+        : (backgroundOptions[0]?.moduleId ?? ''),
+    [selectedBackgroundModuleId, backgroundOptions],
+  )
   const selectedBackgroundOption = useMemo(
-    () => backgroundOptions.find((x) => x.moduleId === selectedBackgroundModuleId) ?? null,
-    [backgroundOptions, selectedBackgroundModuleId],
+    () => backgroundOptions.find((x) => x.moduleId === effectiveSelectedBackgroundModuleId) ?? null,
+    [backgroundOptions, effectiveSelectedBackgroundModuleId],
   )
 
   const rolledScores = useMemo<Record<AbilityName, number>>(
@@ -286,14 +336,14 @@ function App() {
   }, [buildMethod, manualScores, pointBuyScores, rolledScores])
 
   const raceBonuses = useMemo(() => {
-    const selected = raceOptions.find((x) => x.moduleId === selectedRaceModuleId)
+    const selected = raceOptions.find((x) => x.moduleId === effectiveSelectedRaceModuleId)
     return selected?.abilityBonuses ?? {}
-  }, [raceOptions, selectedRaceModuleId])
+  }, [raceOptions, effectiveSelectedRaceModuleId])
 
   const backgroundBonuses = useMemo(() => {
-    const selected = backgroundOptions.find((x) => x.moduleId === selectedBackgroundModuleId)
+    const selected = backgroundOptions.find((x) => x.moduleId === effectiveSelectedBackgroundModuleId)
     return selected?.abilityBonuses ?? {}
-  }, [backgroundOptions, selectedBackgroundModuleId])
+  }, [backgroundOptions, effectiveSelectedBackgroundModuleId])
 
   const totalAbilityScores = useMemo<Record<AbilityName, number>>(() => {
     const combined = { ...activeAbilityScores }
@@ -306,8 +356,22 @@ function App() {
   }, [activeAbilityScores, raceBonuses, backgroundBonuses])
 
   const totalCharacterLevel = useMemo(
-    () => characterLevel + multiClassSelections.reduce((sum, entry) => sum + entry.level, 0),
-    [characterLevel, multiClassSelections],
+    () => primaryClassLevel + multiClassSelections.reduce((sum, entry) => sum + entry.level, 0),
+    [primaryClassLevel, multiClassSelections],
+  )
+  const effectiveSelectedClassModuleId = useMemo(
+    () =>
+      mainClassOptions.some((x) => x.moduleId === selectedClassModuleId)
+        ? selectedClassModuleId
+        : (mainClassOptions[0]?.moduleId ?? ''),
+    [mainClassOptions, selectedClassModuleId],
+  )
+  const effectiveSelectedSubclassModuleId = useMemo(
+    () =>
+      selectedSubclassModuleId && subclassOptions.some((x) => x.moduleId === selectedSubclassModuleId)
+        ? selectedSubclassModuleId
+        : '',
+    [selectedSubclassModuleId, subclassOptions],
   )
 
   const pointBuySpent = useMemo(
@@ -365,44 +429,49 @@ function App() {
   }, [])
 
   async function loadCatalogData(ruleSystem: RuleSystemMode) {
-    const [classes, modules, items, guidance, sources] = await Promise.all([
+    const [classes, items, guidance, sources] = await Promise.all([
       getClassCatalog(ruleSystem),
-      getModuleCatalog({
-        baseRuleSystem: ruleSystem,
-        mixedMode,
-        overlaySources,
-        moduleTypes: ['class', 'race', 'species', 'background', 'origin', 'subclass', 'feat', 'spell'],
-      }),
       getItemCatalog(),
       getAttunementGuidance(),
       getContentSources(ruleSystem),
     ])
+    const validOverlaySources = overlaySources.filter((code) => sources.some((src) => src.sourceCode === code))
+    const effectiveOverlaySources = mixedMode ? validOverlaySources : []
+    const modules = await getModuleCatalog({
+      baseRuleSystem: ruleSystem,
+      mixedMode,
+      overlaySources: effectiveOverlaySources,
+      moduleTypes: ['class', 'race', 'species', 'background', 'origin', 'subclass', 'feat', 'spell'],
+    })
+    const filteredRaceOptions = modules.filter(
+      (x) =>
+        (x.moduleType.toLowerCase() === 'race' || x.moduleType.toLowerCase() === 'species') &&
+        KNOWN_RACES.has(x.displayName),
+    )
+    const filteredBackgroundOptions = modules.filter(
+      (x) =>
+        (x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin') &&
+        KNOWN_BACKGROUNDS.has(x.displayName),
+    )
     setClassCatalog(classes)
     setModuleCatalog(modules)
     setItemCatalog(items)
     setAttunementGuidance(JSON.stringify(guidance, null, 2))
     setOverlaySourceOptions(sources)
-    setOverlaySources((prev) => prev.filter((code) => sources.some((src) => src.sourceCode === code)))
+    setOverlaySources(validOverlaySources)
     if (!selectedClassModuleId && classes.length > 0) {
       setSelectedClassModuleId(classes[0].moduleId)
-      setSelectionModuleId(classes[0].moduleId)
-      setSelectionSourceCode(classes[0].sourceCode)
-    } else if (!selectedClassModuleId) {
-      const firstClass = modules.find((x) => x.moduleType.toLowerCase() === 'class')
-      if (firstClass) {
-        setSelectedClassModuleId(firstClass.moduleId)
-        setSelectionModuleId(firstClass.moduleId)
-        setSelectionSourceCode(firstClass.sourceCode)
-      }
     }
-    if (!selectedRaceModuleId) {
-      const firstRace = modules.find((x) => x.moduleType.toLowerCase() === 'race' || x.moduleType.toLowerCase() === 'species')
+    const selectedRaceStillVisible = filteredRaceOptions.some((x) => x.moduleId === selectedRaceModuleId)
+    if (!selectedRaceStillVisible) {
+      const firstRace = filteredRaceOptions[0]
       if (firstRace) {
         setSelectedRaceModuleId(firstRace.moduleId)
       }
     }
-    if (!selectedBackgroundModuleId) {
-      const firstBackground = modules.find((x) => x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin')
+    const selectedBackgroundStillVisible = filteredBackgroundOptions.some((x) => x.moduleId === selectedBackgroundModuleId)
+    if (!selectedBackgroundStillVisible) {
+      const firstBackground = filteredBackgroundOptions[0]
       if (firstBackground) {
         setSelectedBackgroundModuleId(firstBackground.moduleId)
       }
@@ -422,16 +491,18 @@ function App() {
       const persistedClassLevels = build.classLevels.length > 0 ? build.classLevels : [{ classModuleId: build.classModuleId, className: build.className, level: build.level, sortOrder: 0 }]
       const primaryPersistedClass = persistedClassLevels[0]
       setSelectedClassModuleId(primaryPersistedClass.classModuleId)
-      setCharacterLevel(primaryPersistedClass.level)
+      setPrimaryClassLevel(primaryPersistedClass.level)
       setMultiClassSelections(
         persistedClassLevels
           .slice(1)
           .map((entry) => ({ moduleId: entry.classModuleId, level: entry.level })),
       )
+      const subclassModule = build.selectedModules.find((x) => x.slot.toLowerCase() === 'subclass')
       const raceModule = build.selectedModules.find((x) => x.slot.toLowerCase() === 'race' || x.slot.toLowerCase() === 'species')
       const backgroundModule = build.selectedModules.find(
         (x) => x.slot.toLowerCase() === 'background' || x.slot.toLowerCase() === 'origin',
       )
+      if (subclassModule) setSelectedSubclassModuleId(subclassModule.moduleId)
       if (raceModule) setSelectedRaceModuleId(raceModule.moduleId)
       if (backgroundModule) setSelectedBackgroundModuleId(backgroundModule.moduleId)
       setSkillTrainingBySkill(() => {
@@ -465,6 +536,35 @@ function App() {
       setInventoryState(null)
       setInventoryResult('')
     }
+
+    try {
+      const spells = await getCharacterSpells(characterId)
+      setSpellEntries(spells.entries)
+    } catch {
+      setSpellEntries([])
+    }
+
+    try {
+      const resources = await getCharacterResources(characterId)
+      setResourcePools(resources.resources)
+    } catch {
+      setResourcePools([])
+    }
+
+    try {
+      const nextVitals = await getCharacterVitals(characterId)
+      setVitals({
+        maxHitPoints: nextVitals.maxHitPoints,
+        currentHitPoints: nextVitals.currentHitPoints,
+        tempHitPoints: nextVitals.tempHitPoints,
+        baseMoveSpeed: nextVitals.baseMoveSpeed,
+        baseArmorClass: nextVitals.baseArmorClass,
+      })
+    } catch {
+      setVitals({ ...DEFAULT_VITALS })
+    }
+
+    setSheetResult('')
   }
 
   async function refreshCharacters() {
@@ -505,6 +605,10 @@ function App() {
     setSavedBuild(null)
     setInventoryState(null)
     setActiveDraft(null)
+    setSpellEntries([])
+    setResourcePools([])
+    setVitals({ ...DEFAULT_VITALS })
+    setSheetResult('')
   }
 
   async function handleBaseRulesChange(ruleSystem: RuleSystemMode) {
@@ -536,35 +640,16 @@ function App() {
     }
   }
 
-  async function handleSubmitStep() {
-    if (!activeDraft?.draft) return
-    try {
-      setError('')
-      const result = await submitWizardStep(activeDraft.draft.characterId, selectionStepName, [
-        {
-          slot: selectionStepName,
-          moduleId: selectionModuleId,
-          sourceCode: selectionSourceCode,
-          compatible2014: true,
-          compatible2024: true,
-        },
-      ])
-      setActiveDraft(result)
-    } catch (e) {
-      setError(String(e))
-    }
-  }
-
   async function handleApplySelectedClassToWizard() {
-    if (!activeDraft?.draft || !selectedClassModuleId) return
-    const selectedClass = classCatalog.find((x) => x.moduleId === selectedClassModuleId)
-    const selectedClassModule = classOptions.find((x) => x.moduleId === selectedClassModuleId)
+    if (!activeDraft?.draft || !effectiveSelectedClassModuleId) return
+    const selectedClass = classCatalog.find((x) => x.moduleId === effectiveSelectedClassModuleId)
+    const selectedClassModule = classOptions.find((x) => x.moduleId === effectiveSelectedClassModuleId)
     if (!selectedClass && !selectedClassModule) return
     try {
       const classSelections = [
         {
           slot: 'class',
-          moduleId: selectedClassModuleId,
+          moduleId: effectiveSelectedClassModuleId,
           sourceCode: selectedClassModule?.sourceCode ?? selectedClass?.sourceCode ?? '',
           compatible2014: true,
           compatible2024: true,
@@ -583,8 +668,8 @@ function App() {
 
       let result = await submitWizardStep(activeDraft.draft.characterId, 'class', classSelections)
 
-      if (selectedRaceModuleId) {
-        const race = raceOptions.find((x) => x.moduleId === selectedRaceModuleId)
+      if (effectiveSelectedRaceModuleId) {
+        const race = raceOptions.find((x) => x.moduleId === effectiveSelectedRaceModuleId)
         if (race) {
           result = await submitWizardStep(activeDraft.draft.characterId, 'race', [
             {
@@ -598,8 +683,8 @@ function App() {
         }
       }
 
-      if (selectedBackgroundModuleId) {
-        const background = backgroundOptions.find((x) => x.moduleId === selectedBackgroundModuleId)
+      if (effectiveSelectedBackgroundModuleId) {
+        const background = backgroundOptions.find((x) => x.moduleId === effectiveSelectedBackgroundModuleId)
         if (background) {
           result = await submitWizardStep(activeDraft.draft.characterId, 'background', [
             {
@@ -613,9 +698,24 @@ function App() {
         }
       }
 
+      if (effectiveSelectedSubclassModuleId) {
+        const subclass = subclassOptions.find((x) => x.moduleId === effectiveSelectedSubclassModuleId)
+        if (subclass) {
+          result = await submitWizardStep(activeDraft.draft.characterId, 'subclass', [
+            {
+              slot: 'subclass',
+              moduleId: subclass.moduleId,
+              sourceCode: subclass.sourceCode,
+              compatible2014: true,
+              compatible2024: true,
+            },
+          ])
+        }
+      }
+
       setActiveDraft(result)
       setClassCatalogResult(
-        `Submitted selections: primary class + ${multiClassSelections.length} multiclass entries, race/background selections.`,
+        `Submitted selections: primary class + ${multiClassSelections.length} multiclass entries, subclass/race/background selections.`,
       )
     } catch (e) {
       setError(String(e))
@@ -643,8 +743,8 @@ function App() {
       setError('Assign all rolled values to abilities before saving.')
       return
     }
-    const selectedClass = classCatalog.find((x) => x.moduleId === selectedClassModuleId)
-    const selectedClassFromModules = classOptions.find((x) => x.moduleId === selectedClassModuleId)
+    const selectedClass = classCatalog.find((x) => x.moduleId === effectiveSelectedClassModuleId)
+    const selectedClassFromModules = classOptions.find((x) => x.moduleId === effectiveSelectedClassModuleId)
     const primaryClassName = selectedClass?.className ?? selectedClassFromModules?.displayName
     if (!primaryClassName) {
       setError('Select a class before saving the build.')
@@ -656,7 +756,7 @@ function App() {
     }
 
     try {
-      const selectedClassModule = classOptions.find((x) => x.moduleId === selectedClassModuleId)
+      const selectedClassModule = classOptions.find((x) => x.moduleId === effectiveSelectedClassModuleId)
       const secondarySummary = multiClassSelections
         .map((entry) => {
           const option = classOptions.find((x) => x.moduleId === entry.moduleId)
@@ -665,9 +765,9 @@ function App() {
         .join(', ')
       const classLevels = [
         {
-          classModuleId: selectedClassModuleId,
+          classModuleId: effectiveSelectedClassModuleId,
           className: primaryClassName,
-          level: characterLevel,
+          level: primaryClassLevel,
           sortOrder: 0,
         },
         ...multiClassSelections.map((entry, index) => {
@@ -689,10 +789,10 @@ function App() {
               sourceCode: selectedClassModule.sourceCode,
             }
           : null,
-        ...(selectedRaceModuleId
+        ...(effectiveSelectedRaceModuleId
           ? [
               (() => {
-                const race = raceOptions.find((x) => x.moduleId === selectedRaceModuleId)
+                const race = raceOptions.find((x) => x.moduleId === effectiveSelectedRaceModuleId)
                 return race
                   ? {
                       slot: race.moduleType.toLowerCase() === 'species' ? 'species' : 'race',
@@ -704,10 +804,10 @@ function App() {
               })(),
             ]
           : []),
-        ...(selectedBackgroundModuleId
+        ...(effectiveSelectedBackgroundModuleId
           ? [
               (() => {
-                const background = backgroundOptions.find((x) => x.moduleId === selectedBackgroundModuleId)
+                const background = backgroundOptions.find((x) => x.moduleId === effectiveSelectedBackgroundModuleId)
                 return background
                   ? {
                       slot: background.moduleType.toLowerCase() === 'origin' ? 'origin' : 'background',
@@ -719,13 +819,28 @@ function App() {
               })(),
             ]
           : []),
+        ...(effectiveSelectedSubclassModuleId
+          ? [
+              (() => {
+                const subclass = subclassOptions.find((x) => x.moduleId === effectiveSelectedSubclassModuleId)
+                return subclass
+                  ? {
+                      slot: 'subclass',
+                      moduleId: subclass.moduleId,
+                      displayName: subclass.displayName,
+                      sourceCode: subclass.sourceCode,
+                    }
+                  : null
+              })(),
+            ]
+          : []),
       ].filter((x): x is { slot: string; moduleId: string; displayName: string; sourceCode: string } => x !== null)
 
       const saved = await upsertCharacterBuild(currentCharacterId, {
         characterName: wizardName,
         baseRuleSystem: baseRules,
         buildMethod,
-        classModuleId: selectedClassModuleId,
+        classModuleId: effectiveSelectedClassModuleId,
         className: secondarySummary ? `${primaryClassName} (Primary); ${secondarySummary}` : primaryClassName,
         level: totalCharacterLevel,
         proficiencyBonus,
@@ -771,11 +886,14 @@ function App() {
   function handleOverlaySourcesChange(event: ChangeEvent<HTMLSelectElement>) {
     const selected = Array.from(event.target.selectedOptions).map((x) => x.value)
     setOverlaySources(selected)
+    if (session) {
+      void loadCatalogData(baseRules).catch((e) => setError(String(e)))
+    }
   }
 
   function addMultiClassSelection() {
     if (!secondaryClassModuleId) return
-    if (secondaryClassModuleId === selectedClassModuleId) return
+    if (secondaryClassModuleId === effectiveSelectedClassModuleId) return
     if (multiClassSelections.some((x) => x.moduleId === secondaryClassModuleId)) return
     setMultiClassSelections((prev) => [...prev, { moduleId: secondaryClassModuleId, level: 1 }])
   }
@@ -804,6 +922,15 @@ function App() {
     const spent = ABILITIES.reduce((sum, key) => sum + POINT_BUY_COST[candidate[key]], 0)
     if (spent > 27) return
     setPointBuyScores(candidate)
+  }
+
+  function toNonNegativeInt(value: string, fallback = 0) {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) {
+      return fallback
+    }
+
+    return Math.max(0, Math.trunc(parsed))
   }
 
   function handleRollPoolGenerate() {
@@ -915,6 +1042,45 @@ function App() {
     }
   }
 
+  async function handleSaveVitals() {
+    if (!currentCharacterId) return
+    try {
+      const saved = await upsertCharacterVitals(currentCharacterId, vitals)
+      setVitals({
+        maxHitPoints: saved.maxHitPoints,
+        currentHitPoints: saved.currentHitPoints,
+        tempHitPoints: saved.tempHitPoints,
+        baseMoveSpeed: saved.baseMoveSpeed,
+        baseArmorClass: saved.baseArmorClass,
+      })
+      setSheetResult('Saved vitals.')
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleSaveSpells() {
+    if (!currentCharacterId) return
+    try {
+      const saved = await upsertCharacterSpells(currentCharacterId, spellEntries)
+      setSpellEntries(saved.entries)
+      setSheetResult('Saved spells.')
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleSaveResources() {
+    if (!currentCharacterId) return
+    try {
+      const saved = await upsertCharacterResources(currentCharacterId, resourcePools)
+      setResourcePools(saved.resources)
+      setSheetResult('Saved resources.')
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
   async function handlePreviewOrigin() {
     const result = await previewOrigin({ name: 'Wanderer-Born', mode: 'GuidedCustom' })
     setOriginPreview(JSON.stringify(result, null, 2))
@@ -952,13 +1118,10 @@ function App() {
           <section className="card">
             <h2>Login</h2>
             <div className="row">
-              <input value={loginName} onChange={(e) => setLoginName(e.target.value)} placeholder="Username" />
-              <input
-                type="password"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="Password"
-              />
+              <label htmlFor="login-username">Username</label>
+              <input id="login-username" value={loginName} onChange={(e) => setLoginName(e.target.value)} placeholder="Enter username" />
+              <label htmlFor="login-password">Password</label>
+              <input id="login-password" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="Enter password" />
               <label>
                 <input type="checkbox" checked={isRegisterMode} onChange={(e) => setIsRegisterMode(e.target.checked)} /> Register
                 new user
@@ -980,21 +1143,57 @@ function App() {
             <h2>Session</h2>
             <div className="row">
               <p>
-                Signed in as <strong>{session.userName}</strong> ({session.sessionToken.slice(0, 10)}...)
+                Signed in as <strong>{session.userName}</strong>
               </p>
               <button onClick={handleLogout}>Log out</button>
             </div>
+            <p>
+              <strong>Getting started:</strong> pick a character (or start a wizard draft), then complete build setup and
+              use the sheet sections for vitals, spells, resources, skills, and inventory.
+            </p>
           </section>
 
-      <section className="card">
+          <section className="card">
+            <h2>1. Your characters</h2>
+            <div className="row">
+              <button onClick={refreshCharacters} disabled={!session}>
+                Refresh
+              </button>
+              <button onClick={handleCopyRuleset} disabled={!selectedCharacterId}>
+                Copy to other ruleset
+              </button>
+            </div>
+            <ul className="list">
+              {characters.map((c) => (
+                <li key={c.characterId} className={selectedCharacterId === c.characterId ? 'selected' : ''}>
+                  <button onClick={() => void handleSelectCharacter(c.characterId)}>{c.characterName}</button>
+                  <span className="ruleset-badge">{rulesetLabel(c.baseRuleSystem)}</span>
+                  <button onClick={() => void handleArchive(c.characterId)}>Archive</button>
+                  <button onClick={() => void handleDuplicate(c.characterId)}>Duplicate</button>
+                  <button onClick={() => void handleLoadHistory(c.characterId)}>History</button>
+                </li>
+              ))}
+            </ul>
+            {history.length > 0 && (
+              <details>
+                <summary>Technical details</summary>
+                <pre>{JSON.stringify(history, null, 2)}</pre>
+              </details>
+            )}
+          </section>
+
+          <section className="card">
         <h2>2. Character build setup</h2>
         <div className="grid">
-          <input value={wizardName} onChange={(e) => setWizardName(e.target.value)} placeholder="Character name" />
-          <select value={baseRules} onChange={(e) => void handleBaseRulesChange(e.target.value as RuleSystemMode)}>
-            <option value="Rules2024">Rules2024</option>
-            <option value="Rules2014">Rules2014</option>
+          <label htmlFor="character-name">Character name</label>
+          <input id="character-name" value={wizardName} onChange={(e) => setWizardName(e.target.value)} placeholder="Character name" />
+          <label htmlFor="base-rules">Base ruleset</label>
+          <select id="base-rules" value={baseRules} onChange={(e) => void handleBaseRulesChange(e.target.value as RuleSystemMode)}>
+            <option value="Rules2024">2024 rules</option>
+            <option value="Rules2014">2014 rules</option>
           </select>
-          <select value={buildMethod} onChange={(e) => setBuildMethod(e.target.value as BuildMethod)}>
+          <label htmlFor="build-method">Ability score method</label>
+          <select id="build-method" value={buildMethod} onChange={(e) => setBuildMethod(e.target.value as BuildMethod)}>
             <option value="PointBuy">Point buy</option>
             <option value="Manual">Manual entry</option>
             <option value="Roll">Roll</option>
@@ -1013,7 +1212,8 @@ function App() {
             />{' '}
             Mixed mode
           </label>
-          <select multiple value={overlaySources} onChange={handleOverlaySourcesChange} disabled={!mixedMode}>
+          <label htmlFor="overlay-sources">Overlay sources</label>
+          <select id="overlay-sources" multiple value={overlaySources} onChange={handleOverlaySourcesChange} disabled={!mixedMode}>
             {overlaySourceOptions.length === 0 ? (
               <option value="">No overlay sources available</option>
             ) : (
@@ -1024,13 +1224,15 @@ function App() {
               ))
             )}
           </select>
+          <label htmlFor="primary-class-level">Primary class level</label>
           <input
+            id="primary-class-level"
             type="number"
             min={1}
             max={20}
-            value={characterLevel}
-            onChange={(e) => setCharacterLevel(Math.max(1, Math.min(20, Number(e.target.value))))}
-            placeholder="Character level"
+            value={primaryClassLevel}
+            onChange={(e) => setPrimaryClassLevel(Math.max(1, Math.min(20, Number(e.target.value))))}
+            placeholder="Primary class level"
           />
         </div>
         <div className="row">
@@ -1038,11 +1240,15 @@ function App() {
             Refresh content catalogs
           </button>
         </div>
+        {mixedMode && overlaySources.length === 0 && (
+          <small>Select one or more overlay sources to include mixed-rule catalog modules.</small>
+        )}
         <p>
           Total level: {totalCharacterLevel} | Proficiency bonus: +{proficiencyBonus}
         </p>
         <div className="grid">
-          <select value={selectedRaceModuleId} onChange={(e) => setSelectedRaceModuleId(e.target.value)}>
+          <label htmlFor="race-module">Race / species</label>
+          <select id="race-module" value={effectiveSelectedRaceModuleId} onChange={(e) => setSelectedRaceModuleId(e.target.value)}>
             {raceOptions.length === 0 ? (
               <option value="">No race/species modules found</option>
             ) : (
@@ -1053,7 +1259,8 @@ function App() {
               ))
             )}
           </select>
-          <select value={selectedBackgroundModuleId} onChange={(e) => setSelectedBackgroundModuleId(e.target.value)}>
+          <label htmlFor="background-module">Background / origin</label>
+          <select id="background-module" value={effectiveSelectedBackgroundModuleId} onChange={(e) => setSelectedBackgroundModuleId(e.target.value)}>
             {backgroundOptions.length === 0 ? (
               <option value="">No background/origin modules found</option>
             ) : (
@@ -1064,17 +1271,18 @@ function App() {
               ))
             )}
           </select>
-          <select value={secondaryClassModuleId} onChange={(e) => setSecondaryClassModuleId(e.target.value)}>
+          <label htmlFor="multiclass-module">Multiclass option</label>
+          <select id="multiclass-module" value={secondaryClassModuleId} onChange={(e) => setSecondaryClassModuleId(e.target.value)}>
             <option value="">Add multiclass option...</option>
             {classOptions
-              .filter((x) => x.moduleId !== selectedClassModuleId)
+              .filter((x) => x.moduleId !== effectiveSelectedClassModuleId)
               .map((item) => (
                 <option key={item.moduleId} value={item.moduleId}>
                   {item.displayName} ({item.sourceCode})
                 </option>
               ))}
           </select>
-          <button onClick={addMultiClassSelection} disabled={!selectedClassModuleId || !secondaryClassModuleId}>
+          <button onClick={addMultiClassSelection} disabled={!effectiveSelectedClassModuleId || !secondaryClassModuleId}>
             Add multiclass
           </button>
         </div>
@@ -1085,7 +1293,9 @@ function App() {
               return (
                 <div key={entry.moduleId} className="row">
                   <span>{option?.displayName ?? entry.moduleId}</span>
+                  <label htmlFor={`multiclass-level-${entry.moduleId}`}>Level</label>
                   <input
+                    id={`multiclass-level-${entry.moduleId}`}
                     type="number"
                     min={1}
                     max={20}
@@ -1186,29 +1396,30 @@ function App() {
           Start Wizard Draft
         </button>
         <div className="row">
-          <select value={selectedClassModuleId} onChange={(e) => setSelectedClassModuleId(e.target.value)}>
-            {classCatalog.length === 0 && classOptions.length === 0 ? (
+          <label htmlFor="main-class-module">Class</label>
+          <select id="main-class-module" value={effectiveSelectedClassModuleId} onChange={(e) => setSelectedClassModuleId(e.target.value)}>
+            {mainClassOptions.length === 0 ? (
               <option value="">No class modules found in DB</option>
             ) : (
-              <>
-                {classCatalog.map((item) => (
-                  <option key={item.moduleId} value={item.moduleId}>
-                    {item.className} ({item.sourceCode})
-                  </option>
-                ))}
-                {classOptions
-                  .filter((item) => !classCatalog.some((legacy) => legacy.moduleId === item.moduleId))
-                  .map((item) => (
-                    <option key={item.moduleId} value={item.moduleId}>
-                      {item.displayName} ({item.sourceCode})
-                    </option>
-                  ))}
-              </>
+              mainClassOptions.map((item) => (
+                <option key={item.moduleId} value={item.moduleId}>
+                  {item.className} ({item.sourceCode})
+                </option>
+              ))
             )}
+          </select>
+          <label htmlFor="subclass-module">Subclass</label>
+          <select id="subclass-module" value={effectiveSelectedSubclassModuleId} onChange={(e) => setSelectedSubclassModuleId(e.target.value)}>
+            <option value="">None</option>
+            {subclassOptions.map((item) => (
+              <option key={item.moduleId} value={item.moduleId}>
+                {item.displayName} ({item.sourceCode})
+              </option>
+            ))}
           </select>
           <button
             onClick={handleApplySelectedClassToWizard}
-            disabled={!activeDraft?.draft || (classCatalog.length === 0 && classOptions.length === 0)}
+            disabled={!activeDraft?.draft || mainClassOptions.length === 0}
           >
             Apply selected class to wizard
           </button>
@@ -1216,67 +1427,220 @@ function App() {
             onClick={handleSaveBuildToDb}
             disabled={
               !currentCharacterId ||
-              (classCatalog.length === 0 && classOptions.length === 0) ||
+              mainClassOptions.length === 0 ||
               (buildMethod === 'Roll' && !isRollAssignmentComplete)
             }
           >
             Save build to persistent model
           </button>
         </div>
-        <div className="grid">
-          <input value={selectionStepName} onChange={(e) => setSelectionStepName(e.target.value)} placeholder="Step slot" />
-          <input value={selectionModuleId} onChange={(e) => setSelectionModuleId(e.target.value)} placeholder="Module id" />
-          <input value={selectionSourceCode} onChange={(e) => setSelectionSourceCode(e.target.value)} placeholder="Source code" />
-        </div>
         <div className="row">
-          <button onClick={handleSubmitStep} disabled={!activeDraft?.draft}>
-            Submit Step
-          </button>
           <button onClick={handleFinalizeWizard} disabled={!activeDraft?.draft}>
             Finalize
           </button>
         </div>
         {classCatalogResult && <p>{classCatalogResult}</p>}
-        {savedBuild && <pre>{JSON.stringify(savedBuild, null, 2)}</pre>}
+        {savedBuild && (
+          <details>
+            <summary>Technical details</summary>
+            <pre>{JSON.stringify(savedBuild, null, 2)}</pre>
+          </details>
+        )}
         {!savedBuild && buildResult && <p>{buildResult}</p>}
-        {activeDraft && <pre>{JSON.stringify(activeDraft, null, 2)}</pre>}
+        {activeDraft && (
+          <details>
+            <summary>Technical details</summary>
+            <pre>{JSON.stringify(activeDraft, null, 2)}</pre>
+          </details>
+        )}
       </section>
 
       <section className="card">
-        <h2>4. Your characters</h2>
+        <h2>4. Character sheet: vitals, spells, resources</h2>
+        {sheetResult && <p>{sheetResult}</p>}
+        <h3>Vitals</h3>
+        <div className="grid">
+          <label htmlFor="vitals-max-hp">Max HP</label>
+          <input
+            id="vitals-max-hp"
+            type="number"
+            min={0}
+            value={vitals.maxHitPoints}
+            onChange={(e) => setVitals((prev) => ({ ...prev, maxHitPoints: toNonNegativeInt(e.target.value) }))}
+          />
+          <label htmlFor="vitals-current-hp">Current HP</label>
+          <input
+            id="vitals-current-hp"
+            type="number"
+            min={0}
+            value={vitals.currentHitPoints}
+            onChange={(e) => setVitals((prev) => ({ ...prev, currentHitPoints: toNonNegativeInt(e.target.value) }))}
+          />
+          <label htmlFor="vitals-temp-hp">Temp HP</label>
+          <input
+            id="vitals-temp-hp"
+            type="number"
+            min={0}
+            value={vitals.tempHitPoints}
+            onChange={(e) => setVitals((prev) => ({ ...prev, tempHitPoints: toNonNegativeInt(e.target.value) }))}
+          />
+          <label htmlFor="vitals-speed">Base move speed</label>
+          <input
+            id="vitals-speed"
+            type="number"
+            min={0}
+            value={vitals.baseMoveSpeed}
+            onChange={(e) => setVitals((prev) => ({ ...prev, baseMoveSpeed: toNonNegativeInt(e.target.value) }))}
+          />
+          <label htmlFor="vitals-ac">Base armor class</label>
+          <input
+            id="vitals-ac"
+            type="number"
+            min={0}
+            value={vitals.baseArmorClass}
+            onChange={(e) => setVitals((prev) => ({ ...prev, baseArmorClass: toNonNegativeInt(e.target.value) }))}
+          />
+        </div>
         <div className="row">
-          <button onClick={refreshCharacters} disabled={!session}>
-            Refresh
-          </button>
-          <button onClick={handleCopyRuleset} disabled={!selectedCharacterId}>
-            Copy to other ruleset
+          <button onClick={handleSaveVitals} disabled={!currentCharacterId}>
+            Save vitals
           </button>
         </div>
-        <ul className="list">
-          {characters.map((c) => (
-            <li key={c.characterId} className={selectedCharacterId === c.characterId ? 'selected' : ''}>
-                <button onClick={() => void handleSelectCharacter(c.characterId)}>{c.characterName}</button>
-                <span className="ruleset-badge">{c.baseRuleSystem}</span>
-                <button onClick={() => void handleArchive(c.characterId)}>Archive</button>
-              <button onClick={() => void handleDuplicate(c.characterId)}>Duplicate</button>
-              <button onClick={() => void handleLoadHistory(c.characterId)}>History</button>
+        <h3>Spells</h3>
+        <div className="row">
+          <button
+            onClick={() =>
+              setSpellEntries((prev) => [...prev, { spellModuleId: '', spellName: '', preparationMode: 'Prepared' }])
+            }
+            disabled={!currentCharacterId}
+          >
+            Add spell
+          </button>
+          <button onClick={handleSaveSpells} disabled={!currentCharacterId}>
+            Save spells
+          </button>
+        </div>
+        <ul className="inventory-list">
+          {spellEntries.map((entry, index) => (
+            <li key={`${entry.spellModuleId}-${index}`}>
+              <div className="grid">
+                <label htmlFor={`spell-module-${index}`}>Spell module id</label>
+                <input
+                  id={`spell-module-${index}`}
+                  value={entry.spellModuleId}
+                  onChange={(e) =>
+                    setSpellEntries((prev) =>
+                      prev.map((spell, i) => (i === index ? { ...spell, spellModuleId: e.target.value } : spell)),
+                    )
+                  }
+                />
+                <label htmlFor={`spell-name-${index}`}>Spell name</label>
+                <input
+                  id={`spell-name-${index}`}
+                  value={entry.spellName}
+                  onChange={(e) =>
+                    setSpellEntries((prev) =>
+                      prev.map((spell, i) => (i === index ? { ...spell, spellName: e.target.value } : spell)),
+                    )
+                  }
+                />
+                <label htmlFor={`spell-mode-${index}`}>Preparation mode</label>
+                <input
+                  id={`spell-mode-${index}`}
+                  value={entry.preparationMode}
+                  onChange={(e) =>
+                    setSpellEntries((prev) =>
+                      prev.map((spell, i) => (i === index ? { ...spell, preparationMode: e.target.value } : spell)),
+                    )
+                  }
+                />
+              </div>
+              <button onClick={() => setSpellEntries((prev) => prev.filter((_, i) => i !== index))}>Remove spell</button>
             </li>
           ))}
         </ul>
-        {history.length > 0 && <pre>{JSON.stringify(history, null, 2)}</pre>}
+        <h3>Resources</h3>
+        <div className="row">
+          <button
+            onClick={() =>
+              setResourcePools((prev) => [...prev, { resourceKey: '', currentValue: 0, maxValue: 0, metadataJson: '{}' }])
+            }
+            disabled={!currentCharacterId}
+          >
+            Add resource
+          </button>
+          <button onClick={handleSaveResources} disabled={!currentCharacterId}>
+            Save resources
+          </button>
+        </div>
+        <ul className="inventory-list">
+          {resourcePools.map((resource, index) => (
+            <li key={`${resource.resourceKey}-${index}`}>
+              <div className="grid">
+                <label htmlFor={`resource-key-${index}`}>Resource key</label>
+                <input
+                  id={`resource-key-${index}`}
+                  value={resource.resourceKey}
+                  onChange={(e) =>
+                    setResourcePools((prev) =>
+                      prev.map((row, i) => (i === index ? { ...row, resourceKey: e.target.value } : row)),
+                    )
+                  }
+                />
+                <label htmlFor={`resource-current-${index}`}>Current value</label>
+                <input
+                  id={`resource-current-${index}`}
+                  type="number"
+                  min={0}
+                  value={resource.currentValue}
+                  onChange={(e) =>
+                    setResourcePools((prev) =>
+                      prev.map((row, i) => (i === index ? { ...row, currentValue: toNonNegativeInt(e.target.value) } : row)),
+                    )
+                  }
+                />
+                <label htmlFor={`resource-max-${index}`}>Max value</label>
+                <input
+                  id={`resource-max-${index}`}
+                  type="number"
+                  min={0}
+                  value={resource.maxValue}
+                  onChange={(e) =>
+                    setResourcePools((prev) =>
+                      prev.map((row, i) => (i === index ? { ...row, maxValue: toNonNegativeInt(e.target.value) } : row)),
+                    )
+                  }
+                />
+                <label htmlFor={`resource-meta-${index}`}>Metadata JSON</label>
+                <input
+                  id={`resource-meta-${index}`}
+                  value={resource.metadataJson}
+                  onChange={(e) =>
+                    setResourcePools((prev) =>
+                      prev.map((row, i) => (i === index ? { ...row, metadataJson: e.target.value } : row)),
+                    )
+                  }
+                />
+              </div>
+              <button onClick={() => setResourcePools((prev) => prev.filter((_, i) => i !== index))}>Remove resource</button>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="card">
         <h2>5. Skills menu and persisted checks</h2>
         <div className="row">
-          <select value={selectedSkill} onChange={(e) => setSelectedSkill(e.target.value as SkillName)}>
+          <label htmlFor="selected-skill">Skill</label>
+          <select id="selected-skill" value={selectedSkill} onChange={(e) => setSelectedSkill(e.target.value as SkillName)}>
             {ALL_SKILLS.map((skill) => (
               <option key={skill} value={skill}>
                 {skill}
               </option>
             ))}
           </select>
-          <select value={advantageState} onChange={(e) => setAdvantageState(e.target.value as AdvantageState)}>
+          <label htmlFor="skill-advantage-state">Roll mode</label>
+          <select id="skill-advantage-state" value={advantageState} onChange={(e) => setAdvantageState(e.target.value as AdvantageState)}>
             <option value="None">None</option>
             <option value="Advantage">Advantage</option>
             <option value="Disadvantage">Disadvantage</option>
@@ -1311,13 +1675,19 @@ function App() {
             </label>
           ))}
         </div>
-        {rollResult && <pre>{rollResult}</pre>}
+        {rollResult && (
+          <details>
+            <summary>Technical details</summary>
+            <pre>{rollResult}</pre>
+          </details>
+        )}
       </section>
 
       <section className="card">
         <h2>6. Inventory from database (persisted)</h2>
         <div className="row">
-          <select value={selectedCatalogItemId} onChange={(e) => setSelectedCatalogItemId(e.target.value)}>
+          <label htmlFor="catalog-item">Item</label>
+          <select id="catalog-item" value={selectedCatalogItemId} onChange={(e) => setSelectedCatalogItemId(e.target.value)}>
             {itemCatalog.length === 0 ? (
               <option value="">No item definitions found in DB</option>
             ) : (
@@ -1328,7 +1698,9 @@ function App() {
               ))
             )}
           </select>
+          <label htmlFor="catalog-item-quantity">Quantity</label>
           <input
+            id="catalog-item-quantity"
             type="number"
             min={1}
             value={selectedCatalogQuantity}
@@ -1366,7 +1738,9 @@ function App() {
                     {item.isAttuned ? 'Unattune' : 'Attune'}
                   </button>
                 )}
+                <label htmlFor={`inventory-quantity-${item.inventoryItemId}`}>Qty</label>
                 <input
+                  id={`inventory-quantity-${item.inventoryItemId}`}
                   type="number"
                   min={1}
                   value={item.quantity}
@@ -1381,14 +1755,25 @@ function App() {
             </li>
           ))}
         </ul>
-        {attunementGuidance && <pre>{attunementGuidance}</pre>}
-        {inventoryResult && <pre>{inventoryResult}</pre>}
+        {attunementGuidance && (
+          <details>
+            <summary>Technical details</summary>
+            <pre>{attunementGuidance}</pre>
+          </details>
+        )}
+        {inventoryResult && (
+          <details>
+            <summary>Technical details</summary>
+            <pre>{inventoryResult}</pre>
+          </details>
+        )}
       </section>
 
       <section className="card">
-        <h2>6b. Attacks</h2>
+        <h2>7. Attacks</h2>
         <div className="row">
-          <select value={attackAdvantageState} onChange={(e) => setAttackAdvantageState(e.target.value as AdvantageState)}>
+          <label htmlFor="attack-advantage-state">Roll mode</label>
+          <select id="attack-advantage-state" value={attackAdvantageState} onChange={(e) => setAttackAdvantageState(e.target.value as AdvantageState)}>
             <option value="None">None</option>
             <option value="Advantage">Advantage</option>
             <option value="Disadvantage">Disadvantage</option>
@@ -1421,13 +1806,23 @@ function App() {
       </section>
 
       <section className="card">
-        <h2>7. Custom builder previews</h2>
+        <h2>8. Custom builder previews</h2>
         <div className="row">
           <button onClick={handlePreviewOrigin}>Preview Origin</button>
           <button onClick={handlePreviewSpecies}>Preview Species</button>
         </div>
-        {originPreview && <pre>{originPreview}</pre>}
-        {speciesPreview && <pre>{speciesPreview}</pre>}
+        {originPreview && (
+          <details>
+            <summary>Technical details</summary>
+            <pre>{originPreview}</pre>
+          </details>
+        )}
+        {speciesPreview && (
+          <details>
+            <summary>Technical details</summary>
+            <pre>{speciesPreview}</pre>
+          </details>
+        )}
       </section>
         </>
       )}

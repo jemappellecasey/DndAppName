@@ -3,7 +3,12 @@ import type {
   CharacterBuildData,
   CharacterHistoryEntry,
   CharacterInventoryState,
+  CharacterResourcesData,
+  CharacterResourcePoolData,
+  CharacterSpellEntryData,
+  CharacterSpellsData,
   CharacterSummary,
+  CharacterVitalsData,
   CharacterWizardResult,
   ClassCatalogItem,
   ContentSourceCatalogItem,
@@ -220,6 +225,48 @@ export function upsertCharacterBuild(characterId: string, payload: UpsertCharact
 
 export function getCharacterInventory(characterId: string) {
   return request<CharacterInventoryState>(`/characters/${characterId}/inventory`)
+}
+
+export function getCharacterSpells(characterId: string) {
+  return request<CharacterSpellsData>(`/characters/${characterId}/spells`)
+}
+
+export function upsertCharacterSpells(characterId: string, entries: CharacterSpellEntryData[]) {
+  return request<CharacterSpellsData>(`/characters/${characterId}/spells`, {
+    method: 'PUT',
+    body: JSON.stringify({ entries }),
+  })
+}
+
+export function getCharacterResources(characterId: string) {
+  return request<CharacterResourcesData>(`/characters/${characterId}/resources`)
+}
+
+export function upsertCharacterResources(characterId: string, resources: CharacterResourcePoolData[]) {
+  return request<CharacterResourcesData>(`/characters/${characterId}/resources`, {
+    method: 'PUT',
+    body: JSON.stringify({ resources }),
+  })
+}
+
+export function getCharacterVitals(characterId: string) {
+  return request<CharacterVitalsData>(`/characters/${characterId}/vitals`)
+}
+
+export function upsertCharacterVitals(
+  characterId: string,
+  payload: {
+    maxHitPoints: number
+    currentHitPoints: number
+    tempHitPoints: number
+    baseMoveSpeed: number
+    baseArmorClass: number
+  },
+) {
+  return request<CharacterVitalsData>(`/characters/${characterId}/vitals`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
 }
 
 export function addInventoryItem(characterId: string, itemDefinitionId: string, quantity = 1) {
