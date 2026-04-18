@@ -209,7 +209,21 @@ export interface CharacterBuildData {
   level: number
   proficiencyBonus: number
   abilityScores: Record<AbilityName, number>
+  skillTrainingBySkill: Record<SkillName, 'None' | 'Proficient' | 'Expertise'>
   proficientSkills: SkillName[]
+  saveProficiencies: AbilityName[]
+  classLevels: Array<{
+    classModuleId: string
+    className: string
+    level: number
+    sortOrder: number
+  }>
+  selectedModules: Array<{
+    slot: string
+    moduleId: string
+    displayName: string
+    sourceCode: string
+  }>
   createdAtUtc: string
   updatedAtUtc: string
 }
@@ -224,6 +238,19 @@ export interface UpsertCharacterBuildPayload {
   proficiencyBonus: number
   abilityScores: Record<AbilityName, number>
   proficientSkills: SkillName[]
+  skillTrainingBySkill: Record<SkillName, 'None' | 'Proficient' | 'Expertise'>
+  classLevels: Array<{
+    classModuleId: string
+    className: string
+    level: number
+    sortOrder: number
+  }>
+  selectedModules: Array<{
+    slot: string
+    moduleId: string
+    displayName: string
+    sourceCode: string
+  }>
 }
 
 export interface CharacterInventoryItemData {

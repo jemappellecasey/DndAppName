@@ -26,6 +26,7 @@ public sealed class CharacterSkillProficiencyEntity
 {
     public string CharacterId { get; set; } = string.Empty;
     public string SkillName { get; set; } = string.Empty;
+    public string TrainingLevel { get; set; } = "Proficient";
 }
 
 public sealed class CharacterInventoryItemEntity
@@ -78,4 +79,22 @@ public sealed class CharacterHistoryEntity
     public string Action { get; set; } = string.Empty;
     public string ActorUserId { get; set; } = string.Empty;
     public string Details { get; set; } = string.Empty;
+}
+
+public sealed class CharacterClassLevelEntity
+{
+    public string CharacterId { get; set; } = string.Empty;
+    public string ClassModuleId { get; set; } = string.Empty;
+    public string ClassName { get; set; } = string.Empty;
+    public int Level { get; set; }
+    public int SortOrder { get; set; }
+}
+
+public sealed class CharacterSelectedModuleEntity
+{
+    public string CharacterId { get; set; } = string.Empty;
+    public string Slot { get; set; } = string.Empty;
+    public string ModuleId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string SourceCode { get; set; } = string.Empty;
 }

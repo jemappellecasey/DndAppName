@@ -42,6 +42,7 @@ public sealed class CharacterComputationServiceTests
         {
             CharacterId = id,
             SkillName = "Stealth",
+            TrainingLevel = "Proficient",
         });
 
         fixture.Db.RuleSystems.Add(new RuleSystemEntity { Id = "rules-2024", Name = "Rules 2024" });
@@ -111,6 +112,112 @@ public sealed class CharacterComputationServiceTests
         Assert.NotNull(computed.Result);
         Assert.Equal("Stealth", computed.Result.SkillName);
         Assert.Equal(6, computed.Result.TotalModifier);
+    }
+
+    [Fact]
+    public async Task ComputeCheck_UsesPersistedExpertiseWhenTrainingLevelIsExpertise()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var characterId = Guid.NewGuid();
+        var id = characterId.ToString();
+
+        fixture.Db.CharacterSheets.Add(new CharacterSheetEntity
+        {
+            CharacterId = id,
+            CharacterName = "Expert Tester",
+            BaseRuleSystem = "Rules2024",
+            BuildMethod = "Manual",
+            ClassModuleId = "class-rogue",
+            ClassName = "Rogue",
+            Level = 3,
+            ProficiencyBonus = 2,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        fixture.Db.CharacterAbilityScores.AddRange(new[]
+        {
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Strength", Score = 10 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Dexterity", Score = 16 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Constitution", Score = 10 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Intelligence", Score = 10 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Wisdom", Score = 10 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Charisma", Score = 10 },
+        });
+        fixture.Db.CharacterSkillProficiencies.Add(new CharacterSkillProficiencyEntity
+        {
+            CharacterId = id,
+            SkillName = "Stealth",
+            TrainingLevel = "Expertise",
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var service = new CharacterComputationService(
+            fixture.Db,
+            new ItemEffectPipelineService(),
+            new CalculationEngineService());
+        var computed = await service.ComputeCheckAsync(
+            characterId,
+            new PersistedComputeCheckRequest(
+                SkillName: "Stealth",
+                AdvantageState: AdvantageState.None,
+                RollDice: false,
+                AdditionalModifier: 0,
+                HasExpertise: false),
+            CancellationToken.None);
+
+        Assert.Empty(computed.Errors);
+        Assert.NotNull(computed.Result);
+        Assert.Equal(7, computed.Result.TotalModifier);
+    }
+
+    [Fact]
+    public async Task ComputeSave_DerivesProficiencyFromPersistedClassWhenRequestOmitsOverride()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var characterId = Guid.NewGuid();
+        var id = characterId.ToString();
+
+        fixture.Db.CharacterSheets.Add(new CharacterSheetEntity
+        {
+            CharacterId = id,
+            CharacterName = "Save Tester",
+            BaseRuleSystem = "Rules2024",
+            BuildMethod = "Manual",
+            ClassModuleId = "class-rogue",
+            ClassName = "Rogue",
+            Level = 3,
+            ProficiencyBonus = 2,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        fixture.Db.CharacterAbilityScores.AddRange(new[]
+        {
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Strength", Score = 10 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Dexterity", Score = 16 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Constitution", Score = 10 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Intelligence", Score = 14 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Wisdom", Score = 10 },
+            new CharacterAbilityScoreEntity { CharacterId = id, AbilityName = "Charisma", Score = 10 },
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var service = new CharacterComputationService(
+            fixture.Db,
+            new ItemEffectPipelineService(),
+            new CalculationEngineService());
+        var computed = await service.ComputeSaveAsync(
+            characterId,
+            new PersistedComputeSaveRequest(
+                AbilityName: "Dexterity",
+                AdvantageState: AdvantageState.None,
+                RollDice: false,
+                AdditionalModifier: 0,
+                IsProficient: null),
+            CancellationToken.None);
+
+        Assert.Empty(computed.Errors);
+        Assert.NotNull(computed.Result);
+        Assert.Equal(5, computed.Result.TotalModifier);
     }
 
     private static async Task<DbFixture> CreateFixtureAsync()

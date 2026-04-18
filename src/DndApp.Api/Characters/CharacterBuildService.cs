@@ -16,12 +16,29 @@ public sealed class CharacterBuildService : ICharacterBuildService
 {
     private static readonly string[] AllowedAbilityNames =
     {
-        "Strength",
-        "Dexterity",
-        "Constitution",
-        "Intelligence",
-        "Wisdom",
-        "Charisma",
+        "Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma",
+    };
+
+    private static readonly HashSet<string> AllowedTrainingLevels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "None", "Proficient", "Expertise"
+    };
+
+    private static readonly Dictionary<string, string[]> ClassSaveProficiencies = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Artificer"] = ["Constitution", "Intelligence"],
+        ["Barbarian"] = ["Strength", "Constitution"],
+        ["Bard"] = ["Dexterity", "Charisma"],
+        ["Cleric"] = ["Wisdom", "Charisma"],
+        ["Druid"] = ["Intelligence", "Wisdom"],
+        ["Fighter"] = ["Strength", "Constitution"],
+        ["Monk"] = ["Strength", "Dexterity"],
+        ["Paladin"] = ["Wisdom", "Charisma"],
+        ["Ranger"] = ["Strength", "Dexterity"],
+        ["Rogue"] = ["Dexterity", "Intelligence"],
+        ["Sorcerer"] = ["Constitution", "Charisma"],
+        ["Warlock"] = ["Wisdom", "Charisma"],
+        ["Wizard"] = ["Intelligence", "Wisdom"],
     };
 
     private readonly AppDbContext _db;
@@ -44,6 +61,10 @@ public sealed class CharacterBuildService : ICharacterBuildService
         UpsertCharacterBuildRequest request,
         CancellationToken cancellationToken)
     {
+        var classLevels = NormalizeClassLevels(request.ClassLevels, request.ClassModuleId, request.ClassName, request.Level);
+        var skillTraining = NormalizeSkillTraining(request.SkillTrainingBySkill, request.ProficientSkills);
+        var selectedModules = NormalizeSelectedModules(request.SelectedModules);
+
         var errors = Validate(
             request.CharacterName,
             request.ClassModuleId,
@@ -51,21 +72,26 @@ public sealed class CharacterBuildService : ICharacterBuildService
             request.Level,
             request.ProficiencyBonus,
             request.AbilityScores,
-            request.ProficientSkills);
+            skillTraining,
+            classLevels,
+            selectedModules);
         if (errors.Count > 0)
         {
             return (null, errors);
         }
 
-        var ruleErrors = await _validation.ValidateClassSelectionAsync(
-            request.ClassModuleId,
-            request.BaseRuleSystem,
-            request.AbilityScores,
-            request.Level,
-            cancellationToken);
-        if (ruleErrors.Count > 0)
+        foreach (var classLevel in classLevels)
         {
-            return (null, ruleErrors);
+            var classErrors = await _validation.ValidateClassSelectionAsync(
+                classLevel.ClassModuleId,
+                request.BaseRuleSystem,
+                request.AbilityScores,
+                classLevel.Level,
+                cancellationToken);
+            if (classErrors.Count > 0)
+            {
+                return (null, classErrors);
+            }
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -83,11 +109,12 @@ public sealed class CharacterBuildService : ICharacterBuildService
             _db.CharacterSheets.Add(existing);
         }
 
+        var primaryClass = classLevels.OrderBy(x => x.SortOrder).First();
         existing.CharacterName = request.CharacterName.Trim();
         existing.BaseRuleSystem = request.BaseRuleSystem.ToString();
         existing.BuildMethod = request.BuildMethod.ToString();
-        existing.ClassModuleId = request.ClassModuleId.Trim();
-        existing.ClassName = request.ClassName.Trim();
+        existing.ClassModuleId = primaryClass.ClassModuleId.Trim();
+        existing.ClassName = primaryClass.ClassName.Trim();
         existing.Level = request.Level;
         existing.ProficiencyBonus = request.ProficiencyBonus;
         if (string.IsNullOrWhiteSpace(existing.OwnerUserId))
@@ -97,7 +124,9 @@ public sealed class CharacterBuildService : ICharacterBuildService
         existing.UpdatedAtUtc = now;
 
         await ReplaceAbilityScoresAsync(id, request.AbilityScores, cancellationToken);
-        await ReplaceSkillProficienciesAsync(id, request.ProficientSkills, cancellationToken);
+        await ReplaceSkillTrainingAsync(id, skillTraining, cancellationToken);
+        await ReplaceClassLevelsAsync(id, classLevels, cancellationToken);
+        await ReplaceSelectedModulesAsync(id, selectedModules, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -119,10 +148,34 @@ public sealed class CharacterBuildService : ICharacterBuildService
         var currentAbilities = await _db.CharacterAbilityScores
             .Where(x => x.CharacterId == id)
             .ToDictionaryAsync(x => x.AbilityName, x => x.Score, cancellationToken);
-        var currentSkills = await _db.CharacterSkillProficiencies
+
+        var currentSkillTraining = await _db.CharacterSkillProficiencies
             .Where(x => x.CharacterId == id)
-            .Select(x => x.SkillName)
+            .ToDictionaryAsync(x => x.SkillName, x => x.TrainingLevel, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var currentClassLevels = await _db.CharacterClassLevels
+            .Where(x => x.CharacterId == id)
+            .OrderBy(x => x.SortOrder)
+            .Select(x => new CharacterClassLevelData(x.ClassModuleId, x.ClassName, x.Level, x.SortOrder))
             .ToArrayAsync(cancellationToken);
+
+        var currentSelectedModules = await _db.CharacterSelectedModules
+            .Where(x => x.CharacterId == id)
+            .Select(x => new CharacterSelectedModuleData(x.Slot, x.ModuleId, x.DisplayName, x.SourceCode))
+            .ToArrayAsync(cancellationToken);
+
+        if (currentClassLevels.Length == 0)
+        {
+            currentClassLevels = [new CharacterClassLevelData(sheet.ClassModuleId, sheet.ClassName, sheet.Level, 0)];
+        }
+        if (currentSkillTraining.Count == 0)
+        {
+            var currentSkills = await _db.CharacterSkillProficiencies
+                .Where(x => x.CharacterId == id)
+                .Select(x => x.SkillName)
+                .ToArrayAsync(cancellationToken);
+            currentSkillTraining = currentSkills.ToDictionary(x => x, _ => "Proficient", StringComparer.OrdinalIgnoreCase);
+        }
 
         var mergedCharacterName = request.CharacterName?.Trim() ?? sheet.CharacterName;
         var mergedBaseRuleSystem = request.BaseRuleSystem ?? Enum.Parse<RuleSystemMode>(sheet.BaseRuleSystem, ignoreCase: true);
@@ -132,7 +185,25 @@ public sealed class CharacterBuildService : ICharacterBuildService
         var mergedLevel = request.Level ?? sheet.Level;
         var mergedProficiencyBonus = request.ProficiencyBonus ?? sheet.ProficiencyBonus;
         var mergedAbilities = request.AbilityScores ?? currentAbilities;
-        var mergedSkills = request.ProficientSkills ?? currentSkills;
+        var mergedSkillTraining = request.SkillTrainingBySkill is not null
+            ? NormalizeSkillTraining(request.SkillTrainingBySkill, request.ProficientSkills)
+            : (request.ProficientSkills is not null
+                ? NormalizeSkillTraining(null, request.ProficientSkills)
+                : currentSkillTraining);
+
+        var mergedClassLevels = request.ClassLevels is not null && request.ClassLevels.Count > 0
+            ? NormalizeClassLevels(request.ClassLevels, mergedClassModuleId, mergedClassName, mergedLevel)
+            : currentClassLevels;
+        if ((request.ClassLevels is null || request.ClassLevels.Count == 0)
+            && request.Level is not null
+            && mergedClassLevels.Count == 1)
+        {
+            mergedClassLevels = [mergedClassLevels[0] with { Level = mergedLevel }];
+        }
+
+        var mergedSelectedModules = request.SelectedModules is not null
+            ? NormalizeSelectedModules(request.SelectedModules)
+            : currentSelectedModules;
 
         var errors = Validate(
             mergedCharacterName,
@@ -141,36 +212,44 @@ public sealed class CharacterBuildService : ICharacterBuildService
             mergedLevel,
             mergedProficiencyBonus,
             mergedAbilities,
-            mergedSkills);
+            mergedSkillTraining,
+            mergedClassLevels,
+            mergedSelectedModules);
         if (errors.Count > 0)
         {
             return (null, errors);
         }
 
-        var ruleErrors = await _validation.ValidateClassSelectionAsync(
-            mergedClassModuleId,
-            mergedBaseRuleSystem,
-            mergedAbilities,
-            mergedLevel,
-            cancellationToken);
-        if (ruleErrors.Count > 0)
+        foreach (var classLevel in mergedClassLevels)
         {
-            return (null, ruleErrors);
+            var classErrors = await _validation.ValidateClassSelectionAsync(
+                classLevel.ClassModuleId,
+                mergedBaseRuleSystem,
+                mergedAbilities,
+                classLevel.Level,
+                cancellationToken);
+            if (classErrors.Count > 0)
+            {
+                return (null, classErrors);
+            }
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
+        var primaryClass = mergedClassLevels.OrderBy(x => x.SortOrder).First();
         sheet.CharacterName = mergedCharacterName;
         sheet.BaseRuleSystem = mergedBaseRuleSystem.ToString();
         sheet.BuildMethod = mergedBuildMethod.ToString();
-        sheet.ClassModuleId = mergedClassModuleId;
-        sheet.ClassName = mergedClassName;
+        sheet.ClassModuleId = primaryClass.ClassModuleId;
+        sheet.ClassName = primaryClass.ClassName;
         sheet.Level = mergedLevel;
         sheet.ProficiencyBonus = mergedProficiencyBonus;
         sheet.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
         await ReplaceAbilityScoresAsync(id, mergedAbilities, cancellationToken);
-        await ReplaceSkillProficienciesAsync(id, mergedSkills, cancellationToken);
+        await ReplaceSkillTrainingAsync(id, mergedSkillTraining, cancellationToken);
+        await ReplaceClassLevelsAsync(id, mergedClassLevels, cancellationToken);
+        await ReplaceSelectedModulesAsync(id, mergedSelectedModules, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -204,11 +283,36 @@ public sealed class CharacterBuildService : ICharacterBuildService
             .Where(x => x.CharacterId == id)
             .OrderBy(x => x.AbilityName)
             .ToDictionaryAsync(x => x.AbilityName, x => x.Score, cancellationToken);
-        var proficientSkills = await _db.CharacterSkillProficiencies.AsNoTracking()
+
+        var skillTrainingRows = await _db.CharacterSkillProficiencies.AsNoTracking()
             .Where(x => x.CharacterId == id)
-            .Select(x => x.SkillName)
-            .OrderBy(x => x)
+            .OrderBy(x => x.SkillName)
             .ToArrayAsync(cancellationToken);
+        var skillTraining = skillTrainingRows
+            .ToDictionary(x => x.SkillName, x => NormalizeTrainingLevel(x.TrainingLevel), StringComparer.OrdinalIgnoreCase);
+        var proficientSkills = skillTraining
+            .Where(x => !string.Equals(x.Value, "None", StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.Key)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var classLevels = await _db.CharacterClassLevels.AsNoTracking()
+            .Where(x => x.CharacterId == id)
+            .OrderBy(x => x.SortOrder)
+            .Select(x => new CharacterClassLevelData(x.ClassModuleId, x.ClassName, x.Level, x.SortOrder))
+            .ToArrayAsync(cancellationToken);
+        if (classLevels.Length == 0)
+        {
+            classLevels = [new CharacterClassLevelData(sheet.ClassModuleId, sheet.ClassName, sheet.Level, 0)];
+        }
+
+        var selectedModules = await _db.CharacterSelectedModules.AsNoTracking()
+            .Where(x => x.CharacterId == id)
+            .OrderBy(x => x.Slot)
+            .Select(x => new CharacterSelectedModuleData(x.Slot, x.ModuleId, x.DisplayName, x.SourceCode))
+            .ToArrayAsync(cancellationToken);
+
+        var saveProficiencies = DeriveSaveProficiencies(classLevels);
 
         return new CharacterBuildData(
             characterId,
@@ -220,7 +324,11 @@ public sealed class CharacterBuildService : ICharacterBuildService
             sheet.Level,
             sheet.ProficiencyBonus,
             abilityScores,
+            skillTraining,
             proficientSkills,
+            saveProficiencies,
+            classLevels,
+            selectedModules,
             sheet.CreatedAtUtc,
             sheet.UpdatedAtUtc);
     }
@@ -240,18 +348,134 @@ public sealed class CharacterBuildService : ICharacterBuildService
         }
     }
 
-    private async Task ReplaceSkillProficienciesAsync(string characterId, IReadOnlyList<string> skills, CancellationToken cancellationToken)
+    private async Task ReplaceSkillTrainingAsync(string characterId, IReadOnlyDictionary<string, string> skills, CancellationToken cancellationToken)
     {
         var current = await _db.CharacterSkillProficiencies.Where(x => x.CharacterId == characterId).ToListAsync(cancellationToken);
         _db.CharacterSkillProficiencies.RemoveRange(current);
-        foreach (var skill in skills.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var pair in skills.DistinctBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
         {
+            var training = NormalizeTrainingLevel(pair.Value);
+            if (string.Equals(training, "None", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             _db.CharacterSkillProficiencies.Add(new CharacterSkillProficiencyEntity
             {
                 CharacterId = characterId,
-                SkillName = skill.Trim(),
+                SkillName = pair.Key.Trim(),
+                TrainingLevel = training,
             });
         }
+    }
+
+    private async Task ReplaceClassLevelsAsync(string characterId, IReadOnlyList<CharacterClassLevelData> classLevels, CancellationToken cancellationToken)
+    {
+        var current = await _db.CharacterClassLevels.Where(x => x.CharacterId == characterId).ToListAsync(cancellationToken);
+        _db.CharacterClassLevels.RemoveRange(current);
+        foreach (var classLevel in classLevels.OrderBy(x => x.SortOrder))
+        {
+            _db.CharacterClassLevels.Add(new CharacterClassLevelEntity
+            {
+                CharacterId = characterId,
+                ClassModuleId = classLevel.ClassModuleId.Trim(),
+                ClassName = classLevel.ClassName.Trim(),
+                Level = classLevel.Level,
+                SortOrder = classLevel.SortOrder,
+            });
+        }
+    }
+
+    private async Task ReplaceSelectedModulesAsync(string characterId, IReadOnlyList<CharacterSelectedModuleData> selectedModules, CancellationToken cancellationToken)
+    {
+        var current = await _db.CharacterSelectedModules.Where(x => x.CharacterId == characterId).ToListAsync(cancellationToken);
+        _db.CharacterSelectedModules.RemoveRange(current);
+        foreach (var module in selectedModules)
+        {
+            _db.CharacterSelectedModules.Add(new CharacterSelectedModuleEntity
+            {
+                CharacterId = characterId,
+                Slot = module.Slot.Trim(),
+                ModuleId = module.ModuleId.Trim(),
+                DisplayName = module.DisplayName.Trim(),
+                SourceCode = module.SourceCode.Trim(),
+            });
+        }
+    }
+
+    private static IReadOnlyList<CharacterClassLevelData> NormalizeClassLevels(
+        IReadOnlyList<CharacterClassLevelData>? provided,
+        string fallbackClassModuleId,
+        string fallbackClassName,
+        int fallbackLevel)
+    {
+        if (provided is null || provided.Count == 0)
+        {
+            return [new CharacterClassLevelData(fallbackClassModuleId, fallbackClassName, fallbackLevel, 0)];
+        }
+
+        return provided
+            .OrderBy(x => x.SortOrder)
+            .Select((x, i) => new CharacterClassLevelData(x.ClassModuleId, x.ClassName, x.Level, i))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<CharacterSelectedModuleData> NormalizeSelectedModules(IReadOnlyList<CharacterSelectedModuleData>? provided)
+    {
+        return provided ?? Array.Empty<CharacterSelectedModuleData>();
+    }
+
+    private static IReadOnlyDictionary<string, string> NormalizeSkillTraining(
+        IReadOnlyDictionary<string, string>? trainingBySkill,
+        IReadOnlyList<string>? proficientSkills)
+    {
+        if (trainingBySkill is not null && trainingBySkill.Count > 0)
+        {
+            return trainingBySkill.ToDictionary(x => x.Key, x => NormalizeTrainingLevel(x.Value), StringComparer.OrdinalIgnoreCase);
+        }
+
+        var skills = proficientSkills ?? Array.Empty<string>();
+        return skills
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Trim(), _ => "Proficient", StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeTrainingLevel(string? level)
+    {
+        if (string.IsNullOrWhiteSpace(level))
+        {
+            return "Proficient";
+        }
+
+        if (level.Equals("Expertise", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Expertise";
+        }
+        if (level.Equals("None", StringComparison.OrdinalIgnoreCase))
+        {
+            return "None";
+        }
+        return "Proficient";
+    }
+
+    public static IReadOnlyList<string> DeriveSaveProficiencies(IReadOnlyList<CharacterClassLevelData> classLevels)
+    {
+        var saves = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var classLevel in classLevels)
+        {
+            if (!ClassSaveProficiencies.TryGetValue(classLevel.ClassName, out var classSaves))
+            {
+                continue;
+            }
+
+            foreach (var save in classSaves)
+            {
+                saves.Add(save);
+            }
+        }
+
+        return saves.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static List<string> Validate(
@@ -261,7 +485,9 @@ public sealed class CharacterBuildService : ICharacterBuildService
         int level,
         int proficiencyBonus,
         IReadOnlyDictionary<string, int> abilityScores,
-        IReadOnlyList<string> proficientSkills)
+        IReadOnlyDictionary<string, string> skillTraining,
+        IReadOnlyList<CharacterClassLevelData> classLevels,
+        IReadOnlyList<CharacterSelectedModuleData> selectedModules)
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(characterName))
@@ -285,6 +511,24 @@ public sealed class CharacterBuildService : ICharacterBuildService
             errors.Add("Proficiency bonus must be between 1 and 8.");
         }
 
+        var classLevelTotal = classLevels.Sum(x => x.Level);
+        if (classLevels.Count == 0)
+        {
+            errors.Add("At least one class level entry is required.");
+        }
+        if (classLevels.Any(x => string.IsNullOrWhiteSpace(x.ClassModuleId) || string.IsNullOrWhiteSpace(x.ClassName)))
+        {
+            errors.Add("Each class level entry requires class module id and class name.");
+        }
+        if (classLevels.Any(x => x.Level < 1 || x.Level > 20))
+        {
+            errors.Add("Each class level entry must be between 1 and 20.");
+        }
+        if (classLevelTotal != level)
+        {
+            errors.Add("Class level entries must sum to the total character level.");
+        }
+
         var allowed = new HashSet<string>(AllowedAbilityNames, StringComparer.OrdinalIgnoreCase);
         foreach (var ability in AllowedAbilityNames)
         {
@@ -293,7 +537,6 @@ public sealed class CharacterBuildService : ICharacterBuildService
                 errors.Add($"Missing ability score for '{ability}'.");
             }
         }
-
         foreach (var pair in abilityScores)
         {
             if (!allowed.Contains(pair.Key))
@@ -307,11 +550,23 @@ public sealed class CharacterBuildService : ICharacterBuildService
             }
         }
 
-        foreach (var skill in proficientSkills)
+        foreach (var pair in skillTraining)
         {
-            if (string.IsNullOrWhiteSpace(skill))
+            if (string.IsNullOrWhiteSpace(pair.Key))
             {
-                errors.Add("Skill proficiency values cannot be empty.");
+                errors.Add("Skill names in training map cannot be empty.");
+            }
+            if (!AllowedTrainingLevels.Contains(pair.Value))
+            {
+                errors.Add($"Skill '{pair.Key}' has invalid training level '{pair.Value}'.");
+            }
+        }
+
+        foreach (var selected in selectedModules)
+        {
+            if (string.IsNullOrWhiteSpace(selected.Slot) || string.IsNullOrWhiteSpace(selected.ModuleId))
+            {
+                errors.Add("Selected module entries must include slot and module id.");
             }
         }
 

@@ -35,7 +35,22 @@ public sealed class CharacterBuildServiceTests
                     ["Wisdom"] = 10,
                     ["Charisma"] = 8,
                 },
-                ProficientSkills: new[] { "Athletics", "Perception" }),
+                ProficientSkills: new[] { "Athletics", "Perception" },
+                SkillTrainingBySkill: new Dictionary<string, string>
+                {
+                    ["Athletics"] = "Proficient",
+                    ["Perception"] = "Expertise",
+                },
+                ClassLevels: new[]
+                {
+                    new CharacterClassLevelData("class-fighter", "Fighter", 2, 0),
+                    new CharacterClassLevelData("class-wizard", "Wizard", 1, 1),
+                },
+                SelectedModules: new[]
+                {
+                    new CharacterSelectedModuleData("race", "race-human", "Human", "PHB2024"),
+                    new CharacterSelectedModuleData("background", "background-soldier", "Soldier", "PHB2024"),
+                }),
             CancellationToken.None);
 
         Assert.Empty(upsert.Errors);
@@ -47,6 +62,10 @@ public sealed class CharacterBuildServiceTests
         Assert.Equal("class-fighter", fromDb.ClassModuleId);
         Assert.Equal(16, fromDb.AbilityScores["Strength"]);
         Assert.Contains("Athletics", fromDb.ProficientSkills);
+        Assert.Equal("Expertise", fromDb.SkillTrainingBySkill["Perception"]);
+        Assert.Equal(2, fromDb.ClassLevels.Count);
+        Assert.Equal(2, fromDb.SelectedModules.Count);
+        Assert.Contains("Intelligence", fromDb.SaveProficiencies);
 
         var owner = await fixture.Db.CharacterSheets
             .AsNoTracking()
@@ -177,6 +196,15 @@ public sealed class CharacterBuildServiceTests
                 ModuleType = "class",
                 Slug = "rogue",
                 DisplayName = "Rogue",
+                VersionTag = "v1",
+            },
+            new RuleModuleEntity
+            {
+                Id = "class-wizard",
+                ContentSourceId = "content-2024",
+                ModuleType = "class",
+                Slug = "wizard",
+                DisplayName = "Wizard",
                 VersionTag = "v1",
             },
         });

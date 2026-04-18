@@ -14,7 +14,7 @@ public sealed record PersistedComputeSaveRequest(
     AdvantageState AdvantageState,
     bool RollDice,
     int AdditionalModifier,
-    bool IsProficient);
+    bool? IsProficient);
 
 public sealed record PersistedComputeAttackRequest(
     string WeaponName,
@@ -33,4 +33,5 @@ public sealed record CharacterDerivedStatsResponse(
     IReadOnlyDictionary<string, int> SavingThrows,
     IReadOnlyDictionary<string, int> AbilityChecks,
     IReadOnlyList<string> AvailableSpells,
-    IReadOnlyList<string> ActiveInventoryItemIds);
+    IReadOnlyList<string> ActiveInventoryItemIds,
+    IReadOnlyList<string> SaveProficiencies);

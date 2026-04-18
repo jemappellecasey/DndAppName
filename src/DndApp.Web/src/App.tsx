@@ -419,12 +419,31 @@ function App() {
       setBuildMethod(build.buildMethod)
       setWizardName(build.characterName)
       setBaseRules(build.baseRuleSystem)
-      setSelectedClassModuleId(build.classModuleId)
-      setCharacterLevel(build.level)
+      const persistedClassLevels = build.classLevels.length > 0 ? build.classLevels : [{ classModuleId: build.classModuleId, className: build.className, level: build.level, sortOrder: 0 }]
+      const primaryPersistedClass = persistedClassLevels[0]
+      setSelectedClassModuleId(primaryPersistedClass.classModuleId)
+      setCharacterLevel(primaryPersistedClass.level)
+      setMultiClassSelections(
+        persistedClassLevels
+          .slice(1)
+          .map((entry) => ({ moduleId: entry.classModuleId, level: entry.level })),
+      )
+      const raceModule = build.selectedModules.find((x) => x.slot.toLowerCase() === 'race' || x.slot.toLowerCase() === 'species')
+      const backgroundModule = build.selectedModules.find(
+        (x) => x.slot.toLowerCase() === 'background' || x.slot.toLowerCase() === 'origin',
+      )
+      if (raceModule) setSelectedRaceModuleId(raceModule.moduleId)
+      if (backgroundModule) setSelectedBackgroundModuleId(backgroundModule.moduleId)
       setSkillTrainingBySkill(() => {
         const next = Object.fromEntries(ALL_SKILLS.map((skill) => [skill, 'None'])) as Record<SkillName, SkillTrainingLevel>
-        for (const skill of build.proficientSkills) {
-          next[skill] = 'Proficient'
+        if (build.skillTrainingBySkill) {
+          for (const [skill, level] of Object.entries(build.skillTrainingBySkill)) {
+            next[skill as SkillName] = level as SkillTrainingLevel
+          }
+        } else {
+          for (const skill of build.proficientSkills) {
+            next[skill] = 'Proficient'
+          }
         }
         return next
       })
@@ -637,12 +656,70 @@ function App() {
     }
 
     try {
+      const selectedClassModule = classOptions.find((x) => x.moduleId === selectedClassModuleId)
       const secondarySummary = multiClassSelections
         .map((entry) => {
           const option = classOptions.find((x) => x.moduleId === entry.moduleId)
           return option ? `${option.displayName} ${entry.level}` : `${entry.moduleId} ${entry.level}`
         })
         .join(', ')
+      const classLevels = [
+        {
+          classModuleId: selectedClassModuleId,
+          className: primaryClassName,
+          level: characterLevel,
+          sortOrder: 0,
+        },
+        ...multiClassSelections.map((entry, index) => {
+          const option = classOptions.find((x) => x.moduleId === entry.moduleId)
+          return {
+            classModuleId: entry.moduleId,
+            className: option?.displayName ?? entry.moduleId,
+            level: entry.level,
+            sortOrder: index + 1,
+          }
+        }),
+      ]
+      const selectedModules = [
+        selectedClassModule
+          ? {
+              slot: 'class',
+              moduleId: selectedClassModule.moduleId,
+              displayName: selectedClassModule.displayName,
+              sourceCode: selectedClassModule.sourceCode,
+            }
+          : null,
+        ...(selectedRaceModuleId
+          ? [
+              (() => {
+                const race = raceOptions.find((x) => x.moduleId === selectedRaceModuleId)
+                return race
+                  ? {
+                      slot: race.moduleType.toLowerCase() === 'species' ? 'species' : 'race',
+                      moduleId: race.moduleId,
+                      displayName: race.displayName,
+                      sourceCode: race.sourceCode,
+                    }
+                  : null
+              })(),
+            ]
+          : []),
+        ...(selectedBackgroundModuleId
+          ? [
+              (() => {
+                const background = backgroundOptions.find((x) => x.moduleId === selectedBackgroundModuleId)
+                return background
+                  ? {
+                      slot: background.moduleType.toLowerCase() === 'origin' ? 'origin' : 'background',
+                      moduleId: background.moduleId,
+                      displayName: background.displayName,
+                      sourceCode: background.sourceCode,
+                    }
+                  : null
+              })(),
+            ]
+          : []),
+      ].filter((x): x is { slot: string; moduleId: string; displayName: string; sourceCode: string } => x !== null)
 
       const saved = await upsertCharacterBuild(currentCharacterId, {
         characterName: wizardName,
@@ -654,6 +731,9 @@ function App() {
         proficiencyBonus,
         abilityScores: totalAbilityScores,
         proficientSkills: ALL_SKILLS.filter((skill) => skillTrainingBySkill[skill] !== 'None'),
+        skillTrainingBySkill,
+        classLevels,
+        selectedModules,
       })
       setSavedBuild(saved)
       setBuildResult(JSON.stringify(saved, null, 2))

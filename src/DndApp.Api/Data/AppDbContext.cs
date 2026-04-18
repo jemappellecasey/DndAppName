@@ -28,6 +28,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<CharacterRecordEntity> CharacterRecords => Set<CharacterRecordEntity>();
     public DbSet<CharacterDraftEntity> CharacterDrafts => Set<CharacterDraftEntity>();
     public DbSet<CharacterHistoryEntity> CharacterHistoryEntries => Set<CharacterHistoryEntity>();
+    public DbSet<CharacterClassLevelEntity> CharacterClassLevels => Set<CharacterClassLevelEntity>();
+    public DbSet<CharacterSelectedModuleEntity> CharacterSelectedModules => Set<CharacterSelectedModuleEntity>();
     public DbSet<UserAccountEntity> UserAccounts => Set<UserAccountEntity>();
     public DbSet<UserSessionEntity> UserSessions => Set<UserSessionEntity>();
     public DbSet<IngestionRunEntity> IngestionRuns => Set<IngestionRunEntity>();
@@ -241,6 +243,7 @@ public sealed class AppDbContext : DbContext
             entity.HasKey(x => new { x.CharacterId, x.SkillName });
             entity.Property(x => x.CharacterId).HasMaxLength(36);
             entity.Property(x => x.SkillName).HasMaxLength(64);
+            entity.Property(x => x.TrainingLevel).HasMaxLength(24).HasDefaultValue("Proficient");
             entity.HasOne<CharacterSheetEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.CharacterId)
@@ -306,6 +309,35 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.ActorUserId).HasMaxLength(64);
             entity.Property(x => x.Details).HasColumnType("TEXT");
             entity.HasIndex(x => new { x.CharacterId, x.TimestampUtc });
+        });
+
+        modelBuilder.Entity<CharacterClassLevelEntity>(entity =>
+        {
+            entity.ToTable("character_class_level");
+            entity.HasKey(x => new { x.CharacterId, x.SortOrder });
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.ClassModuleId).HasMaxLength(64);
+            entity.Property(x => x.ClassName).HasMaxLength(160);
+            entity.HasIndex(x => new { x.CharacterId, x.ClassModuleId });
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterSelectedModuleEntity>(entity =>
+        {
+            entity.ToTable("character_selected_module");
+            entity.HasKey(x => new { x.CharacterId, x.Slot, x.ModuleId });
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.Slot).HasMaxLength(40);
+            entity.Property(x => x.ModuleId).HasMaxLength(64);
+            entity.Property(x => x.DisplayName).HasMaxLength(300);
+            entity.Property(x => x.SourceCode).HasMaxLength(40);
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<UserAccountEntity>(entity =>

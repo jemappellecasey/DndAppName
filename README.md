@@ -8,9 +8,10 @@ DndAppName is a D&D character creation and management app focused on 2014/2024 r
 3. Character wizard flow with mixed-rules resolution and copy-to-ruleset support.
 4. Persisted wizard drafts, character library summaries, and character history (survive API restarts).
 5. Persistent character build model (class, build method, ability scores, skill proficiencies).
-6. Persistent inventory model with equip/attune/unattune and attunement-cap enforcement.
-7. Persisted calculations for checks/saves/attacks and derived stats.
-8. Custom origin/species validation and preview endpoints.
+6. Build persistence now stores multiclass levels, selected lineage/background modules, and per-skill training tiers (`None`/`Proficient`/`Expertise`).
+7. Persistent inventory model with equip/attune/unattune and attunement-cap enforcement.
+8. Persisted calculations for checks/saves/attacks and derived stats.
+9. Custom origin/species validation and preview endpoints.
 
 ## Prerequisites
 1. .NET SDK 10.x
@@ -70,7 +71,7 @@ npm run build
 7. Race/species and background/origin ability bonuses (when available from catalog payload) are applied into total ability scores.
 8. In **Wizard + persistent build**, click **Start Wizard Draft**, apply class/race/background selections, then click **Save build to persistent model**.
 9. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
-10. In **Skills menu and persisted checks**, each skill has a `None/Proficient/Expertise` dropdown with live proficiency/expertise slot counters (negative values indicate over-allocation), plus persisted advantage/disadvantage check rolling.
+10. In **Skills menu and persisted checks**, each skill has a `None/Proficient/Expertise` dropdown with live proficiency/expertise slot counters (negative values indicate over-allocation), plus persisted advantage/disadvantage check rolling; saved builds now round-trip these training tiers.
 11. In **Inventory from database (persisted)**, add item definitions from catalog, set quantity, and manage equip/attune/unattune/remove states. Inventory rows show value, weight, attunement, equip status, and quantity.
 12. **Attacks** auto-builds from equipped weapon-style inventory entries (deduped by weapon details) and shows to-hit bonus, damage expression, and advantage/disadvantage rolling.
 13. In **Custom builder previews**, click preview buttons to test guided custom payload validation.

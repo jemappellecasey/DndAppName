@@ -91,8 +91,14 @@ public sealed class CharacterComputationService : ICharacterComputationService
         }
 
         var abilityModifier = Modifier(loaded.AbilityScores[abilityName]);
-        var isProficient = loaded.ProficientSkills.Contains(request.SkillName, StringComparer.OrdinalIgnoreCase);
-        var baseBeforeItems = abilityModifier + (isProficient ? loaded.ProficiencyBonus : 0);
+        var skillTrainingLevel = loaded.SkillTrainingBySkill.TryGetValue(request.SkillName, out var trainingLevel)
+            ? trainingLevel
+            : "None";
+        var isProficient = !string.Equals(skillTrainingLevel, "None", StringComparison.OrdinalIgnoreCase);
+        var hasExpertise = string.Equals(skillTrainingLevel, "Expertise", StringComparison.OrdinalIgnoreCase) || request.HasExpertise;
+        var baseBeforeItems = abilityModifier + (isProficient
+            ? (hasExpertise ? loaded.ProficiencyBonus * 2 : loaded.ProficiencyBonus)
+            : 0);
         var derivedValue = loaded.Derived.AbilityChecks.TryGetValue(request.SkillName, out var fromItems) ? fromItems : baseBeforeItems;
         var inventoryModifier = derivedValue - baseBeforeItems;
 
@@ -101,7 +107,7 @@ public sealed class CharacterComputationService : ICharacterComputationService
             AbilityModifier: abilityModifier,
             ProficiencyBonus: loaded.ProficiencyBonus,
             IsProficient: isProficient,
-            HasExpertise: request.HasExpertise && isProficient,
+            HasExpertise: hasExpertise && isProficient,
             AdditionalModifier: request.AdditionalModifier + inventoryModifier,
             AdvantageState: request.AdvantageState,
             RollDice: request.RollDice));
@@ -126,16 +132,17 @@ public sealed class CharacterComputationService : ICharacterComputationService
         }
 
         var abilityModifier = Modifier(score);
-        var baseBeforeItems = abilityModifier + (request.IsProficient ? loaded.ProficiencyBonus : 0);
-        var derivedValue = loaded.Derived.SavingThrows.TryGetValue(request.AbilityName, out var fromItems) ? fromItems : abilityModifier;
-        var inventoryModifier = derivedValue - abilityModifier;
-        var extra = request.AdditionalModifier + inventoryModifier + (request.IsProficient ? 0 : 0);
+        var isProficient = request.IsProficient ?? loaded.SaveProficiencies.Contains(request.AbilityName, StringComparer.OrdinalIgnoreCase);
+        var baseBeforeItems = abilityModifier + (isProficient ? loaded.ProficiencyBonus : 0);
+        var derivedValue = loaded.Derived.SavingThrows.TryGetValue(request.AbilityName, out var fromItems) ? fromItems : baseBeforeItems;
+        var inventoryModifier = derivedValue - baseBeforeItems;
+        var extra = request.AdditionalModifier + inventoryModifier;
 
         var result = _calculation.ComputeSave(new ComputeSaveRequest(
             AbilityName: request.AbilityName,
             AbilityModifier: abilityModifier,
             ProficiencyBonus: loaded.ProficiencyBonus,
-            IsProficient: request.IsProficient,
+            IsProficient: isProficient,
             AdditionalModifier: extra,
             AdvantageState: request.AdvantageState,
             RollDice: request.RollDice));
@@ -191,7 +198,8 @@ public sealed class CharacterComputationService : ICharacterComputationService
             loaded.Derived.SavingThrows,
             loaded.Derived.AbilityChecks,
             loaded.Derived.AvailableSpells,
-            loaded.ActiveInventoryItemIds), Array.Empty<string>());
+            loaded.ActiveInventoryItemIds,
+            loaded.SaveProficiencies), Array.Empty<string>());
     }
 
     private async Task<LoadStateResult> LoadStateAsync(Guid characterId, CancellationToken cancellationToken)
@@ -211,12 +219,32 @@ public sealed class CharacterComputationService : ICharacterComputationService
             return LoadStateResult.FromError("Character ability scores are missing.");
         }
 
-        var proficientSkills = await _db.CharacterSkillProficiencies.AsNoTracking()
+        var skillTrainingRows = await _db.CharacterSkillProficiencies.AsNoTracking()
             .Where(x => x.CharacterId == id)
-            .Select(x => x.SkillName)
+            .Select(x => new { x.SkillName, x.TrainingLevel })
             .ToArrayAsync(cancellationToken);
+        var skillTrainingBySkill = skillTrainingRows
+            .ToDictionary(
+                x => x.SkillName,
+                x => string.IsNullOrWhiteSpace(x.TrainingLevel) ? "Proficient" : x.TrainingLevel,
+                StringComparer.OrdinalIgnoreCase);
+        var proficientSkills = skillTrainingBySkill
+            .Where(x => !string.Equals(x.Value, "None", StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.Key)
+            .ToArray();
 
-        var baseStats = BuildBaseStats(abilityScores, proficientSkills, sheet.ProficiencyBonus);
+        var classLevels = await _db.CharacterClassLevels.AsNoTracking()
+            .Where(x => x.CharacterId == id)
+            .OrderBy(x => x.SortOrder)
+            .Select(x => new CharacterClassLevelData(x.ClassModuleId, x.ClassName, x.Level, x.SortOrder))
+            .ToArrayAsync(cancellationToken);
+        if (classLevels.Length == 0)
+        {
+            classLevels = [new CharacterClassLevelData(sheet.ClassModuleId, sheet.ClassName, sheet.Level, 0)];
+        }
+        var saveProficiencies = CharacterBuildService.DeriveSaveProficiencies(classLevels);
+
+        var baseStats = BuildBaseStats(abilityScores, skillTrainingBySkill, sheet.ProficiencyBonus, saveProficiencies);
         var inventoryRows = await _db.CharacterInventoryItems.AsNoTracking()
             .Where(x => x.CharacterId == id)
             .ToListAsync(cancellationToken);
@@ -254,6 +282,8 @@ public sealed class CharacterComputationService : ICharacterComputationService
             ProficiencyBonus: sheet.ProficiencyBonus,
             AbilityScores: abilityScores,
             ProficientSkills: proficientSkills,
+            SkillTrainingBySkill: skillTrainingBySkill,
+            SaveProficiencies: saveProficiencies,
             Derived: pipelineResult.DerivedStats,
             ActiveInventoryItemIds: itemStates.Where(x => x.IsEquipped).Select(x => x.ItemId).ToArray(),
             Errors: Array.Empty<string>());
@@ -261,8 +291,9 @@ public sealed class CharacterComputationService : ICharacterComputationService
 
     private static BaseStats BuildBaseStats(
         IReadOnlyDictionary<string, int> abilityScores,
-        IReadOnlyList<string> proficientSkills,
-        int proficiencyBonus)
+        IReadOnlyDictionary<string, string> skillTrainingBySkill,
+        int proficiencyBonus,
+        IReadOnlyList<string> saveProficiencies)
     {
         var abilityModifiers = abilityScores.ToDictionary(x => x.Key, x => Modifier(x.Value), StringComparer.OrdinalIgnoreCase);
         var abilityChecks = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -273,18 +304,29 @@ public sealed class CharacterComputationService : ICharacterComputationService
                 continue;
             }
             var baseValue = abilityModifiers.TryGetValue(abilityName, out var mod) ? mod : 0;
-            if (proficientSkills.Contains(skill, StringComparer.OrdinalIgnoreCase))
+            if (skillTrainingBySkill.TryGetValue(skill, out var trainingLevel) && !string.Equals(trainingLevel, "None", StringComparison.OrdinalIgnoreCase))
             {
-                baseValue += proficiencyBonus;
+                baseValue += string.Equals(trainingLevel, "Expertise", StringComparison.OrdinalIgnoreCase)
+                    ? proficiencyBonus * 2
+                    : proficiencyBonus;
             }
             abilityChecks[skill] = baseValue;
+        }
+
+        var savingThrows = new Dictionary<string, int>(abilityModifiers, StringComparer.OrdinalIgnoreCase);
+        foreach (var save in saveProficiencies)
+        {
+            if (savingThrows.ContainsKey(save))
+            {
+                savingThrows[save] += proficiencyBonus;
+            }
         }
 
         var armorClass = 10 + (abilityModifiers.TryGetValue("Dexterity", out var dex) ? dex : 0);
         return new BaseStats(
             ArmorClass: armorClass,
             MoveSpeed: 30,
-            SavingThrows: abilityModifiers,
+            SavingThrows: savingThrows,
             AbilityChecks: abilityChecks,
             AvailableSpells: Array.Empty<string>());
     }
@@ -379,6 +421,8 @@ public sealed class CharacterComputationService : ICharacterComputationService
         int ProficiencyBonus,
         IReadOnlyDictionary<string, int> AbilityScores,
         IReadOnlyList<string> ProficientSkills,
+        IReadOnlyDictionary<string, string> SkillTrainingBySkill,
+        IReadOnlyList<string> SaveProficiencies,
         DerivedStats Derived,
         IReadOnlyList<string> ActiveInventoryItemIds,
         IReadOnlyList<string> Errors)
@@ -388,6 +432,8 @@ public sealed class CharacterComputationService : ICharacterComputationService
             return new LoadStateResult(
                 0,
                 new Dictionary<string, int>(),
+                Array.Empty<string>(),
+                new Dictionary<string, string>(),
                 Array.Empty<string>(),
                 new DerivedStats(0, 0, new Dictionary<string, int>(), new Dictionary<string, int>(), Array.Empty<string>()),
                 Array.Empty<string>(),
