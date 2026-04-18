@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Globalization;
 using DndApp.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -272,6 +273,12 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
         db.RuleVariants.RemoveRange(existingVariants);
     }
 
+    var existingItems = db.ItemDefinitions.ToList();
+    if (existingItems.Count > 0)
+    {
+        db.ItemDefinitions.RemoveRange(existingItems);
+    }
+
     var existingModules = db.RuleModules.ToList();
     if (existingModules.Count > 0)
     {
@@ -283,6 +290,8 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
         from book in db.SourceBooks
         join chapter in db.SourceChapters on book.Id equals chapter.SourceBookId
         join section in db.SourceSections on chapter.Id equals section.SourceChapterId
+        join block in db.SourceBlocks on section.Id equals block.SourceSectionId into blockJoin
+        from block in blockJoin.DefaultIfEmpty()
         select new
         {
             book.SourceCode,
@@ -292,6 +301,7 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
             section.SectionOrder,
             section.StartLine,
             section.EndLine,
+            Preview = block != null ? block.RawText : string.Empty
         })
         .OrderBy(x => x.SourceCode)
         .ThenBy(x => x.SectionOrder)
@@ -306,6 +316,9 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
         var ruleSystemId = contentSourceId.EndsWith("2014", StringComparison.OrdinalIgnoreCase)
             ? "rules-2014"
             : "rules-2024";
+        var moduleType = InferModuleType(row.Title, row.Preview);
+        var abilityBonuses = InferAbilityBonuses(moduleType, row.Title, row.SourceCode);
+        var spellClasses = moduleType == "spell" ? InferSpellClasses(row.Preview) : Array.Empty<string>();
 
         var slug = $"{Slugify(row.Title)}-{row.SectionOrder}";
         var moduleId = Guid.NewGuid().ToString("N");
@@ -313,7 +326,7 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
         {
             Id = moduleId,
             ContentSourceId = contentSourceId,
-            ModuleType = "section",
+            ModuleType = moduleType,
             Slug = slug,
             DisplayName = row.Title,
             VersionTag = row.VersionTag
@@ -331,11 +344,26 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
             {
                 sourceSectionId = row.Id,
                 startLine = row.StartLine,
-                endLine = row.EndLine
+                endLine = row.EndLine,
+                abilityBonuses,
+                spellClasses
             })
         };
         db.RuleVariants.Add(variant);
         variantCount++;
+
+        if (moduleType == "item")
+        {
+            db.ItemDefinitions.Add(new ItemDefinitionEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                RuleModuleId = moduleId,
+                ItemType = InferItemType(row.Title),
+                Rarity = InferItemRarity(row.Title, row.Preview),
+                RequiresAttunement = row.Preview.Contains("attunement", StringComparison.OrdinalIgnoreCase),
+                ChargesModelJson = "{}"
+            });
+        }
     }
 
     await db.SaveChangesAsync();
@@ -350,6 +378,162 @@ static string ComputeSha256(string value)
 {
     var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
     return Convert.ToHexString(bytes);
+}
+
+static string InferModuleType(string title, string? preview)
+{
+    var text = $"{title} {preview}".Trim();
+
+    if (Regex.IsMatch(text, @"\bspell\b", RegexOptions.IgnoreCase))
+    {
+        return "spell";
+    }
+    if (Regex.IsMatch(text, @"\bsubclass\b|subclasses", RegexOptions.IgnoreCase))
+    {
+        return "subclass";
+    }
+    if (Regex.IsMatch(text, @"\bclass\b|barbarian|bard|cleric|druid|fighter|monk|paladin|ranger|rogue|sorcerer|warlock|wizard|artificer", RegexOptions.IgnoreCase))
+    {
+        return "class";
+    }
+    if (Regex.IsMatch(text, @"\brace\b|species|elf|dwarf|halfling|human|dragonborn|gnome|orc|tiefling|aasimar|goliath", RegexOptions.IgnoreCase))
+    {
+        return title.Contains("species", StringComparison.OrdinalIgnoreCase) ? "species" : "race";
+    }
+    if (Regex.IsMatch(text, @"\bbackground\b|origin", RegexOptions.IgnoreCase))
+    {
+        return title.Contains("origin", StringComparison.OrdinalIgnoreCase) ? "origin" : "background";
+    }
+    if (Regex.IsMatch(text, @"\bfeat\b", RegexOptions.IgnoreCase))
+    {
+        return "feat";
+    }
+    if (Regex.IsMatch(text, @"\barmor\b|\bweapon\b|\bshield\b|wondrous|magic item|potion|ring|rod|staff|wand", RegexOptions.IgnoreCase))
+    {
+        return "item";
+    }
+
+    return "section";
+}
+
+static IReadOnlyDictionary<string, int> InferAbilityBonuses(string moduleType, string title, string sourceCode)
+{
+    if (!string.Equals(moduleType, "race", StringComparison.OrdinalIgnoreCase))
+    {
+        return new Dictionary<string, int>();
+    }
+
+    if (!sourceCode.EndsWith("2014", StringComparison.OrdinalIgnoreCase))
+    {
+        return new Dictionary<string, int>();
+    }
+
+    var normalized = title.ToLowerInvariant();
+    if (normalized.Contains("dwarf"))
+    {
+        return new Dictionary<string, int> { ["Constitution"] = 2 };
+    }
+    if (normalized.Contains("elf"))
+    {
+        return new Dictionary<string, int> { ["Dexterity"] = 2 };
+    }
+    if (normalized.Contains("halfling"))
+    {
+        return new Dictionary<string, int> { ["Dexterity"] = 2 };
+    }
+    if (normalized.Contains("human"))
+    {
+        return new Dictionary<string, int>
+        {
+            ["Strength"] = 1,
+            ["Dexterity"] = 1,
+            ["Constitution"] = 1,
+            ["Intelligence"] = 1,
+            ["Wisdom"] = 1,
+            ["Charisma"] = 1
+        };
+    }
+    if (normalized.Contains("dragonborn"))
+    {
+        return new Dictionary<string, int> { ["Strength"] = 2, ["Charisma"] = 1 };
+    }
+    if (normalized.Contains("gnome"))
+    {
+        return new Dictionary<string, int> { ["Intelligence"] = 2 };
+    }
+    if (normalized.Contains("half-elf"))
+    {
+        return new Dictionary<string, int> { ["Charisma"] = 2 };
+    }
+    if (normalized.Contains("half-orc"))
+    {
+        return new Dictionary<string, int> { ["Strength"] = 2, ["Constitution"] = 1 };
+    }
+    if (normalized.Contains("tiefling"))
+    {
+        return new Dictionary<string, int> { ["Charisma"] = 2, ["Intelligence"] = 1 };
+    }
+
+    return new Dictionary<string, int>();
+}
+
+static IReadOnlyList<string> InferSpellClasses(string? preview)
+{
+    if (string.IsNullOrWhiteSpace(preview))
+    {
+        return Array.Empty<string>();
+    }
+
+    var classes = new[]
+    {
+        "Artificer", "Barbarian", "Bard", "Cleric", "Druid",
+        "Fighter", "Monk", "Paladin", "Ranger", "Rogue",
+        "Sorcerer", "Warlock", "Wizard"
+    };
+
+    return classes
+        .Where(c => preview.Contains(c, StringComparison.OrdinalIgnoreCase))
+        .ToArray();
+}
+
+static string InferItemType(string title)
+{
+    var normalized = title.ToLowerInvariant();
+    if (normalized.Contains("armor") || normalized.Contains("shield"))
+    {
+        return "Armor";
+    }
+    if (normalized.Contains("weapon"))
+    {
+        return "Weapon";
+    }
+    if (normalized.Contains("potion"))
+    {
+        return "Potion";
+    }
+    if (normalized.Contains("ring"))
+    {
+        return "Ring";
+    }
+    if (normalized.Contains("wand") || normalized.Contains("rod") || normalized.Contains("staff"))
+    {
+        return "Focus";
+    }
+    return "Wondrous Item";
+}
+
+static string InferItemRarity(string title, string? preview)
+{
+    var text = $"{title} {preview}".ToLowerInvariant();
+    foreach (var rarity in new[] { "common", "uncommon", "rare", "very rare", "legendary", "artifact" })
+    {
+        if (text.Contains(rarity, StringComparison.Ordinal))
+        {
+            return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(rarity);
+        }
+    }
+
+    return "Unknown";
 }
 
 static string Slugify(string value)
