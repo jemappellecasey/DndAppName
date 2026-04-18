@@ -643,10 +643,13 @@ app.MapGet(
 
 app.MapGet(
     "/characters",
-    async (bool includeArchived, bool archivedOnly, bool mine, HttpContext httpContext, ILocalAuthService auth, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
+    async (bool? includeArchived, bool? archivedOnly, bool? mine, HttpContext httpContext, ILocalAuthService auth, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
+        var includeArchivedFlag = includeArchived ?? false;
+        var archivedOnlyFlag = archivedOnly ?? false;
+        var mineFlag = mine ?? false;
         string? ownerUserId = null;
-        if (mine)
+        if (mineFlag)
         {
             var session = await EndpointAuth.RequireSessionAsync(httpContext, auth, cancellationToken);
             if (session is null)
@@ -657,7 +660,7 @@ app.MapGet(
             ownerUserId = session.UserId;
         }
 
-        var result = await wizardService.ListCharactersAsync(includeArchived, archivedOnly, ownerUserId, cancellationToken);
+        var result = await wizardService.ListCharactersAsync(includeArchivedFlag, archivedOnlyFlag, ownerUserId, cancellationToken);
         return Results.Ok(result);
     });
 
