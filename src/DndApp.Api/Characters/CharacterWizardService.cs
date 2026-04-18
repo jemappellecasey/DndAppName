@@ -101,10 +101,12 @@ public sealed class CharacterWizardService : ICharacterWizardService
             query = query.Where(x => !x.IsArchived);
         }
 
-        var entities = await query
+        // SQLite cannot translate DateTimeOffset ORDER BY, so materialize and sort in memory.
+        var entities = await query.ToArrayAsync(cancellationToken);
+        return entities
             .OrderByDescending(x => x.UpdatedAtUtc)
-            .ToArrayAsync(cancellationToken);
-        return entities.Select(ToSummary).ToArray();
+            .Select(ToSummary)
+            .ToArray();
     }
 
     public async Task<CharacterSummary?> GetCharacterAsync(Guid characterId, CancellationToken cancellationToken)
@@ -183,16 +185,18 @@ public sealed class CharacterWizardService : ICharacterWizardService
 
     public async Task<IReadOnlyList<CharacterRevisionEntry>> GetCharacterHistoryAsync(Guid characterId, CancellationToken cancellationToken)
     {
-        return await _db.CharacterHistoryEntries
+        var entries = await _db.CharacterHistoryEntries
             .AsNoTracking()
             .Where(x => x.CharacterId == characterId.ToString())
-            .OrderByDescending(x => x.TimestampUtc)
             .Select(x => new CharacterRevisionEntry(
                 x.TimestampUtc,
                 x.Action,
                 x.ActorUserId,
                 x.Details))
             .ToArrayAsync(cancellationToken);
+        return entries
+            .OrderByDescending(x => x.TimestampUtc)
+            .ToArray();
     }
 
     public async Task<CharacterWizardResult> SubmitStepAsync(Guid characterId, SubmitWizardStepRequest request, CancellationToken cancellationToken)
