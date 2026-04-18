@@ -83,6 +83,15 @@ pre {
   border-radius: 6px;
 }
 
+.ruleset-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #2563eb;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
 .scores-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

@@ -7,7 +7,7 @@ public interface ICharacterWizardService
 {
     CharacterWizardResult StartDraft(StartCharacterWizardRequest request);
     CharacterWizardDraft? GetDraft(Guid characterId);
-    IReadOnlyList<CharacterSummary> ListCharacters(bool includeArchived);
+    IReadOnlyList<CharacterSummary> ListCharacters(bool includeArchived, string? ownerUserId = null);
     CharacterSummary? GetCharacter(Guid characterId);
     CharacterSummary? UpdateCharacter(Guid characterId, UpdateCharacterRequest request);
     CharacterSummary? ArchiveCharacter(Guid characterId);
@@ -71,9 +71,10 @@ public sealed class CharacterWizardService : ICharacterWizardService
         return _drafts.TryGetValue(characterId, out var draft) ? draft : null;
     }
 
-    public IReadOnlyList<CharacterSummary> ListCharacters(bool includeArchived)
+    public IReadOnlyList<CharacterSummary> ListCharacters(bool includeArchived, string? ownerUserId = null)
     {
         return _characters.Values
+            .Where(x => string.IsNullOrWhiteSpace(ownerUserId) || string.Equals(x.OwnerUserId, ownerUserId, StringComparison.Ordinal))
             .Where(x => includeArchived || !x.IsArchived)
             .OrderByDescending(x => x.UpdatedAtUtc)
             .Select(ToSummary)

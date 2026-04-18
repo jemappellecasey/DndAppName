@@ -5,6 +5,7 @@ using DndApp.Api.Items;
 using DndApp.Api.Mechanics;
 using DndApp.Api.MixedRules;
 using DndApp.Api.Data;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 
@@ -160,6 +161,90 @@ app.MapGet(
             .ToArray();
 
         return Results.Ok(items);
+    });
+
+app.MapGet(
+    "/catalog/content-sources",
+    async (RuleSystemMode? ruleSystem, AppDbContext db, CancellationToken cancellationToken) =>
+    {
+        var sources = await db.ContentSources
+            .AsNoTracking()
+            .OrderBy(x => x.Code)
+            .Select(x => new ContentSourceCatalogItem(
+                x.Code,
+                x.Name,
+                x.RuleSystemId == "rules-2014" ? RuleSystemMode.Rules2014 : RuleSystemMode.Rules2024))
+            .ToArrayAsync(cancellationToken);
+
+        if (ruleSystem is null)
+        {
+            return Results.Ok(sources);
+        }
+
+        var filtered = sources
+            .Where(x => x.RuleSystem != ruleSystem.Value)
+            .ToArray();
+        return Results.Ok(filtered);
+    });
+
+app.MapGet(
+    "/catalog/modules",
+    async (
+        RuleSystemMode baseRuleSystem,
+        bool mixedMode,
+        string[]? overlaySources,
+        string[]? moduleTypes,
+        AppDbContext db,
+        CancellationToken cancellationToken) =>
+    {
+        var baseRuleSystemId = baseRuleSystem == RuleSystemMode.Rules2014 ? "rules-2014" : "rules-2024";
+        var baseSourceCodes = await db.ContentSources
+            .AsNoTracking()
+            .Where(x => x.RuleSystemId == baseRuleSystemId)
+            .Select(x => x.Code)
+            .ToArrayAsync(cancellationToken);
+
+        var allowedSources = new HashSet<string>(baseSourceCodes, StringComparer.OrdinalIgnoreCase);
+        if (mixedMode && overlaySources is not null)
+        {
+            foreach (var source in overlaySources.Where(x => !string.IsNullOrWhiteSpace(x)))
+            {
+                allowedSources.Add(source.Trim());
+            }
+        }
+
+        var requestedModuleTypes = (moduleTypes ?? Array.Empty<string>())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim().ToLowerInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var rows = await (
+            from module in db.RuleModules
+            join source in db.ContentSources on module.ContentSourceId equals source.Id
+            join variant in db.RuleVariants on module.Id equals variant.RuleModuleId into variantJoin
+            from variant in variantJoin.DefaultIfEmpty()
+            where allowedSources.Contains(source.Code)
+            select new
+            {
+                Module = module,
+                Source = source,
+                VariantPayloadJson = variant != null ? variant.PayloadJson : null
+            })
+            .ToListAsync(cancellationToken);
+
+        var filtered = rows
+            .Where(x => requestedModuleTypes.Count == 0 || requestedModuleTypes.Contains(x.Module.ModuleType))
+            .OrderBy(x => x.Module.DisplayName)
+            .Select(x => new ModuleCatalogItem(
+                x.Module.Id,
+                x.Module.ModuleType,
+                x.Module.DisplayName,
+                x.Source.Code,
+                x.Module.VersionTag,
+                CatalogParsing.ParseAbilityBonuses(x.VariantPayloadJson)))
+            .ToArray();
+
+        return Results.Ok(filtered);
     });
 
 app.MapPost(
@@ -461,9 +546,15 @@ app.MapPost(
 
 app.MapPost(
     "/wizard/characters/start",
-    (StartCharacterWizardRequest request, ICharacterWizardService wizardService) =>
+    async (StartCharacterWizardRequest request, ILocalAuthService auth, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.StartDraft(request);
+        var session = await auth.GetSessionAsync(request.SessionToken, cancellationToken);
+        if (session is null)
+        {
+            return Results.BadRequest(new { errors = new[] { "Session token is invalid or expired." } });
+        }
+
+        var result = wizardService.StartDraft(request with { SessionToken = session.UserId });
         return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
     });
 
@@ -477,9 +568,21 @@ app.MapGet(
 
 app.MapGet(
     "/characters",
-    (bool includeArchived, ICharacterWizardService wizardService) =>
+    async (bool includeArchived, bool mine, HttpContext httpContext, ILocalAuthService auth, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
-        var result = wizardService.ListCharacters(includeArchived);
+        string? ownerUserId = null;
+        if (mine)
+        {
+            var session = await EndpointAuth.RequireSessionAsync(httpContext, auth, cancellationToken);
+            if (session is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            ownerUserId = session.UserId;
+        }
+
+        var result = wizardService.ListCharacters(includeArchived, ownerUserId);
         return Results.Ok(result);
     });
 
@@ -641,6 +744,47 @@ public sealed record ItemCatalogItem(
     string Rarity,
     bool RequiresAttunement,
     IReadOnlyList<ItemCatalogEffect> Effects);
+
+public sealed record ContentSourceCatalogItem(
+    string SourceCode,
+    string SourceName,
+    RuleSystemMode RuleSystem);
+
+public sealed record ModuleCatalogItem(
+    string ModuleId,
+    string ModuleType,
+    string DisplayName,
+    string SourceCode,
+    string VersionTag,
+    IReadOnlyDictionary<string, int> AbilityBonuses);
+
+public static class CatalogParsing
+{
+    public static IReadOnlyDictionary<string, int> ParseAbilityBonuses(string? payloadJson)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+        {
+            return new Dictionary<string, int>();
+        }
+
+        using var document = JsonDocument.Parse(payloadJson);
+        if (!document.RootElement.TryGetProperty("abilityBonuses", out var bonusesElement) || bonusesElement.ValueKind != JsonValueKind.Object)
+        {
+            return new Dictionary<string, int>();
+        }
+
+        var bonuses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var prop in bonusesElement.EnumerateObject())
+        {
+            if (prop.Value.ValueKind == JsonValueKind.Number && prop.Value.TryGetInt32(out var value))
+            {
+                bonuses[prop.Name] = value;
+            }
+        }
+
+        return bonuses;
+    }
+}
 
 public static class EndpointAuth
 {

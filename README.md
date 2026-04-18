@@ -57,17 +57,21 @@ npm run build
 ```
 
 ## Frontend quick walkthrough (first-time user)
-1. In the **Local session** card, enter username + password. Use **Register new user** for first login, then start the session.
-2. In **Character build setup**, set the character name, rules mode, and ability-score method:
-   - **Point buy** (27-point budget),
-   - **Manual** score entry, or
-   - **Roll** (4d6 drop lowest) with drag/drop assignment from roll pool into each ability slot.
-3. In **Wizard + persistent build**, click **Start Wizard Draft**, pick a class from DB-backed class catalog, optionally apply to wizard, then click **Save build to persistent model**.
-4. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
-5. In **Skills menu and persisted checks**, choose any skill, set advantage/expertise, and roll checks via persisted-computation endpoint(s).
-6. In **Inventory from database (persisted)**, add item definitions from catalog, then equip/attune/unattune/remove through persisted inventory endpoints.
-7. In **Character library**, click **Refresh** and select your character. Use **History**, **Duplicate**, or **Archive** as needed.
-8. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
+1. The landing page shows **Login** and **About DndAppName**. Sign in with username + password (or register a new local account).
+2. After login, **Your characters** displays only characters owned by the signed-in user, with ruleset badges.
+3. In **Character build setup**, set the character name, rules mode, character level, and ability-score method:
+    - **Point buy** (27-point budget),
+    - **Manual** score entry, or
+    - **Roll** (4d6 drop lowest) with drag/drop assignment from roll pool into each ability slot.
+4. **Proficiency bonus** is auto-calculated from level using `(level - 1) // 4 + 2`.
+5. Mixed mode now uses a **multi-select overlay source picker** instead of comma-separated text.
+6. New-character setup now includes primary class, optional multiclass entries (primary class required), race/species, and background/origin selections.
+7. Race/species and background/origin ability bonuses (when available from catalog payload) are applied into total ability scores.
+8. In **Wizard + persistent build**, click **Start Wizard Draft**, apply class/race/background selections, then click **Save build to persistent model**.
+9. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
+10. In **Skills menu and persisted checks**, choose any skill, set advantage/expertise, and roll checks via persisted-computation endpoint(s).
+11. In **Inventory from database (persisted)**, add item definitions from catalog, then equip/attune/unattune/remove through persisted inventory endpoints.
+12. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
 
 ### Troubleshooting (local run)
 1. If `dotnet build` fails with `DndApp.Api.exe ... file is being used by another process`, stop the running API (`Ctrl+C` in the terminal where `dotnet run` is active), then build again.
@@ -89,6 +93,8 @@ Normalize imported raw sections into core domain entities (`rule_system`, `conte
 ```powershell
 dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.csproj -- --normalize-db
 ```
+
+Normalization now classifies modules into expandable categories (`class`, `subclass`, `race`, `background`, `feat`, `spell`, `item`, `section`) and creates item definitions for detected item modules.
 
 Outputs are written under:
 - `data\ingested\phb2014\v1\sections.json`
@@ -120,11 +126,13 @@ Outputs are written under:
 5. `POST /characters/{characterId}/copy-to-ruleset`
 6. `POST /rules/resolve-mixed`
 7. `GET /characters`
-8. `GET /characters/{characterId}`
-9. `PATCH /characters/{characterId}`
-10. `POST /characters/{characterId}/archive`
-11. `POST /characters/{characterId}/duplicate`
-12. `GET /characters/{characterId}/history`
+8. `GET /characters?mine=true` (requires `X-Session-Token`; returns only current user's characters)
+9. `GET /catalog/content-sources?ruleSystem={Rules2014|Rules2024}` (overlay-source options from opposite ruleset)
+10. `GET /characters/{characterId}`
+11. `PATCH /characters/{characterId}`
+12. `POST /characters/{characterId}/archive`
+13. `POST /characters/{characterId}/duplicate`
+14. `GET /characters/{characterId}/history`
 
 ### Local auth
 1. `POST /auth/local/register`
@@ -178,6 +186,8 @@ The React app now uses persisted build/inventory/computation endpoints for core 
 ### Content catalogs (database-backed)
 1. `GET /catalog/classes?ruleSystem={Rules2014|Rules2024}`
 2. `GET /catalog/items`
+3. `GET /catalog/content-sources?ruleSystem={Rules2014|Rules2024}`
+4. `GET /catalog/modules?baseRuleSystem={Rules2014|Rules2024}&mixedMode={true|false}&overlaySources=...&moduleTypes=...`
 
 ## Documentation update policy
 For this repository, **README.md must be updated whenever behavior, setup steps, or user workflows change**. Treat README updates as part of done criteria for every future feature phase.

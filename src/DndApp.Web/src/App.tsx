@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import {
   addInventoryItem,
@@ -13,6 +13,8 @@ import {
   getCharacterInventory,
   getCharacters,
   getClassCatalog,
+  getContentSources,
+  getModuleCatalog,
   getItemCatalog,
   health,
   loginLocal,
@@ -36,8 +38,10 @@ import type {
   CharacterSummary,
   CharacterWizardResult,
   ClassCatalogItem,
+  ContentSourceCatalogItem,
   ItemCatalogItem,
   LocalSession,
+  ModuleCatalogItem,
   RuleSystemMode,
   SkillName,
 } from './types'
@@ -122,14 +126,20 @@ function App() {
   const [wizardName, setWizardName] = useState('New Adventurer')
   const [baseRules, setBaseRules] = useState<RuleSystemMode>('Rules2024')
   const [mixedMode, setMixedMode] = useState(false)
-  const [overlaySources, setOverlaySources] = useState('PHB2014')
+  const [overlaySourceOptions, setOverlaySourceOptions] = useState<ContentSourceCatalogItem[]>([])
+  const [overlaySources, setOverlaySources] = useState<string[]>([])
   const [activeDraft, setActiveDraft] = useState<CharacterWizardResult | null>(null)
   const [selectionStepName, setSelectionStepName] = useState('class')
   const [selectionModuleId, setSelectionModuleId] = useState('class-fighter')
   const [selectionSourceCode, setSelectionSourceCode] = useState('PHB2024')
 
   const [classCatalog, setClassCatalog] = useState<ClassCatalogItem[]>([])
+  const [moduleCatalog, setModuleCatalog] = useState<ModuleCatalogItem[]>([])
   const [selectedClassModuleId, setSelectedClassModuleId] = useState('')
+  const [selectedRaceModuleId, setSelectedRaceModuleId] = useState('')
+  const [selectedBackgroundModuleId, setSelectedBackgroundModuleId] = useState('')
+  const [secondaryClassModuleId, setSecondaryClassModuleId] = useState('')
+  const [multiClassSelections, setMultiClassSelections] = useState<Array<{ moduleId: string; level: number }>>([])
   const [classCatalogResult, setClassCatalogResult] = useState('')
 
   const [buildMethod, setBuildMethod] = useState<BuildMethod>('PointBuy')
@@ -137,7 +147,7 @@ function App() {
   const [pointBuyScores, setPointBuyScores] = useState<Record<AbilityName, number>>({ ...DEFAULT_SCORES })
   const [rolledPool, setRolledPool] = useState<number[]>([])
   const [rollAssignments, setRollAssignments] = useState<Partial<Record<AbilityName, number>>>({})
-  const [proficiencyBonus, setProficiencyBonus] = useState(2)
+  const [characterLevel, setCharacterLevel] = useState(1)
   const [proficientSkills, setProficientSkills] = useState<SkillName[]>([])
   const [savedBuild, setSavedBuild] = useState<CharacterBuildData | null>(null)
   const [buildResult, setBuildResult] = useState('')
@@ -161,6 +171,19 @@ function App() {
     [selectedCharacterId, activeDraft?.draft?.characterId],
   )
 
+  const classOptions = useMemo(
+    () => moduleCatalog.filter((x) => x.moduleType.toLowerCase() === 'class'),
+    [moduleCatalog],
+  )
+  const raceOptions = useMemo(
+    () => moduleCatalog.filter((x) => x.moduleType.toLowerCase() === 'race' || x.moduleType.toLowerCase() === 'species'),
+    [moduleCatalog],
+  )
+  const backgroundOptions = useMemo(
+    () => moduleCatalog.filter((x) => x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin'),
+    [moduleCatalog],
+  )
+
   const rolledScores = useMemo<Record<AbilityName, number>>(
     () =>
       ABILITIES.reduce(
@@ -181,10 +204,37 @@ function App() {
     return pointBuyScores
   }, [buildMethod, manualScores, pointBuyScores, rolledScores])
 
+  const raceBonuses = useMemo(() => {
+    const selected = raceOptions.find((x) => x.moduleId === selectedRaceModuleId)
+    return selected?.abilityBonuses ?? {}
+  }, [raceOptions, selectedRaceModuleId])
+
+  const backgroundBonuses = useMemo(() => {
+    const selected = backgroundOptions.find((x) => x.moduleId === selectedBackgroundModuleId)
+    return selected?.abilityBonuses ?? {}
+  }, [backgroundOptions, selectedBackgroundModuleId])
+
+  const totalAbilityScores = useMemo<Record<AbilityName, number>>(() => {
+    const combined = { ...activeAbilityScores }
+    for (const ability of ABILITIES) {
+      const raceBonus = raceBonuses[ability] ?? 0
+      const backgroundBonus = backgroundBonuses[ability] ?? 0
+      combined[ability] = Math.max(1, Math.min(30, combined[ability] + raceBonus + backgroundBonus))
+    }
+    return combined
+  }, [activeAbilityScores, raceBonuses, backgroundBonuses])
+
+  const totalCharacterLevel = useMemo(
+    () => characterLevel + multiClassSelections.reduce((sum, entry) => sum + entry.level, 0),
+    [characterLevel, multiClassSelections],
+  )
+
   const pointBuySpent = useMemo(
     () => ABILITIES.reduce((sum, ability) => sum + POINT_BUY_COST[pointBuyScores[ability]], 0),
     [pointBuyScores],
   )
+
+  const proficiencyBonus = useMemo(() => Math.floor((totalCharacterLevel - 1) / 4) + 2, [totalCharacterLevel])
 
   useEffect(() => {
     health()
@@ -193,18 +243,47 @@ function App() {
   }, [])
 
   async function loadCatalogData(ruleSystem: RuleSystemMode) {
-    const [classes, items, guidance] = await Promise.all([
+    const [classes, modules, items, guidance, sources] = await Promise.all([
       getClassCatalog(ruleSystem),
+      getModuleCatalog({
+        baseRuleSystem: ruleSystem,
+        mixedMode,
+        overlaySources,
+        moduleTypes: ['class', 'race', 'species', 'background', 'origin', 'subclass', 'feat', 'spell'],
+      }),
       getItemCatalog(),
       getAttunementGuidance(),
+      getContentSources(ruleSystem),
     ])
     setClassCatalog(classes)
+    setModuleCatalog(modules)
     setItemCatalog(items)
     setAttunementGuidance(JSON.stringify(guidance, null, 2))
+    setOverlaySourceOptions(sources)
+    setOverlaySources((prev) => prev.filter((code) => sources.some((src) => src.sourceCode === code)))
     if (!selectedClassModuleId && classes.length > 0) {
       setSelectedClassModuleId(classes[0].moduleId)
       setSelectionModuleId(classes[0].moduleId)
       setSelectionSourceCode(classes[0].sourceCode)
+    } else if (!selectedClassModuleId) {
+      const firstClass = modules.find((x) => x.moduleType.toLowerCase() === 'class')
+      if (firstClass) {
+        setSelectedClassModuleId(firstClass.moduleId)
+        setSelectionModuleId(firstClass.moduleId)
+        setSelectionSourceCode(firstClass.sourceCode)
+      }
+    }
+    if (!selectedRaceModuleId) {
+      const firstRace = modules.find((x) => x.moduleType.toLowerCase() === 'race' || x.moduleType.toLowerCase() === 'species')
+      if (firstRace) {
+        setSelectedRaceModuleId(firstRace.moduleId)
+      }
+    }
+    if (!selectedBackgroundModuleId) {
+      const firstBackground = modules.find((x) => x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin')
+      if (firstBackground) {
+        setSelectedBackgroundModuleId(firstBackground.moduleId)
+      }
     }
     if (!selectedCatalogItemId && items.length > 0) {
       setSelectedCatalogItemId(items[0].itemId)
@@ -219,7 +298,7 @@ function App() {
       setWizardName(build.characterName)
       setBaseRules(build.baseRuleSystem)
       setSelectedClassModuleId(build.classModuleId)
-      setProficiencyBonus(build.proficiencyBonus)
+      setCharacterLevel(build.level)
       setProficientSkills(build.proficientSkills)
       setManualScores(build.abilityScores)
       setPointBuyScores(build.abilityScores)
@@ -242,7 +321,7 @@ function App() {
   }
 
   async function refreshCharacters() {
-    const list = await getCharacters(true)
+    const list = await getCharacters(true, true)
     setCharacters(list)
     if (!selectedCharacterId && list.length > 0) {
       setSelectedCharacterId(list[0].characterId)
@@ -270,6 +349,17 @@ function App() {
     }
   }
 
+  function handleLogout() {
+    setSession(null)
+    setSessionToken(null)
+    setCharacters([])
+    setSelectedCharacterId('')
+    setHistory([])
+    setSavedBuild(null)
+    setInventoryState(null)
+    setActiveDraft(null)
+  }
+
   async function handleBaseRulesChange(ruleSystem: RuleSystemMode) {
     try {
       setBaseRules(ruleSystem)
@@ -288,12 +378,7 @@ function App() {
         characterName: wizardName,
         baseRuleSystem: baseRules,
         mixedModeEnabled: mixedMode,
-        overlaySources: mixedMode
-          ? overlaySources
-              .split(',')
-              .map((x) => x.trim())
-              .filter(Boolean)
-          : [],
+        overlaySources: mixedMode ? overlaySources : [],
       })
       setActiveDraft(result)
       if (result.draft?.characterId) {
@@ -326,19 +411,65 @@ function App() {
   async function handleApplySelectedClassToWizard() {
     if (!activeDraft?.draft || !selectedClassModuleId) return
     const selectedClass = classCatalog.find((x) => x.moduleId === selectedClassModuleId)
-    if (!selectedClass) return
+    const selectedClassModule = classOptions.find((x) => x.moduleId === selectedClassModuleId)
+    if (!selectedClass && !selectedClassModule) return
     try {
-      const result = await submitWizardStep(activeDraft.draft.characterId, 'class', [
+      const classSelections = [
         {
           slot: 'class',
-          moduleId: selectedClass.moduleId,
-          sourceCode: selectedClass.sourceCode,
+          moduleId: selectedClassModuleId,
+          sourceCode: selectedClassModule?.sourceCode ?? selectedClass?.sourceCode ?? '',
           compatible2014: true,
           compatible2024: true,
         },
-      ])
+        ...multiClassSelections.map((entry) => {
+          const option = classOptions.find((x) => x.moduleId === entry.moduleId)
+          return {
+            slot: 'class',
+            moduleId: entry.moduleId,
+            sourceCode: option?.sourceCode ?? '',
+            compatible2014: true,
+            compatible2024: true,
+          }
+        }),
+      ]
+
+      let result = await submitWizardStep(activeDraft.draft.characterId, 'class', classSelections)
+
+      if (selectedRaceModuleId) {
+        const race = raceOptions.find((x) => x.moduleId === selectedRaceModuleId)
+        if (race) {
+          result = await submitWizardStep(activeDraft.draft.characterId, 'race', [
+            {
+              slot: 'race',
+              moduleId: race.moduleId,
+              sourceCode: race.sourceCode,
+              compatible2014: true,
+              compatible2024: true,
+            },
+          ])
+        }
+      }
+
+      if (selectedBackgroundModuleId) {
+        const background = backgroundOptions.find((x) => x.moduleId === selectedBackgroundModuleId)
+        if (background) {
+          result = await submitWizardStep(activeDraft.draft.characterId, 'background', [
+            {
+              slot: 'background',
+              moduleId: background.moduleId,
+              sourceCode: background.sourceCode,
+              compatible2014: true,
+              compatible2024: true,
+            },
+          ])
+        }
+      }
+
       setActiveDraft(result)
-      setClassCatalogResult(`Submitted class selection: ${selectedClass.className}`)
+      setClassCatalogResult(
+        `Submitted selections: primary class + ${multiClassSelections.length} multiclass entries, race/background selections.`,
+      )
     } catch (e) {
       setError(String(e))
     }
@@ -366,21 +497,34 @@ function App() {
       return
     }
     const selectedClass = classCatalog.find((x) => x.moduleId === selectedClassModuleId)
-    if (!selectedClass) {
+    const selectedClassFromModules = classOptions.find((x) => x.moduleId === selectedClassModuleId)
+    const primaryClassName = selectedClass?.className ?? selectedClassFromModules?.displayName
+    if (!primaryClassName) {
       setError('Select a class before saving the build.')
+      return
+    }
+    if (totalCharacterLevel > 20) {
+      setError('Total character level across all classes must be 20 or lower.')
       return
     }
 
     try {
+      const secondarySummary = multiClassSelections
+        .map((entry) => {
+          const option = classOptions.find((x) => x.moduleId === entry.moduleId)
+          return option ? `${option.displayName} ${entry.level}` : `${entry.moduleId} ${entry.level}`
+        })
+        .join(', ')
+
       const saved = await upsertCharacterBuild(currentCharacterId, {
         characterName: wizardName,
         baseRuleSystem: baseRules,
         buildMethod,
-        classModuleId: selectedClass.moduleId,
-        className: selectedClass.className,
-        level: 1,
+        classModuleId: selectedClassModuleId,
+        className: secondarySummary ? `${primaryClassName} (Primary); ${secondarySummary}` : primaryClassName,
+        level: totalCharacterLevel,
         proficiencyBonus,
-        abilityScores: activeAbilityScores,
+        abilityScores: totalAbilityScores,
         proficientSkills,
       })
       setSavedBuild(saved)
@@ -414,6 +558,27 @@ function App() {
     if (!selectedCharacterId) return
     await copyToRuleset(selectedCharacterId, baseRules === 'Rules2024' ? 'Rules2014' : 'Rules2024')
     await refreshCharacters()
+  }
+
+  function handleOverlaySourcesChange(event: ChangeEvent<HTMLSelectElement>) {
+    const selected = Array.from(event.target.selectedOptions).map((x) => x.value)
+    setOverlaySources(selected)
+  }
+
+  function addMultiClassSelection() {
+    if (!secondaryClassModuleId) return
+    if (secondaryClassModuleId === selectedClassModuleId) return
+    if (multiClassSelections.some((x) => x.moduleId === secondaryClassModuleId)) return
+    setMultiClassSelections((prev) => [...prev, { moduleId: secondaryClassModuleId, level: 1 }])
+  }
+
+  function removeMultiClassSelection(moduleId: string) {
+    setMultiClassSelections((prev) => prev.filter((x) => x.moduleId !== moduleId))
+  }
+
+  function setMultiClassLevel(moduleId: string, level: number) {
+    const bounded = Math.max(1, Math.min(20, level))
+    setMultiClassSelections((prev) => prev.map((x) => (x.moduleId === moduleId ? { ...x, level: bounded } : x)))
   }
 
   function toggleProficientSkill(skill: SkillName) {
@@ -536,7 +701,7 @@ function App() {
 
   function skillModifier(skill: SkillName) {
     const ability = SKILL_ABILITY[skill]
-    const abilityMod = abilityModifier(activeAbilityScores[ability])
+    const abilityMod = abilityModifier(totalAbilityScores[ability])
     const prof = proficientSkills.includes(skill) ? proficiencyBonus : 0
     return abilityMod + prof
   }
@@ -544,30 +709,50 @@ function App() {
   return (
     <main className="layout">
       <header>
-        <h1>DndAppName Frontend</h1>
+        <h1>Welcome to DndAppName</h1>
         <p>{status}</p>
       </header>
 
       {error && <p className="error">{error}</p>}
 
-      <section className="card">
-        <h2>1. Local session</h2>
-        <div className="row">
-          <input value={loginName} onChange={(e) => setLoginName(e.target.value)} placeholder="Username" />
-          <input
-            type="password"
-            value={loginPassword}
-            onChange={(e) => setLoginPassword(e.target.value)}
-            placeholder="Password"
-          />
-          <label>
-            <input type="checkbox" checked={isRegisterMode} onChange={(e) => setIsRegisterMode(e.target.checked)} /> Register
-            new user
-          </label>
-          <button onClick={handleLogin}>{isRegisterMode ? 'Register + Start Session' : 'Start Session'}</button>
-        </div>
-        {session && <p>Session: {session.userName} ({session.sessionToken.slice(0, 10)}...)</p>}
-      </section>
+      {!session ? (
+        <>
+          <section className="card">
+            <h2>Login</h2>
+            <div className="row">
+              <input value={loginName} onChange={(e) => setLoginName(e.target.value)} placeholder="Username" />
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="Password"
+              />
+              <label>
+                <input type="checkbox" checked={isRegisterMode} onChange={(e) => setIsRegisterMode(e.target.checked)} /> Register
+                new user
+              </label>
+              <button onClick={handleLogin}>{isRegisterMode ? 'Register + Start Session' : 'Start Session'}</button>
+            </div>
+          </section>
+          <section className="card">
+            <h2>About DndAppName</h2>
+            <p>
+              Build and manage D&D characters across 2014 and 2024 rules, mix content sources when allowed, run
+              persisted skill checks, and manage attunement-aware inventory from the shared rules database.
+            </p>
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="card">
+            <h2>Session</h2>
+            <div className="row">
+              <p>
+                Signed in as <strong>{session.userName}</strong> ({session.sessionToken.slice(0, 10)}...)
+              </p>
+              <button onClick={handleLogout}>Log out</button>
+            </div>
+          </section>
 
       <section className="card">
         <h2>2. Character build setup</h2>
@@ -583,22 +768,111 @@ function App() {
             <option value="Roll">Roll</option>
           </select>
           <label>
-            <input type="checkbox" checked={mixedMode} onChange={(e) => setMixedMode(e.target.checked)} /> Mixed mode
+            <input
+              type="checkbox"
+              checked={mixedMode}
+              onChange={(e) => {
+                const nextMixedMode = e.target.checked
+                setMixedMode(nextMixedMode)
+                if (!nextMixedMode) {
+                  setOverlaySources([])
+                }
+              }}
+            />{' '}
+            Mixed mode
           </label>
-          <input
-            value={overlaySources}
-            onChange={(e) => setOverlaySources(e.target.value)}
-            placeholder="Overlay sources (comma separated)"
-            disabled={!mixedMode}
-          />
+          <select multiple value={overlaySources} onChange={handleOverlaySourcesChange} disabled={!mixedMode}>
+            {overlaySourceOptions.length === 0 ? (
+              <option value="">No overlay sources available</option>
+            ) : (
+              overlaySourceOptions.map((source) => (
+                <option key={source.sourceCode} value={source.sourceCode}>
+                  {source.sourceCode} - {source.sourceName}
+                </option>
+              ))
+            )}
+          </select>
           <input
             type="number"
             min={1}
-            max={8}
-            value={proficiencyBonus}
-            onChange={(e) => setProficiencyBonus(Number(e.target.value))}
-            placeholder="Proficiency bonus"
+            max={20}
+            value={characterLevel}
+            onChange={(e) => setCharacterLevel(Math.max(1, Math.min(20, Number(e.target.value))))}
+            placeholder="Character level"
           />
+        </div>
+        <div className="row">
+          <button onClick={() => void loadCatalogData(baseRules)} disabled={!session}>
+            Refresh content catalogs
+          </button>
+        </div>
+        <p>
+          Total level: {totalCharacterLevel} | Proficiency bonus: +{proficiencyBonus}
+        </p>
+        <div className="grid">
+          <select value={selectedRaceModuleId} onChange={(e) => setSelectedRaceModuleId(e.target.value)}>
+            {raceOptions.length === 0 ? (
+              <option value="">No race/species modules found</option>
+            ) : (
+              raceOptions.map((item) => (
+                <option key={item.moduleId} value={item.moduleId}>
+                  {item.displayName} ({item.sourceCode})
+                </option>
+              ))
+            )}
+          </select>
+          <select value={selectedBackgroundModuleId} onChange={(e) => setSelectedBackgroundModuleId(e.target.value)}>
+            {backgroundOptions.length === 0 ? (
+              <option value="">No background/origin modules found</option>
+            ) : (
+              backgroundOptions.map((item) => (
+                <option key={item.moduleId} value={item.moduleId}>
+                  {item.displayName} ({item.sourceCode})
+                </option>
+              ))
+            )}
+          </select>
+          <select value={secondaryClassModuleId} onChange={(e) => setSecondaryClassModuleId(e.target.value)}>
+            <option value="">Add multiclass option...</option>
+            {classOptions
+              .filter((x) => x.moduleId !== selectedClassModuleId)
+              .map((item) => (
+                <option key={item.moduleId} value={item.moduleId}>
+                  {item.displayName} ({item.sourceCode})
+                </option>
+              ))}
+          </select>
+          <button onClick={addMultiClassSelection} disabled={!selectedClassModuleId || !secondaryClassModuleId}>
+            Add multiclass
+          </button>
+        </div>
+        {multiClassSelections.length > 0 && (
+          <div className="list">
+            {multiClassSelections.map((entry) => {
+              const option = classOptions.find((x) => x.moduleId === entry.moduleId)
+              return (
+                <div key={entry.moduleId} className="row">
+                  <span>{option?.displayName ?? entry.moduleId}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={entry.level}
+                    onChange={(e) => setMultiClassLevel(entry.moduleId, Number(e.target.value))}
+                  />
+                  <button onClick={() => removeMultiClassSelection(entry.moduleId)}>Remove</button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <div className="row">
+          <small>Race/Species bonuses: {Object.entries(raceBonuses).map(([k, v]) => `${k}+${v}`).join(', ') || 'None'}</small>
+        </div>
+        <div className="row">
+          <small>
+            Background/Origin bonuses: {Object.entries(backgroundBonuses).map(([k, v]) => `${k}+${v}`).join(', ') || 'None'}
+          </small>
         </div>
 
         {buildMethod === 'PointBuy' && <p>Point-buy spent: {pointBuySpent}/27</p>}
@@ -666,8 +940,8 @@ function App() {
                 </div>
               )}
               <small>
-                mod {abilityModifier(activeAbilityScores[ability]) >= 0 ? '+' : ''}
-                {abilityModifier(activeAbilityScores[ability])}
+                total {totalAbilityScores[ability]} | mod {abilityModifier(totalAbilityScores[ability]) >= 0 ? '+' : ''}
+                {abilityModifier(totalAbilityScores[ability])}
               </small>
             </label>
           ))}
@@ -681,22 +955,38 @@ function App() {
         </button>
         <div className="row">
           <select value={selectedClassModuleId} onChange={(e) => setSelectedClassModuleId(e.target.value)}>
-            {classCatalog.length === 0 ? (
+            {classCatalog.length === 0 && classOptions.length === 0 ? (
               <option value="">No class modules found in DB</option>
             ) : (
-              classCatalog.map((item) => (
-                <option key={item.moduleId} value={item.moduleId}>
-                  {item.className} ({item.sourceCode})
-                </option>
-              ))
+              <>
+                {classCatalog.map((item) => (
+                  <option key={item.moduleId} value={item.moduleId}>
+                    {item.className} ({item.sourceCode})
+                  </option>
+                ))}
+                {classOptions
+                  .filter((item) => !classCatalog.some((legacy) => legacy.moduleId === item.moduleId))
+                  .map((item) => (
+                    <option key={item.moduleId} value={item.moduleId}>
+                      {item.displayName} ({item.sourceCode})
+                    </option>
+                  ))}
+              </>
             )}
           </select>
-          <button onClick={handleApplySelectedClassToWizard} disabled={!activeDraft?.draft || classCatalog.length === 0}>
+          <button
+            onClick={handleApplySelectedClassToWizard}
+            disabled={!activeDraft?.draft || (classCatalog.length === 0 && classOptions.length === 0)}
+          >
             Apply selected class to wizard
           </button>
           <button
             onClick={handleSaveBuildToDb}
-            disabled={!currentCharacterId || classCatalog.length === 0 || (buildMethod === 'Roll' && !isRollAssignmentComplete)}
+            disabled={
+              !currentCharacterId ||
+              (classCatalog.length === 0 && classOptions.length === 0) ||
+              (buildMethod === 'Roll' && !isRollAssignmentComplete)
+            }
           >
             Save build to persistent model
           </button>
@@ -721,7 +1011,7 @@ function App() {
       </section>
 
       <section className="card">
-        <h2>4. Character library</h2>
+        <h2>4. Your characters</h2>
         <div className="row">
           <button onClick={refreshCharacters} disabled={!session}>
             Refresh
@@ -733,9 +1023,9 @@ function App() {
         <ul className="list">
           {characters.map((c) => (
             <li key={c.characterId} className={selectedCharacterId === c.characterId ? 'selected' : ''}>
-              <button onClick={() => void handleSelectCharacter(c.characterId)}>{c.characterName}</button>
-              <span>{c.baseRuleSystem}</span>
-              <button onClick={() => void handleArchive(c.characterId)}>Archive</button>
+                <button onClick={() => void handleSelectCharacter(c.characterId)}>{c.characterName}</button>
+                <span className="ruleset-badge">{c.baseRuleSystem}</span>
+                <button onClick={() => void handleArchive(c.characterId)}>Archive</button>
               <button onClick={() => void handleDuplicate(c.characterId)}>Duplicate</button>
               <button onClick={() => void handleLoadHistory(c.characterId)}>History</button>
             </li>
@@ -836,6 +1126,8 @@ function App() {
         {originPreview && <pre>{originPreview}</pre>}
         {speciesPreview && <pre>{speciesPreview}</pre>}
       </section>
+        </>
+      )}
     </main>
   )
 }

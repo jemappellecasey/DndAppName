@@ -88,6 +88,21 @@ export interface ClassCatalogItem {
   versionTag: string
 }
 
+export interface ContentSourceCatalogItem {
+  sourceCode: string
+  sourceName: string
+  ruleSystem: RuleSystemMode
+}
+
+export interface ModuleCatalogItem {
+  moduleId: string
+  moduleType: string
+  displayName: string
+  sourceCode: string
+  versionTag: string
+  abilityBonuses: Record<string, number>
+}
+
 export interface ItemCatalogEffect {
   effectId: string
   effectType: string

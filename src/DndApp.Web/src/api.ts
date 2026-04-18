@@ -5,8 +5,10 @@ import type {
   CharacterSummary,
   CharacterWizardResult,
   ClassCatalogItem,
+  ContentSourceCatalogItem,
   ItemCatalogItem,
   LocalSession,
+  ModuleCatalogItem,
   PersistedComputeCheckPayload,
   RuleModuleSelection,
   RuleSystemMode,
@@ -64,12 +66,35 @@ export function getLocalMe() {
   return request<LocalSession>('/auth/local/me')
 }
 
-export function getCharacters(includeArchived = true) {
-  return request<CharacterSummary[]>(`/characters?includeArchived=${includeArchived}`)
+export function getCharacters(includeArchived = true, mine = false) {
+  return request<CharacterSummary[]>(`/characters?includeArchived=${includeArchived}&mine=${mine}`)
 }
 
 export function getClassCatalog(ruleSystem: RuleSystemMode) {
   return request<ClassCatalogItem[]>(`/catalog/classes?ruleSystem=${ruleSystem}`)
+}
+
+export function getContentSources(ruleSystem: RuleSystemMode) {
+  return request<ContentSourceCatalogItem[]>(`/catalog/content-sources?ruleSystem=${ruleSystem}`)
+}
+
+export function getModuleCatalog(input: {
+  baseRuleSystem: RuleSystemMode
+  mixedMode: boolean
+  overlaySources: string[]
+  moduleTypes: string[]
+}) {
+  const query = new URLSearchParams()
+  query.set('baseRuleSystem', input.baseRuleSystem)
+  query.set('mixedMode', String(input.mixedMode))
+  for (const source of input.overlaySources) {
+    query.append('overlaySources', source)
+  }
+  for (const moduleType of input.moduleTypes) {
+    query.append('moduleTypes', moduleType)
+  }
+
+  return request<ModuleCatalogItem[]>(`/catalog/modules?${query.toString()}`)
 }
 
 export function getItemCatalog() {
