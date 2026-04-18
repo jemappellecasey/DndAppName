@@ -179,6 +179,10 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.RuleModuleId).HasMaxLength(64);
             entity.Property(x => x.ItemType).HasMaxLength(80);
             entity.Property(x => x.Rarity).HasMaxLength(40);
+            entity.Property(x => x.GoldValue).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.Weight).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.DamageDice).HasMaxLength(40);
+            entity.Property(x => x.WeaponAbility).HasMaxLength(24);
             entity.Property(x => x.ChargesModelJson).HasColumnType("TEXT");
             entity.HasOne<RuleModuleEntity>()
                 .WithMany()
@@ -248,6 +252,7 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.CharacterId).HasMaxLength(36);
             entity.Property(x => x.ItemDefinitionId).HasMaxLength(64);
             entity.Property(x => x.ItemName).HasMaxLength(300);
+            entity.Property(x => x.Quantity).HasDefaultValue(1);
             entity.HasIndex(x => x.CharacterId);
             entity.HasIndex(x => x.ItemDefinitionId);
             entity.HasOne<CharacterSheetEntity>()

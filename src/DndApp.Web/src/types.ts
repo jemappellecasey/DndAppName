@@ -101,6 +101,10 @@ export interface ModuleCatalogItem {
   sourceCode: string
   versionTag: string
   abilityBonuses: Record<string, number>
+  fixedSkillProficiencies: SkillName[]
+  skillChoices: SkillName[]
+  skillChoiceCount: number
+  expertiseChoiceCount: number
 }
 
 export interface ItemCatalogEffect {
@@ -117,6 +121,13 @@ export interface ItemCatalogItem {
   itemType: string
   rarity: string
   requiresAttunement: boolean
+  goldValue: number
+  weight: number
+  isWeapon: boolean
+  damageDice: string
+  weaponAbility: string
+  attackBonus: number
+  damageBonus: number
   effects: ItemCatalogEffect[]
 }
 
@@ -219,9 +230,18 @@ export interface CharacterInventoryItemData {
   inventoryItemId: string
   itemDefinitionId: string
   itemName: string
+  itemType: string
+  goldValue: number
+  weight: number
+  quantity: number
   requiresAttunement: boolean
   isEquipped: boolean
   isAttuned: boolean
+  isWeapon: boolean
+  damageDice: string
+  weaponAbility: string
+  attackBonus: number
+  damageBonus: number
 }
 
 export interface CharacterInventoryState {

@@ -41,6 +41,10 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
         {
             return (null, new[] { "Item definition id is required." });
         }
+        if (request.Quantity <= 0)
+        {
+            return (null, new[] { "Quantity must be greater than zero." });
+        }
 
         var characterIdText = characterId.ToString();
         var sheet = await _db.CharacterSheets.AsNoTracking().SingleOrDefaultAsync(x => x.CharacterId == characterIdText, cancellationToken);
@@ -78,21 +82,33 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
             select module.DisplayName)
             .SingleOrDefaultAsync(cancellationToken) ?? request.ItemDefinitionId;
 
-        var now = DateTimeOffset.UtcNow;
-        var inventoryItem = new CharacterInventoryItemEntity
+        var existingInventoryItem = await _db.CharacterInventoryItems
+            .SingleOrDefaultAsync(
+                x => x.CharacterId == characterIdText && x.ItemDefinitionId == itemDefinition.Id,
+                cancellationToken);
+        if (existingInventoryItem is not null)
         {
-            InventoryItemId = Guid.NewGuid().ToString("N"),
-            CharacterId = characterIdText,
-            ItemDefinitionId = itemDefinition.Id,
-            ItemName = itemName,
-            RequiresAttunement = itemDefinition.RequiresAttunement,
-            IsEquipped = false,
-            IsAttuned = false,
-            AddedAtUtc = now,
-            UpdatedAtUtc = now,
-        };
-
-        _db.CharacterInventoryItems.Add(inventoryItem);
+            existingInventoryItem.Quantity += request.Quantity;
+            existingInventoryItem.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        }
+        else
+        {
+            var now = DateTimeOffset.UtcNow;
+            var inventoryItem = new CharacterInventoryItemEntity
+            {
+                InventoryItemId = Guid.NewGuid().ToString("N"),
+                CharacterId = characterIdText,
+                ItemDefinitionId = itemDefinition.Id,
+                ItemName = itemName,
+                RequiresAttunement = itemDefinition.RequiresAttunement,
+                Quantity = request.Quantity,
+                IsEquipped = false,
+                IsAttuned = false,
+                AddedAtUtc = now,
+                UpdatedAtUtc = now,
+            };
+            _db.CharacterInventoryItems.Add(inventoryItem);
+        }
         await _db.SaveChangesAsync(cancellationToken);
 
         var state = await BuildInventoryStateAsync(characterId, Array.Empty<string>(), Array.Empty<string>(), cancellationToken);
@@ -164,6 +180,10 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
             }
             row.IsEquipped = updated.IsEquipped;
             row.IsAttuned = updated.IsAttuned;
+            if (row.InventoryItemId == inventoryItemId && request.Quantity is not null)
+            {
+                row.Quantity = Math.Max(1, request.Quantity.Value);
+            }
             row.UpdatedAtUtc = now;
         }
 
@@ -239,9 +259,18 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
             x.ItemId,
             inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId,
             x.ItemName,
+            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].ItemType,
+            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].GoldValue,
+            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].Weight,
+            inventory.Single(row => row.InventoryItemId == x.ItemId).Quantity,
             x.RequiresAttunement,
             x.IsEquipped,
-            x.IsAttuned)).ToArray();
+            x.IsAttuned,
+            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].IsWeapon,
+            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].DamageDice,
+            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].WeaponAbility,
+            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].AttackBonus,
+            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].DamageBonus)).ToArray();
 
         return new CharacterInventoryState(
             characterId,

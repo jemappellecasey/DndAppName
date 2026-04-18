@@ -40,6 +40,13 @@ public sealed class ItemDefinitionEntity
     public string ItemType { get; set; } = string.Empty;
     public string Rarity { get; set; } = string.Empty;
     public bool RequiresAttunement { get; set; }
+    public decimal GoldValue { get; set; }
+    public decimal Weight { get; set; }
+    public bool IsWeapon { get; set; }
+    public string DamageDice { get; set; } = string.Empty;
+    public string WeaponAbility { get; set; } = string.Empty;
+    public int AttackBonus { get; set; }
+    public int DamageBonus { get; set; }
     public string ChargesModelJson { get; set; } = "{}";
 }
 

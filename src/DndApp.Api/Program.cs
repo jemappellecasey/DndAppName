@@ -94,7 +94,7 @@ app.MapGet(
     {
         var classes = await (
             from module in db.RuleModules
-            where EF.Functions.Like(module.ModuleType, "%class%")
+            where module.ModuleType == "class"
             join source in db.ContentSources on module.ContentSourceId equals source.Id into sourceJoin
             from source in sourceJoin.DefaultIfEmpty()
             where source == null
@@ -109,7 +109,20 @@ app.MapGet(
                 module.VersionTag))
             .ToArrayAsync(cancellationToken);
 
-        return Results.Ok(classes);
+        var knownClassNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Artificer", "Barbarian", "Bard", "Cleric", "Druid", "Fighter",
+            "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"
+        };
+
+        var deduped = classes
+            .GroupBy(x => $"{x.ClassName}\u001F{x.SourceCode}".ToUpperInvariant())
+            .Select(g => g.First())
+            .Where(x => knownClassNames.Contains(x.ClassName))
+            .OrderBy(x => x.ClassName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return Results.Ok(deduped);
     });
 
 app.MapGet(
@@ -130,6 +143,13 @@ app.MapGet(
                 item.ItemType,
                 item.Rarity,
                 item.RequiresAttunement,
+                item.GoldValue,
+                item.Weight,
+                item.IsWeapon,
+                item.DamageDice,
+                item.WeaponAbility,
+                item.AttackBonus,
+                item.DamageBonus,
                 Array.Empty<ItemCatalogEffect>()))
             .ToArrayAsync(cancellationToken);
 
@@ -234,14 +254,20 @@ app.MapGet(
 
         var filtered = rows
             .Where(x => requestedModuleTypes.Count == 0 || requestedModuleTypes.Contains(x.Module.ModuleType))
-            .OrderBy(x => x.Module.DisplayName)
+            .GroupBy(x => $"{x.Module.ModuleType}\u001F{x.Module.DisplayName}\u001F{x.Source.Code}".ToUpperInvariant())
+            .Select(g => g.First())
+            .OrderBy(x => x.Module.DisplayName, StringComparer.OrdinalIgnoreCase)
             .Select(x => new ModuleCatalogItem(
                 x.Module.Id,
                 x.Module.ModuleType,
                 x.Module.DisplayName,
                 x.Source.Code,
                 x.Module.VersionTag,
-                CatalogParsing.ParseAbilityBonuses(x.VariantPayloadJson)))
+                CatalogParsing.ParseAbilityBonuses(x.VariantPayloadJson),
+                CatalogParsing.ParseStringArray(x.VariantPayloadJson, "fixedSkillProficiencies"),
+                CatalogParsing.ParseStringArray(x.VariantPayloadJson, "skillChoices"),
+                CatalogParsing.ParseInt(x.VariantPayloadJson, "skillChoiceCount"),
+                CatalogParsing.ParseInt(x.VariantPayloadJson, "expertiseChoiceCount")))
             .ToArray();
 
         return Results.Ok(filtered);
@@ -743,6 +769,13 @@ public sealed record ItemCatalogItem(
     string ItemType,
     string Rarity,
     bool RequiresAttunement,
+    decimal GoldValue,
+    decimal Weight,
+    bool IsWeapon,
+    string DamageDice,
+    string WeaponAbility,
+    int AttackBonus,
+    int DamageBonus,
     IReadOnlyList<ItemCatalogEffect> Effects);
 
 public sealed record ContentSourceCatalogItem(
@@ -756,19 +789,34 @@ public sealed record ModuleCatalogItem(
     string DisplayName,
     string SourceCode,
     string VersionTag,
-    IReadOnlyDictionary<string, int> AbilityBonuses);
+    IReadOnlyDictionary<string, int> AbilityBonuses,
+    IReadOnlyList<string> FixedSkillProficiencies,
+    IReadOnlyList<string> SkillChoices,
+    int SkillChoiceCount,
+    int ExpertiseChoiceCount);
 
 public static class CatalogParsing
 {
-    public static IReadOnlyDictionary<string, int> ParseAbilityBonuses(string? payloadJson)
+    private static JsonElement? ParseRoot(string? payloadJson)
     {
         if (string.IsNullOrWhiteSpace(payloadJson))
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(payloadJson);
+        return document.RootElement.Clone();
+    }
+
+    public static IReadOnlyDictionary<string, int> ParseAbilityBonuses(string? payloadJson)
+    {
+        var root = ParseRoot(payloadJson);
+        if (root is null)
         {
             return new Dictionary<string, int>();
         }
 
-        using var document = JsonDocument.Parse(payloadJson);
-        if (!document.RootElement.TryGetProperty("abilityBonuses", out var bonusesElement) || bonusesElement.ValueKind != JsonValueKind.Object)
+        if (!root.Value.TryGetProperty("abilityBonuses", out var bonusesElement) || bonusesElement.ValueKind != JsonValueKind.Object)
         {
             return new Dictionary<string, int>();
         }
@@ -783,6 +831,49 @@ public static class CatalogParsing
         }
 
         return bonuses;
+    }
+
+    public static IReadOnlyList<string> ParseStringArray(string? payloadJson, string propertyName)
+    {
+        var root = ParseRoot(payloadJson);
+        if (root is null)
+        {
+            return Array.Empty<string>();
+        }
+
+        if (!root.Value.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<string>();
+        }
+
+        return value.EnumerateArray()
+            .Where(x => x.ValueKind == JsonValueKind.String)
+            .Select(x => x.GetString())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public static int ParseInt(string? payloadJson, string propertyName)
+    {
+        var root = ParseRoot(payloadJson);
+        if (root is null)
+        {
+            return 0;
+        }
+
+        if (!root.Value.TryGetProperty(propertyName, out var value))
+        {
+            return 0;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.Number when value.TryGetInt32(out var n) => n,
+            JsonValueKind.String when int.TryParse(value.GetString(), out var n) => n,
+            _ => 0
+        };
     }
 }
 
@@ -839,7 +930,7 @@ public static class EndpointAuth
             .SingleOrDefaultAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(ownerUserId))
         {
-            return Results.NotFound();
+            return null;
         }
 
         return string.Equals(ownerUserId, session.UserId, StringComparison.Ordinal)

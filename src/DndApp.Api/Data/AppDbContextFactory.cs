@@ -26,7 +26,7 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
         else
         {
             throw new InvalidOperationException(
-                $"Unsupported provider '{provider}' in design-time factory for this phase. Use 'sqlite' for now.");
+                $"Unsupported provider '{provider}' in design-time factory. Supported provider: 'sqlite'.");
         }
 
         return new AppDbContext(optionsBuilder.Options);

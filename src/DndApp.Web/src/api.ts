@@ -1,4 +1,5 @@
 import type {
+  AdvantageState,
   CharacterBuildData,
   CharacterHistoryEntry,
   CharacterInventoryState,
@@ -221,14 +222,18 @@ export function getCharacterInventory(characterId: string) {
   return request<CharacterInventoryState>(`/characters/${characterId}/inventory`)
 }
 
-export function addInventoryItem(characterId: string, itemDefinitionId: string) {
+export function addInventoryItem(characterId: string, itemDefinitionId: string, quantity = 1) {
   return request<CharacterInventoryState>(`/characters/${characterId}/inventory/items`, {
     method: 'POST',
-    body: JSON.stringify({ itemDefinitionId }),
+    body: JSON.stringify({ itemDefinitionId, quantity }),
   })
 }
 
-export function patchInventoryItem(characterId: string, inventoryItemId: string, payload: { isEquipped?: boolean; isAttuned?: boolean }) {
+export function patchInventoryItem(
+  characterId: string,
+  inventoryItemId: string,
+  payload: { isEquipped?: boolean; isAttuned?: boolean; quantity?: number },
+) {
   return request<CharacterInventoryState>(`/characters/${characterId}/inventory/items/${inventoryItemId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
@@ -243,6 +248,25 @@ export function removeInventoryItem(characterId: string, inventoryItemId: string
 
 export function computePersistedCheck(characterId: string, payload: PersistedComputeCheckPayload) {
   return request(`/characters/${characterId}/compute/check/persisted`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function computePersistedAttack(
+  characterId: string,
+  payload: {
+    weaponName: string
+    abilityName: string
+    isProficientWithWeapon: boolean
+    additionalAttackModifier: number
+    damageDice: string
+    additionalDamageModifier: number
+    advantageState: AdvantageState
+    rollDice: boolean
+  },
+) {
+  return request(`/characters/${characterId}/compute/attack/persisted`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })

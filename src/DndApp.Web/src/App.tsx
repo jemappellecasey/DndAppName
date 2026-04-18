@@ -4,6 +4,7 @@ import {
   addInventoryItem,
   archiveCharacter,
   computePersistedCheck,
+  computePersistedAttack,
   copyToRuleset,
   duplicateCharacter,
   finalizeWizard,
@@ -90,6 +91,8 @@ const SKILL_ABILITY: Record<SkillName, AbilityName> = {
   Survival: 'Wisdom',
 }
 
+type SkillTrainingLevel = 'None' | 'Proficient' | 'Expertise'
+
 const DEFAULT_SCORES: Record<AbilityName, number> = {
   Strength: 8,
   Dexterity: 8,
@@ -100,6 +103,50 @@ const DEFAULT_SCORES: Record<AbilityName, number> = {
 }
 
 const POINT_BUY_COST: Record<number, number> = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 }
+const KNOWN_CLASSES = new Set([
+  'Artificer',
+  'Barbarian',
+  'Bard',
+  'Cleric',
+  'Druid',
+  'Fighter',
+  'Monk',
+  'Paladin',
+  'Ranger',
+  'Rogue',
+  'Sorcerer',
+  'Warlock',
+  'Wizard',
+])
+const KNOWN_RACES = new Set([
+  'Aasimar',
+  'Dragonborn',
+  'Dwarf',
+  'Elf',
+  'Gnome',
+  'Goliath',
+  'Halfling',
+  'Human',
+  'Orc',
+  'Tiefling',
+  'Half-Elf',
+  'Half-Orc',
+])
+const KNOWN_BACKGROUNDS = new Set([
+  'Acolyte',
+  'Artisan',
+  'Charlatan',
+  'Criminal',
+  'Entertainer',
+  'Folk Hero',
+  'Guild Artisan',
+  'Hermit',
+  'Noble',
+  'Sage',
+  'Sailor',
+  'Soldier',
+  'Urchin',
+])
 
 function abilityModifier(score: number) {
   return Math.floor((score - 10) / 2)
@@ -110,6 +157,14 @@ function rollAbilityValues(): number[] {
     const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1).sort((a, b) => a - b)
     return rolls[1] + rolls[2] + rolls[3]
   }).sort((a, b) => b - a)
+}
+
+function getDisplayItemName(itemName: string, itemId: string): string {
+  if (!itemName || itemName.trim().length === 0 || itemName.startsWith('Page ')) {
+    return itemId
+  }
+
+  return itemName
 }
 
 function App() {
@@ -148,20 +203,25 @@ function App() {
   const [rolledPool, setRolledPool] = useState<number[]>([])
   const [rollAssignments, setRollAssignments] = useState<Partial<Record<AbilityName, number>>>({})
   const [characterLevel, setCharacterLevel] = useState(1)
-  const [proficientSkills, setProficientSkills] = useState<SkillName[]>([])
+  const [skillTrainingBySkill, setSkillTrainingBySkill] = useState<Record<SkillName, SkillTrainingLevel>>(
+    () =>
+      Object.fromEntries(ALL_SKILLS.map((skill) => [skill, 'None'])) as Record<SkillName, SkillTrainingLevel>,
+  )
   const [savedBuild, setSavedBuild] = useState<CharacterBuildData | null>(null)
   const [buildResult, setBuildResult] = useState('')
 
   const [itemCatalog, setItemCatalog] = useState<ItemCatalogItem[]>([])
   const [selectedCatalogItemId, setSelectedCatalogItemId] = useState('')
+  const [selectedCatalogQuantity, setSelectedCatalogQuantity] = useState(1)
   const [inventoryState, setInventoryState] = useState<CharacterInventoryState | null>(null)
   const [inventoryResult, setInventoryResult] = useState('')
   const [attunementGuidance, setAttunementGuidance] = useState('')
 
   const [selectedSkill, setSelectedSkill] = useState<SkillName>('Stealth')
   const [advantageState, setAdvantageState] = useState<AdvantageState>('None')
-  const [hasExpertise, setHasExpertise] = useState(false)
   const [rollResult, setRollResult] = useState('')
+  const [attackAdvantageState, setAttackAdvantageState] = useState<AdvantageState>('None')
+  const [attackResults, setAttackResults] = useState<Record<string, string>>({})
 
   const [originPreview, setOriginPreview] = useState('')
   const [speciesPreview, setSpeciesPreview] = useState('')
@@ -172,16 +232,37 @@ function App() {
   )
 
   const classOptions = useMemo(
-    () => moduleCatalog.filter((x) => x.moduleType.toLowerCase() === 'class'),
+    () =>
+      moduleCatalog.filter(
+        (x) => x.moduleType.toLowerCase() === 'class' && KNOWN_CLASSES.has(x.displayName),
+      ),
     [moduleCatalog],
   )
   const raceOptions = useMemo(
-    () => moduleCatalog.filter((x) => x.moduleType.toLowerCase() === 'race' || x.moduleType.toLowerCase() === 'species'),
+    () =>
+      moduleCatalog.filter(
+        (x) =>
+          (x.moduleType.toLowerCase() === 'race' || x.moduleType.toLowerCase() === 'species') &&
+          KNOWN_RACES.has(x.displayName),
+      ),
     [moduleCatalog],
   )
   const backgroundOptions = useMemo(
-    () => moduleCatalog.filter((x) => x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin'),
+    () =>
+      moduleCatalog.filter(
+        (x) =>
+          (x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin') &&
+          KNOWN_BACKGROUNDS.has(x.displayName),
+      ),
     [moduleCatalog],
+  )
+  const selectedClassOption = useMemo(
+    () => classOptions.find((x) => x.moduleId === selectedClassModuleId) ?? null,
+    [classOptions, selectedClassModuleId],
+  )
+  const selectedBackgroundOption = useMemo(
+    () => backgroundOptions.find((x) => x.moduleId === selectedBackgroundModuleId) ?? null,
+    [backgroundOptions, selectedBackgroundModuleId],
   )
 
   const rolledScores = useMemo<Record<AbilityName, number>>(
@@ -235,6 +316,47 @@ function App() {
   )
 
   const proficiencyBonus = useMemo(() => Math.floor((totalCharacterLevel - 1) / 4) + 2, [totalCharacterLevel])
+
+  const proficiencySlotsAvailable = useMemo(
+    () =>
+      (selectedClassOption?.skillChoiceCount ?? 0) +
+      (selectedClassOption?.fixedSkillProficiencies.length ?? 0) +
+      (selectedBackgroundOption?.fixedSkillProficiencies.length ?? 0),
+    [selectedClassOption, selectedBackgroundOption],
+  )
+  const expertiseSlotsAvailable = useMemo(() => selectedClassOption?.expertiseChoiceCount ?? 0, [selectedClassOption])
+  const proficiencySlotsUsed = useMemo(
+    () => ALL_SKILLS.filter((skill) => skillTrainingBySkill[skill] !== 'None').length,
+    [skillTrainingBySkill],
+  )
+  const expertiseSlotsUsed = useMemo(
+    () => ALL_SKILLS.filter((skill) => skillTrainingBySkill[skill] === 'Expertise').length,
+    [skillTrainingBySkill],
+  )
+
+  const attacks = useMemo(() => {
+    const grouped = new Map<string, NonNullable<CharacterInventoryState['items']>[number]>()
+    for (const item of inventoryState?.items ?? []) {
+      if (!item.isWeapon) continue
+      const key = [
+        getDisplayItemName(item.itemName, item.itemDefinitionId),
+        item.damageDice,
+        item.weaponAbility,
+        item.attackBonus,
+        item.damageBonus,
+      ].join('|')
+      if (!grouped.has(key)) {
+        grouped.set(key, item)
+      }
+    }
+    return Array.from(grouped.values()).map((item) => {
+      const abilityName = (item.weaponAbility || 'Strength') as AbilityName
+      const abilityMod = abilityModifier(totalAbilityScores[abilityName] ?? 10)
+      const toHit = abilityMod + proficiencyBonus + item.attackBonus
+      const damageBonus = abilityMod + item.damageBonus
+      return { ...item, abilityName, toHit, damageBonus }
+    })
+  }, [inventoryState, proficiencyBonus, totalAbilityScores])
 
   useEffect(() => {
     health()
@@ -299,7 +421,13 @@ function App() {
       setBaseRules(build.baseRuleSystem)
       setSelectedClassModuleId(build.classModuleId)
       setCharacterLevel(build.level)
-      setProficientSkills(build.proficientSkills)
+      setSkillTrainingBySkill(() => {
+        const next = Object.fromEntries(ALL_SKILLS.map((skill) => [skill, 'None'])) as Record<SkillName, SkillTrainingLevel>
+        for (const skill of build.proficientSkills) {
+          next[skill] = 'Proficient'
+        }
+        return next
+      })
       setManualScores(build.abilityScores)
       setPointBuyScores(build.abilityScores)
       setRollAssignments(build.abilityScores)
@@ -525,7 +653,7 @@ function App() {
         level: totalCharacterLevel,
         proficiencyBonus,
         abilityScores: totalAbilityScores,
-        proficientSkills,
+        proficientSkills: ALL_SKILLS.filter((skill) => skillTrainingBySkill[skill] !== 'None'),
       })
       setSavedBuild(saved)
       setBuildResult(JSON.stringify(saved, null, 2))
@@ -581,12 +709,8 @@ function App() {
     setMultiClassSelections((prev) => prev.map((x) => (x.moduleId === moduleId ? { ...x, level: bounded } : x)))
   }
 
-  function toggleProficientSkill(skill: SkillName) {
-    if (proficientSkills.includes(skill)) {
-      setProficientSkills((prev) => prev.filter((x) => x !== skill))
-      return
-    }
-    setProficientSkills((prev) => [...prev, skill])
+  function setSkillTraining(skill: SkillName, level: SkillTrainingLevel) {
+    setSkillTrainingBySkill((prev) => ({ ...prev, [skill]: level }))
   }
 
   function setManualAbilityScore(ability: AbilityName, score: number) {
@@ -639,7 +763,7 @@ function App() {
   async function handleAddItemFromCatalog() {
     if (!currentCharacterId || !selectedCatalogItemId) return
     try {
-      const next = await addInventoryItem(currentCharacterId, selectedCatalogItemId)
+      const next = await addInventoryItem(currentCharacterId, selectedCatalogItemId, selectedCatalogQuantity)
       setInventoryState(next)
       setInventoryResult(JSON.stringify(next, null, 2))
     } catch (e) {
@@ -649,7 +773,7 @@ function App() {
 
   async function handleUpdateInventoryItem(
     inventoryItemId: string,
-    update: { isEquipped?: boolean; isAttuned?: boolean },
+    update: { isEquipped?: boolean; isAttuned?: boolean; quantity?: number },
   ) {
     if (!currentCharacterId) return
     try {
@@ -681,9 +805,31 @@ function App() {
         advantageState,
         rollDice: true,
         additionalModifier: 0,
-        hasExpertise,
+        hasExpertise: skillTrainingBySkill[selectedSkill] === 'Expertise',
       })
-      setRollResult(JSON.stringify(result, null, 2))
+      setRollResult(JSON.stringify((result as { result?: unknown }).result ?? result, null, 2))
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleRollAttack(attackKey: string, attack: (typeof attacks)[number]) {
+    if (!currentCharacterId) return
+    try {
+      const result = await computePersistedAttack(currentCharacterId, {
+        weaponName: getDisplayItemName(attack.itemName, attack.itemDefinitionId),
+        abilityName: attack.abilityName,
+        isProficientWithWeapon: true,
+        additionalAttackModifier: attack.attackBonus,
+        damageDice: attack.damageDice || '1d6',
+        additionalDamageModifier: attack.damageBonus,
+        advantageState: attackAdvantageState,
+        rollDice: true,
+      })
+      setAttackResults((prev) => ({
+        ...prev,
+        [attackKey]: JSON.stringify((result as { result?: unknown }).result ?? result),
+      }))
     } catch (e) {
       setError(String(e))
     }
@@ -702,8 +848,14 @@ function App() {
   function skillModifier(skill: SkillName) {
     const ability = SKILL_ABILITY[skill]
     const abilityMod = abilityModifier(totalAbilityScores[ability])
-    const prof = proficientSkills.includes(skill) ? proficiencyBonus : 0
-    return abilityMod + prof
+    const training = skillTrainingBySkill[skill]
+    if (training === 'Expertise') {
+      return abilityMod + proficiencyBonus * 2
+    }
+    if (training === 'Proficient') {
+      return abilityMod + proficiencyBonus
+    }
+    return abilityMod
   }
 
   return (
@@ -1049,21 +1201,31 @@ function App() {
             <option value="Advantage">Advantage</option>
             <option value="Disadvantage">Disadvantage</option>
           </select>
-          <label>
-            <input type="checkbox" checked={hasExpertise} onChange={(e) => setHasExpertise(e.target.checked)} /> Expertise
-          </label>
           <button onClick={handleRollSkillCheck} disabled={!currentCharacterId}>
             Roll persisted check
           </button>
         </div>
+        <p>
+          Proficiencies available: {proficiencySlotsAvailable - proficiencySlotsUsed} (used {proficiencySlotsUsed} /{' '}
+          {proficiencySlotsAvailable}) | Expertise available: {expertiseSlotsAvailable - expertiseSlotsUsed} (used{' '}
+          {expertiseSlotsUsed} / {expertiseSlotsAvailable})
+        </p>
+        <small>
+          Class fixed: {selectedClassOption?.fixedSkillProficiencies.join(', ') || 'None'} | Class choices:{' '}
+          {selectedClassOption?.skillChoices.join(', ') || 'None'} | Background fixed:{' '}
+          {selectedBackgroundOption?.fixedSkillProficiencies.join(', ') || 'None'}
+        </small>
         <div className="skills-grid">
           {ALL_SKILLS.map((skill) => (
             <label key={skill}>
-              <input
-                type="checkbox"
-                checked={proficientSkills.includes(skill)}
-                onChange={() => toggleProficientSkill(skill)}
-              />
+              <select
+                value={skillTrainingBySkill[skill]}
+                onChange={(e) => setSkillTraining(skill, e.target.value as SkillTrainingLevel)}
+              >
+                <option value="None">None</option>
+                <option value="Proficient">Proficient</option>
+                <option value="Expertise">Expertise</option>
+              </select>
               {skill} ({SKILL_ABILITY[skill].slice(0, 3)}) mod {skillModifier(skill) >= 0 ? '+' : ''}
               {skillModifier(skill)}
             </label>
@@ -1081,11 +1243,18 @@ function App() {
             ) : (
               itemCatalog.map((item) => (
                 <option key={item.itemId} value={item.itemId}>
-                  {item.itemName} ({item.sourceCode}) {item.requiresAttunement ? '[attunement]' : ''}
+                  {getDisplayItemName(item.itemName, item.itemId)} ({item.sourceCode}) {item.requiresAttunement ? '[attunement]' : ''}
                 </option>
               ))
             )}
           </select>
+          <input
+            type="number"
+            min={1}
+            value={selectedCatalogQuantity}
+            onChange={(e) => setSelectedCatalogQuantity(Math.max(1, Number(e.target.value) || 1))}
+            placeholder="Quantity"
+          />
           <button onClick={() => void handleAddItemFromCatalog()} disabled={!selectedCatalogItemId || !currentCharacterId}>
             Add to persisted inventory
           </button>
@@ -1093,8 +1262,17 @@ function App() {
         <ul className="inventory-list">
           {(inventoryState?.items ?? []).map((item) => (
             <li key={item.inventoryItemId}>
-              <strong>{item.itemName}</strong>
-              <span>{item.requiresAttunement ? 'Requires attunement' : 'No attunement'}</span>
+              <strong>{getDisplayItemName(item.itemName, item.itemDefinitionId)}</strong>
+              <span>
+                type {item.itemType} | qty {item.quantity} | value {item.goldValue} gp | weight {item.weight} lb |{' '}
+                {item.requiresAttunement ? 'requires attunement' : 'no attunement'} | {item.isEquipped ? 'equipped' : 'unequipped'} |{' '}
+                {item.isAttuned ? 'attuned' : 'not attuned'}
+              </span>
+              {item.isWeapon && (
+                <small>
+                  weapon: {item.damageDice} using {item.weaponAbility || 'Strength'} (atk bonus {item.attackBonus}, dmg bonus {item.damageBonus})
+                </small>
+              )}
               <div className="row">
                 <button
                   onClick={() => void handleUpdateInventoryItem(item.inventoryItemId, { isEquipped: !item.isEquipped })}
@@ -1108,6 +1286,16 @@ function App() {
                     {item.isAttuned ? 'Unattune' : 'Attune'}
                   </button>
                 )}
+                <input
+                  type="number"
+                  min={1}
+                  value={item.quantity}
+                  onChange={(e) =>
+                    void handleUpdateInventoryItem(item.inventoryItemId, {
+                      quantity: Math.max(1, Number(e.target.value) || 1),
+                    })
+                  }
+                />
                 <button onClick={() => void handleRemoveItem(item.inventoryItemId)}>Remove</button>
               </div>
             </li>
@@ -1115,6 +1303,41 @@ function App() {
         </ul>
         {attunementGuidance && <pre>{attunementGuidance}</pre>}
         {inventoryResult && <pre>{inventoryResult}</pre>}
+      </section>
+
+      <section className="card">
+        <h2>6b. Attacks</h2>
+        <div className="row">
+          <select value={attackAdvantageState} onChange={(e) => setAttackAdvantageState(e.target.value as AdvantageState)}>
+            <option value="None">None</option>
+            <option value="Advantage">Advantage</option>
+            <option value="Disadvantage">Disadvantage</option>
+          </select>
+        </div>
+        <ul className="inventory-list">
+          {attacks.map((attack) => {
+            const key = [
+              getDisplayItemName(attack.itemName, attack.itemDefinitionId),
+              attack.damageDice,
+              attack.weaponAbility,
+              attack.attackBonus,
+              attack.damageBonus,
+            ].join('|')
+            return (
+              <li key={key}>
+                <strong>{getDisplayItemName(attack.itemName, attack.itemDefinitionId)}</strong>
+                <span>
+                  to hit {attack.toHit >= 0 ? '+' : ''}
+                  {attack.toHit} | damage {attack.damageDice}
+                  {attack.damageBonus >= 0 ? '+' : ''}
+                  {attack.damageBonus} ({attack.abilityName})
+                </span>
+                <button onClick={() => void handleRollAttack(key, attack)}>Roll attack</button>
+                {attackResults[key] && <small>{attackResults[key]}</small>}
+              </li>
+            )
+          })}
+        </ul>
       </section>
 
       <section className="card">

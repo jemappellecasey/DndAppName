@@ -317,10 +317,15 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
             ? "rules-2014"
             : "rules-2024";
         var moduleType = InferModuleType(row.Title, row.Preview);
+        var displayName = ResolveDisplayName(row.Title, row.Preview, moduleType);
         var abilityBonuses = InferAbilityBonuses(moduleType, row.Title, row.SourceCode);
         var spellClasses = moduleType == "spell" ? InferSpellClasses(row.Preview) : Array.Empty<string>();
+        var skillChoices = InferSkillChoices(moduleType, displayName);
+        var skillChoiceCount = InferSkillChoiceCount(moduleType, displayName);
+        var expertiseChoiceCount = InferExpertiseChoiceCount(moduleType, displayName);
+        var fixedSkillProficiencies = InferFixedSkillProficiencies(moduleType, displayName);
 
-        var slug = $"{Slugify(row.Title)}-{row.SectionOrder}";
+        var slug = $"{Slugify(displayName)}-{row.SectionOrder}";
         var moduleId = Guid.NewGuid().ToString("N");
         var module = new RuleModuleEntity
         {
@@ -328,7 +333,7 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
             ContentSourceId = contentSourceId,
             ModuleType = moduleType,
             Slug = slug,
-            DisplayName = row.Title,
+            DisplayName = displayName,
             VersionTag = row.VersionTag
         };
         db.RuleModules.Add(module);
@@ -346,7 +351,11 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
                 startLine = row.StartLine,
                 endLine = row.EndLine,
                 abilityBonuses,
-                spellClasses
+                spellClasses,
+                fixedSkillProficiencies,
+                skillChoices,
+                skillChoiceCount,
+                expertiseChoiceCount
             })
         };
         db.RuleVariants.Add(variant);
@@ -358,9 +367,16 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
             {
                 Id = Guid.NewGuid().ToString("N"),
                 RuleModuleId = moduleId,
-                ItemType = InferItemType(row.Title),
-                Rarity = InferItemRarity(row.Title, row.Preview),
+                ItemType = InferItemType(displayName),
+                Rarity = InferItemRarity(displayName, row.Preview),
                 RequiresAttunement = row.Preview.Contains("attunement", StringComparison.OrdinalIgnoreCase),
+                GoldValue = InferGoldValue(displayName, row.Preview),
+                Weight = InferWeight(displayName, row.Preview),
+                IsWeapon = InferIsWeapon(displayName, row.Preview),
+                DamageDice = InferDamageDice(displayName, row.Preview),
+                WeaponAbility = InferWeaponAbility(displayName, row.Preview),
+                AttackBonus = InferAttackBonus(row.Preview),
+                DamageBonus = InferDamageBonus(row.Preview),
                 ChargesModelJson = "{}"
             });
         }
@@ -388,11 +404,11 @@ static string InferModuleType(string title, string? preview)
     {
         return "spell";
     }
-    if (Regex.IsMatch(text, @"\bsubclass\b|subclasses", RegexOptions.IgnoreCase))
+    if (Regex.IsMatch(text, @"\bsubclass\b|subclasses|archetype|college|domain|circle|oath|patron", RegexOptions.IgnoreCase))
     {
         return "subclass";
     }
-    if (Regex.IsMatch(text, @"\bclass\b|barbarian|bard|cleric|druid|fighter|monk|paladin|ranger|rogue|sorcerer|warlock|wizard|artificer", RegexOptions.IgnoreCase))
+    if (Regex.IsMatch(text, @"\bcharacter class\b|barbarian|bard|cleric|druid|fighter|monk|paladin|ranger|rogue|sorcerer|warlock|wizard|artificer", RegexOptions.IgnoreCase))
     {
         return "class";
     }
@@ -408,12 +424,82 @@ static string InferModuleType(string title, string? preview)
     {
         return "feat";
     }
-    if (Regex.IsMatch(text, @"\barmor\b|\bweapon\b|\bshield\b|wondrous|magic item|potion|ring|rod|staff|wand", RegexOptions.IgnoreCase))
+    if (Regex.IsMatch(text, @"\barmor\b|\bweapon\b|\bshield\b|wondrous|magic item|potion|ring|rod|staff|wand|adventuring gear|equipment|gear", RegexOptions.IgnoreCase))
+    {
+        return "item";
+    }
+
+    if (title.StartsWith("Page ", StringComparison.OrdinalIgnoreCase) && text.Contains("DMG", StringComparison.OrdinalIgnoreCase))
     {
         return "item";
     }
 
     return "section";
+}
+
+static string ResolveDisplayName(string title, string? preview, string moduleType)
+{
+    var cleanedTitle = Regex.Replace(title ?? string.Empty, @"\s+", " ").Trim();
+    if (!cleanedTitle.StartsWith("Page ", StringComparison.OrdinalIgnoreCase))
+    {
+        return cleanedTitle;
+    }
+
+    var text = Regex.Replace(preview ?? string.Empty, @"\s+", " ").Trim();
+    if (string.IsNullOrWhiteSpace(text))
+    {
+        return cleanedTitle;
+    }
+
+    string? fromKeywords = moduleType switch
+    {
+        "class" => new[]
+        {
+            "Artificer", "Barbarian", "Bard", "Cleric", "Druid", "Fighter",
+            "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"
+        }.FirstOrDefault(x => text.Contains(x, StringComparison.OrdinalIgnoreCase)),
+        "race" or "species" => new[]
+        {
+            "Aasimar", "Dragonborn", "Dwarf", "Elf", "Gnome", "Goliath",
+            "Halfling", "Human", "Orc", "Tiefling", "Half-Elf", "Half-Orc"
+        }.FirstOrDefault(x => text.Contains(x, StringComparison.OrdinalIgnoreCase)),
+        "background" or "origin" => new[]
+        {
+            "Acolyte", "Artisan", "Charlatan", "Criminal", "Entertainer", "Folk Hero",
+            "Guild Artisan", "Hermit", "Noble", "Sage", "Sailor", "Soldier", "Urchin"
+        }.FirstOrDefault(x => text.Contains(x, StringComparison.OrdinalIgnoreCase)),
+        _ => null
+    };
+    if (!string.IsNullOrWhiteSpace(fromKeywords))
+    {
+        return fromKeywords;
+    }
+
+    if (moduleType == "spell")
+    {
+        var spellMatch = Regex.Match(text, @"([A-Z][A-Za-z' -]{2,40})");
+        if (spellMatch.Success)
+        {
+            return spellMatch.Groups[1].Value.Trim();
+        }
+    }
+
+    if (moduleType == "item")
+    {
+        var itemMatch = Regex.Match(text, @"([A-Z][A-Za-z' -]{2,60})");
+        if (itemMatch.Success)
+        {
+            return itemMatch.Groups[1].Value.Trim();
+        }
+    }
+
+    var sentence = text.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim();
+    if (!string.IsNullOrWhiteSpace(sentence))
+    {
+        return sentence.Length > 80 ? sentence[..80].Trim() : sentence;
+    }
+
+    return cleanedTitle;
 }
 
 static IReadOnlyDictionary<string, int> InferAbilityBonuses(string moduleType, string title, string sourceCode)
@@ -534,6 +620,165 @@ static string InferItemRarity(string title, string? preview)
     }
 
     return "Unknown";
+}
+
+static decimal InferGoldValue(string title, string? preview)
+{
+    var text = $"{title} {preview}";
+    var gpMatch = Regex.Match(text, @"(\d+(?:\.\d+)?)\s*gp", RegexOptions.IgnoreCase);
+    if (gpMatch.Success && decimal.TryParse(gpMatch.Groups[1].Value, NumberStyles.Number, CultureInfo.InvariantCulture, out var gp))
+    {
+        return gp;
+    }
+    var spMatch = Regex.Match(text, @"(\d+(?:\.\d+)?)\s*sp", RegexOptions.IgnoreCase);
+    if (spMatch.Success && decimal.TryParse(spMatch.Groups[1].Value, NumberStyles.Number, CultureInfo.InvariantCulture, out var sp))
+    {
+        return Math.Round(sp / 10m, 2);
+    }
+    return 0m;
+}
+
+static decimal InferWeight(string title, string? preview)
+{
+    var text = $"{title} {preview}";
+    var match = Regex.Match(text, @"(\d+(?:\.\d+)?)\s*(?:lb|lbs|pounds?)", RegexOptions.IgnoreCase);
+    if (match.Success && decimal.TryParse(match.Groups[1].Value, NumberStyles.Number, CultureInfo.InvariantCulture, out var weight))
+    {
+        return weight;
+    }
+    return 0m;
+}
+
+static bool InferIsWeapon(string title, string? preview)
+{
+    return Regex.IsMatch($"{title} {preview}", @"weapon|sword|axe|bow|dagger|mace|spear|crossbow|hammer|flail|halberd|pike|rapier|scimitar|whip|club", RegexOptions.IgnoreCase);
+}
+
+static string InferDamageDice(string title, string? preview)
+{
+    var text = $"{title} {preview}";
+    var dice = Regex.Match(text, @"\b\d+d\d+\b", RegexOptions.IgnoreCase);
+    if (dice.Success)
+    {
+        return dice.Value.ToLowerInvariant();
+    }
+    return InferIsWeapon(title, preview) ? "1d6" : string.Empty;
+}
+
+static string InferWeaponAbility(string title, string? preview)
+{
+    var text = $"{title} {preview}";
+    if (Regex.IsMatch(text, @"finesse|ranged|bow|crossbow|dart|dagger", RegexOptions.IgnoreCase))
+    {
+        return "Dexterity";
+    }
+    return InferIsWeapon(title, preview) ? "Strength" : string.Empty;
+}
+
+static int InferAttackBonus(string? preview)
+{
+    if (string.IsNullOrWhiteSpace(preview))
+    {
+        return 0;
+    }
+    var match = Regex.Match(preview, @"\+(\d+)\s*to hit", RegexOptions.IgnoreCase);
+    return match.Success && int.TryParse(match.Groups[1].Value, out var value) ? value : 0;
+}
+
+static int InferDamageBonus(string? preview)
+{
+    if (string.IsNullOrWhiteSpace(preview))
+    {
+        return 0;
+    }
+    var match = Regex.Match(preview, @"\d+d\d+\s*\+\s*(\d+)", RegexOptions.IgnoreCase);
+    return match.Success && int.TryParse(match.Groups[1].Value, out var value) ? value : 0;
+}
+
+static IReadOnlyList<string> InferSkillChoices(string moduleType, string displayName)
+{
+    if (!string.Equals(moduleType, "class", StringComparison.OrdinalIgnoreCase))
+    {
+        return Array.Empty<string>();
+    }
+
+    return displayName.ToLowerInvariant() switch
+    {
+        var name when name.Contains("barbarian") => new[] { "Animal Handling", "Athletics", "Intimidation", "Nature", "Perception", "Survival" },
+        var name when name.Contains("bard") => new[] { "Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception", "History", "Insight", "Intimidation", "Investigation", "Medicine", "Nature", "Perception", "Performance", "Persuasion", "Religion", "Sleight of Hand", "Stealth", "Survival" },
+        var name when name.Contains("cleric") => new[] { "History", "Insight", "Medicine", "Persuasion", "Religion" },
+        var name when name.Contains("druid") => new[] { "Arcana", "Animal Handling", "Insight", "Medicine", "Nature", "Perception", "Religion", "Survival" },
+        var name when name.Contains("fighter") => new[] { "Acrobatics", "Animal Handling", "Athletics", "History", "Insight", "Intimidation", "Perception", "Survival" },
+        var name when name.Contains("monk") => new[] { "Acrobatics", "Athletics", "History", "Insight", "Religion", "Stealth" },
+        var name when name.Contains("paladin") => new[] { "Athletics", "Insight", "Intimidation", "Medicine", "Persuasion", "Religion" },
+        var name when name.Contains("ranger") => new[] { "Animal Handling", "Athletics", "Insight", "Investigation", "Nature", "Perception", "Stealth", "Survival" },
+        var name when name.Contains("rogue") => new[] { "Acrobatics", "Athletics", "Deception", "Insight", "Intimidation", "Investigation", "Perception", "Performance", "Persuasion", "Sleight of Hand", "Stealth" },
+        var name when name.Contains("sorcerer") => new[] { "Arcana", "Deception", "Insight", "Intimidation", "Persuasion", "Religion" },
+        var name when name.Contains("warlock") => new[] { "Arcana", "Deception", "History", "Intimidation", "Investigation", "Nature", "Religion" },
+        var name when name.Contains("wizard") => new[] { "Arcana", "History", "Insight", "Investigation", "Medicine", "Religion" },
+        _ => Array.Empty<string>()
+    };
+}
+
+static int InferSkillChoiceCount(string moduleType, string displayName)
+{
+    if (!string.Equals(moduleType, "class", StringComparison.OrdinalIgnoreCase))
+    {
+        return 0;
+    }
+
+    return displayName.ToLowerInvariant() switch
+    {
+        var name when name.Contains("rogue") => 4,
+        var name when name.Contains("bard") => 3,
+        var name when name.Contains("ranger") => 3,
+        var name when name.Contains("fighter") => 2,
+        var name when name.Contains("barbarian") => 2,
+        var name when name.Contains("cleric") => 2,
+        var name when name.Contains("druid") => 2,
+        var name when name.Contains("monk") => 2,
+        var name when name.Contains("paladin") => 2,
+        var name when name.Contains("sorcerer") => 2,
+        var name when name.Contains("warlock") => 2,
+        var name when name.Contains("wizard") => 2,
+        _ => 0
+    };
+}
+
+static int InferExpertiseChoiceCount(string moduleType, string displayName)
+{
+    if (!string.Equals(moduleType, "class", StringComparison.OrdinalIgnoreCase))
+    {
+        return 0;
+    }
+
+    return displayName.ToLowerInvariant() switch
+    {
+        var name when name.Contains("rogue") => 2,
+        var name when name.Contains("bard") => 2,
+        _ => 0
+    };
+}
+
+static IReadOnlyList<string> InferFixedSkillProficiencies(string moduleType, string displayName)
+{
+    if (!string.Equals(moduleType, "background", StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(moduleType, "origin", StringComparison.OrdinalIgnoreCase))
+    {
+        return Array.Empty<string>();
+    }
+
+    return displayName.ToLowerInvariant() switch
+    {
+        var name when name.Contains("acolyte") => new[] { "Insight", "Religion" },
+        var name when name.Contains("criminal") => new[] { "Deception", "Stealth" },
+        var name when name.Contains("entertainer") => new[] { "Acrobatics", "Performance" },
+        var name when name.Contains("folk hero") => new[] { "Animal Handling", "Survival" },
+        var name when name.Contains("sage") => new[] { "Arcana", "History" },
+        var name when name.Contains("soldier") => new[] { "Athletics", "Intimidation" },
+        var name when name.Contains("urchin") => new[] { "Sleight of Hand", "Stealth" },
+        _ => Array.Empty<string>()
+    };
 }
 
 static string Slugify(string value)
