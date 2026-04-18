@@ -8,10 +8,10 @@ Repository folder names may vary (for example `CopilotTesting`), while the solut
 2. Rulebook markdown ingestion to versioned JSON artifacts.
 3. Character wizard flow with mixed-rules resolution and copy-to-ruleset support.
 4. Persisted wizard drafts, character library summaries, and character history (survive API restarts).
-5. Persistent character build model (class, build method, ability scores, skill proficiencies).
+5. Persistent character build model (class, build method, ability scores, skill proficiencies, and selected tool/language picks).
 6. Build persistence now stores multiclass levels, selected lineage/background modules, and per-skill training tiers (`None`/`Proficient`/`Expertise`).
 7. Persistent inventory model with equip/attune/unattune and attunement-cap enforcement.
-8. Persisted calculations for checks/saves/attacks and derived stats.
+8. Persisted calculations for checks/saves/attacks, derived stats, and advanced-rules snapshot output.
 9. Custom origin/species validation and preview endpoints.
 10. Frontend character sheet sections for persisted vitals, spells, and resources.
 
@@ -83,9 +83,11 @@ npm run build
 11. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
 12. In **Skills menu and persisted checks**, each skill has a `None/Proficient/Expertise` dropdown with live proficiency/expertise slot counters (negative values indicate over-allocation), plus persisted advantage/disadvantage check rolling; saved builds now round-trip these training tiers.
 13. In **Inventory from database (persisted)**, add item definitions from catalog, set quantity, and manage equip/attune/unattune/remove states. Inventory rows show value, weight, attunement, equip status, and quantity.
-14. **Attacks** auto-builds from equipped weapon-style inventory entries (deduped by weapon details) and shows to-hit bonus, damage expression, and advantage/disadvantage rolling.
-15. In **Character sheet: vitals, spells, resources**, edit and save persisted HP/speed/AC values, spell entries, and resource pools.
-16. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
+14. Use the **Coin purse** controls for cp/sp/ep/gp/pp tracking, conversion, consolidation, and purchase-mode deduction with change-making.
+15. **Attacks** auto-builds from equipped weapon-style inventory entries (deduped by weapon details) and shows to-hit bonus, damage expression, and advantage/disadvantage rolling.
+16. Use **Load advanced multiclass rules snapshot** for non-stacking Extra Attack and AC-formula resolution status, plus explicit data-gap reporting for blocked advanced tables.
+17. In **Character sheet: vitals, spells, resources**, edit and save persisted HP/speed/AC values, spell entries, and resource pools.
+18. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
 
 ### Troubleshooting (local run)
 1. If `dotnet build` fails with `DndApp.Api.exe ... file is being used by another process`, stop the running API (`Ctrl+C` in the terminal where `dotnet run` is active), then build again.
@@ -178,6 +180,7 @@ Outputs are written under:
 4. `POST /characters/{characterId}/compute/check`
 5. `POST /characters/{characterId}/compute/save`
 6. `POST /characters/{characterId}/compute/attack`
+7. `GET /characters/{characterId}/compute/advanced-rules`
 
 ### Persistent character build
 1. `GET /characters/{characterId}/build`
@@ -199,8 +202,9 @@ Outputs are written under:
 2. `POST /characters/{characterId}/compute/check/persisted`
 3. `POST /characters/{characterId}/compute/save/persisted`
 4. `POST /characters/{characterId}/compute/attack/persisted`
-5. Derived stats now include persisted vitals (HP values) and class-derived save proficiency context.
-6. Persisted compute endpoints now require `X-Session-Token` and enforce owner access.
+5. `GET /characters/{characterId}/compute/advanced-rules`
+6. Derived stats now include persisted vitals (HP values) and class-derived save proficiency context.
+7. Persisted compute endpoints now require `X-Session-Token` and enforce owner access.
 
 ### Persisted spells, resources, and vitals
 1. `GET /characters/{characterId}/spells`
@@ -209,6 +213,12 @@ Outputs are written under:
 4. `PUT /characters/{characterId}/resources`
 5. `GET /characters/{characterId}/vitals`
 6. `PUT /characters/{characterId}/vitals`
+7. `GET /characters/{characterId}/spells/recommended?classModuleId=...&classLevel=...` (advisory, curated-source only; returns explicit data gap when unavailable)
+8. `GET /characters/{characterId}/currency`
+9. `PUT /characters/{characterId}/currency`
+10. `POST /characters/{characterId}/currency/convert`
+11. `POST /characters/{characterId}/currency/consolidate`
+12. `POST /characters/{characterId}/currency/purchase`
 
 ### Rule validation
 1. `PUT /characters/{characterId}/build` and `PATCH /characters/{characterId}/build` now validate class-module compatibility and prerequisite predicates from `prerequisite`.

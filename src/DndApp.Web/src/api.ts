@@ -1,4 +1,5 @@
 import type {
+  AdvancedRulesSnapshotResponse,
   AdvantageState,
   CharacterBuildData,
   CharacterHistoryEntry,
@@ -8,6 +9,7 @@ import type {
   CharacterSpellEntryData,
   CharacterSpellsData,
   CharacterSummary,
+  CharacterCurrencyData,
   CharacterVitalsData,
   CharacterWizardResult,
   ClassCatalogItem,
@@ -269,6 +271,47 @@ export function upsertCharacterResources(characterId: string, resources: Charact
   })
 }
 
+export function getCharacterCurrency(characterId: string) {
+  return request<CharacterCurrencyData>(`/characters/${characterId}/currency`)
+}
+
+export function upsertCharacterCurrency(
+  characterId: string,
+  payload: { cp: number; sp: number; ep: number; gp: number; pp: number },
+) {
+  return request<CharacterCurrencyData>(`/characters/${characterId}/currency`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function convertCharacterCurrency(
+  characterId: string,
+  payload: { fromDenomination: string; toDenomination: string; amount: number },
+) {
+  return request<CharacterCurrencyData>(`/characters/${characterId}/currency/convert`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function consolidateCharacterCurrency(characterId: string, preferPlatinum: boolean) {
+  return request<CharacterCurrencyData>(`/characters/${characterId}/currency/consolidate`, {
+    method: 'POST',
+    body: JSON.stringify({ preferPlatinum }),
+  })
+}
+
+export function purchaseFromCharacterCurrency(
+  characterId: string,
+  payload: { costInGold: number; quantity: number },
+) {
+  return request<CharacterCurrencyData>(`/characters/${characterId}/currency/purchase`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export function getCharacterVitals(characterId: string) {
   return request<CharacterVitalsData>(`/characters/${characterId}/vitals`)
 }
@@ -337,4 +380,8 @@ export function computePersistedAttack(
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+export function getAdvancedRulesSnapshot(characterId: string) {
+  return request<AdvancedRulesSnapshotResponse>(`/characters/${characterId}/compute/advanced-rules`)
 }

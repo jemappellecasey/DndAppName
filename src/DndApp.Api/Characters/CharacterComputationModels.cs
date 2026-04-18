@@ -38,3 +38,10 @@ public sealed record CharacterDerivedStatsResponse(
     IReadOnlyList<string> AvailableSpells,
     IReadOnlyList<string> ActiveInventoryItemIds,
     IReadOnlyList<string> SaveProficiencies);
+
+public sealed record AdvancedRulesSnapshotResponse(
+    Guid CharacterId,
+    bool ExtraAttackStacks,
+    string ArmorClassResolution,
+    bool PactMagicTrackedSeparately,
+    IReadOnlyList<string> DataGaps);

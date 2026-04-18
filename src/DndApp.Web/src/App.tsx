@@ -3,6 +3,8 @@ import './App.css'
 import {
   addInventoryItem,
   archiveCharacter,
+  consolidateCharacterCurrency,
+  convertCharacterCurrency,
   computePersistedCheck,
   computePersistedAttack,
   copyToRuleset,
@@ -14,6 +16,7 @@ import {
   getCharacterBuild,
   getCharacterHistory,
   getCharacterInventory,
+  getCharacterCurrency,
   getCharacterResources,
   getCharacterSpells,
   getCharacterVitals,
@@ -23,29 +26,34 @@ import {
   getRecommendedSpells,
   getModuleCatalog,
   getItemCatalog,
+  getAdvancedRulesSnapshot,
   health,
   loginLocal,
   registerLocal,
   patchInventoryItem,
   previewOrigin,
   previewSpecies,
+  purchaseFromCharacterCurrency,
   removeInventoryItem,
   restoreCharacter,
   setSessionToken,
   startWizard,
   submitWizardStep,
   upsertCharacterResources,
+  upsertCharacterCurrency,
   upsertCharacterBuild,
   upsertCharacterSpells,
   upsertCharacterVitals,
 } from './api'
 import type {
   AbilityName,
+  AdvancedRulesSnapshotResponse,
   AdvantageState,
   BuildMethod,
   CharacterBuildData,
   CharacterHistoryEntry,
   CharacterInventoryState,
+  CharacterCurrencyData,
   CharacterResourcePoolData,
   CharacterSpellEntryData,
   CharacterSummary,
@@ -249,19 +257,29 @@ function App() {
   )
   const [savedBuild, setSavedBuild] = useState<CharacterBuildData | null>(null)
   const [buildResult, setBuildResult] = useState('')
+  const [selectedToolPicks, setSelectedToolPicks] = useState<string[]>([])
+  const [selectedLanguagePicks, setSelectedLanguagePicks] = useState<string[]>([])
 
   const [itemCatalog, setItemCatalog] = useState<ItemCatalogItem[]>([])
   const [selectedCatalogItemId, setSelectedCatalogItemId] = useState('')
   const [selectedCatalogQuantity, setSelectedCatalogQuantity] = useState(1)
+  const [purchaseFromCurrencyMode, setPurchaseFromCurrencyMode] = useState(false)
   const [inventoryState, setInventoryState] = useState<CharacterInventoryState | null>(null)
+  const [currencyState, setCurrencyState] = useState<CharacterCurrencyData | null>(null)
+  const [currencyDraft, setCurrencyDraft] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 })
+  const [currencyConvert, setCurrencyConvert] = useState({ fromDenomination: 'gp', toDenomination: 'sp', amount: 1 })
+  const [usePlatinumConsolidation, setUsePlatinumConsolidation] = useState(false)
   const [inventoryResult, setInventoryResult] = useState('')
   const [attunementGuidance, setAttunementGuidance] = useState('')
+  const [startingEquipmentMode, setStartingEquipmentMode] = useState<'package' | 'gold-only'>('package')
+  const [startingEquipmentModeLocked, setStartingEquipmentModeLocked] = useState(false)
 
   const [selectedSkill, setSelectedSkill] = useState<SkillName>('Stealth')
   const [advantageState, setAdvantageState] = useState<AdvantageState>('None')
   const [rollResult, setRollResult] = useState('')
   const [attackAdvantageState, setAttackAdvantageState] = useState<AdvantageState>('None')
   const [attackResults, setAttackResults] = useState<Record<string, string>>({})
+  const [advancedRulesSnapshot, setAdvancedRulesSnapshot] = useState<AdvancedRulesSnapshotResponse | null>(null)
   const [spellEntries, setSpellEntries] = useState<CharacterSpellEntryData[]>([])
   const [recommendedSpellsByClass, setRecommendedSpellsByClass] = useState<Record<string, string>>({})
   const [resourcePools, setResourcePools] = useState<CharacterResourcePoolData[]>([])
@@ -339,6 +357,10 @@ function App() {
   const selectedBackgroundOption = useMemo(
     () => backgroundOptions.find((x) => x.moduleId === effectiveSelectedBackgroundModuleId) ?? null,
     [backgroundOptions, effectiveSelectedBackgroundModuleId],
+  )
+  const selectedRaceOption = useMemo(
+    () => raceOptions.find((x) => x.moduleId === effectiveSelectedRaceModuleId) ?? null,
+    [raceOptions, effectiveSelectedRaceModuleId],
   )
 
   const rolledScores = useMemo<Record<AbilityName, number>>(
@@ -419,21 +441,126 @@ function App() {
 
   const proficiencyBonus = useMemo(() => Math.floor((totalCharacterLevel - 1) / 4) + 2, [totalCharacterLevel])
 
-  const proficiencySlotsAvailable = useMemo(
+  const autoGrantedSkills = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(selectedClassOption?.fixedSkillProficiencies ?? []),
+          ...(selectedBackgroundOption?.fixedSkillProficiencies ?? []),
+          ...(selectedRaceOption?.fixedSkillProficiencies ?? []),
+        ]),
+      ) as SkillName[],
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
+  )
+  const effectiveSkillTrainingBySkill = useMemo(() => {
+    const next = { ...skillTrainingBySkill }
+    for (const skill of autoGrantedSkills) {
+      if (next[skill] === 'None') {
+        next[skill] = 'Proficient'
+      }
+    }
+    return next
+  }, [autoGrantedSkills, skillTrainingBySkill])
+  const selectableSkillChoices = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(selectedClassOption?.skillChoices ?? []),
+          ...(selectedBackgroundOption?.skillChoices ?? []),
+          ...(selectedRaceOption?.skillChoices ?? []),
+        ]),
+      ) as SkillName[],
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
+  )
+  const skillChoiceCount = useMemo(
     () =>
       (selectedClassOption?.skillChoiceCount ?? 0) +
-      (selectedClassOption?.fixedSkillProficiencies.length ?? 0) +
-      (selectedBackgroundOption?.fixedSkillProficiencies.length ?? 0),
-    [selectedClassOption, selectedBackgroundOption],
+      (selectedBackgroundOption?.skillChoiceCount ?? 0) +
+      (selectedRaceOption?.skillChoiceCount ?? 0),
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
   )
-  const expertiseSlotsAvailable = useMemo(() => selectedClassOption?.expertiseChoiceCount ?? 0, [selectedClassOption])
+  const expertiseSlotsAvailable = useMemo(
+    () =>
+      (selectedClassOption?.expertiseChoiceCount ?? 0) +
+      (selectedBackgroundOption?.expertiseChoiceCount ?? 0) +
+      (selectedRaceOption?.expertiseChoiceCount ?? 0),
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
+  )
+  const proficiencySlotsAvailable = useMemo(() => autoGrantedSkills.length + skillChoiceCount, [autoGrantedSkills.length, skillChoiceCount])
   const proficiencySlotsUsed = useMemo(
-    () => ALL_SKILLS.filter((skill) => skillTrainingBySkill[skill] !== 'None').length,
-    [skillTrainingBySkill],
+    () => ALL_SKILLS.filter((skill) => effectiveSkillTrainingBySkill[skill] !== 'None').length,
+    [effectiveSkillTrainingBySkill],
+  )
+  const nonAutoSkillPicksUsed = useMemo(
+    () =>
+      ALL_SKILLS.filter(
+        (skill) => effectiveSkillTrainingBySkill[skill] !== 'None' && !autoGrantedSkills.some((x) => x.toLowerCase() === skill.toLowerCase()),
+      ).length,
+    [autoGrantedSkills, effectiveSkillTrainingBySkill],
   )
   const expertiseSlotsUsed = useMemo(
-    () => ALL_SKILLS.filter((skill) => skillTrainingBySkill[skill] === 'Expertise').length,
-    [skillTrainingBySkill],
+    () => ALL_SKILLS.filter((skill) => effectiveSkillTrainingBySkill[skill] === 'Expertise').length,
+    [effectiveSkillTrainingBySkill],
+  )
+
+  const fixedTools = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(selectedClassOption?.fixedToolProficiencies ?? []),
+          ...(selectedBackgroundOption?.fixedToolProficiencies ?? []),
+          ...(selectedRaceOption?.fixedToolProficiencies ?? []),
+        ]),
+      ),
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
+  )
+  const selectableTools = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(selectedClassOption?.toolChoices ?? []),
+          ...(selectedBackgroundOption?.toolChoices ?? []),
+          ...(selectedRaceOption?.toolChoices ?? []),
+        ]),
+      ),
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
+  )
+  const toolChoiceCount = useMemo(
+    () =>
+      (selectedClassOption?.toolChoiceCount ?? 0) +
+      (selectedBackgroundOption?.toolChoiceCount ?? 0) +
+      (selectedRaceOption?.toolChoiceCount ?? 0),
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
+  )
+
+  const fixedLanguages = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(selectedClassOption?.fixedLanguages ?? []),
+          ...(selectedBackgroundOption?.fixedLanguages ?? []),
+          ...(selectedRaceOption?.fixedLanguages ?? []),
+        ]),
+      ),
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
+  )
+  const selectableLanguages = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(selectedClassOption?.languageChoices ?? []),
+          ...(selectedBackgroundOption?.languageChoices ?? []),
+          ...(selectedRaceOption?.languageChoices ?? []),
+        ]),
+      ),
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
+  )
+  const languageChoiceCount = useMemo(
+    () =>
+      (selectedClassOption?.languageChoiceCount ?? 0) +
+      (selectedBackgroundOption?.languageChoiceCount ?? 0) +
+      (selectedRaceOption?.languageChoiceCount ?? 0),
+    [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
   )
 
   const attacks = useMemo(() => {
@@ -625,9 +752,25 @@ function App() {
       const backgroundModule = build.selectedModules.find(
         (x) => x.slot.toLowerCase() === 'background' || x.slot.toLowerCase() === 'origin',
       )
+      const toolPicks = build.selectedModules
+        .filter((x) => x.slot.toLowerCase() === 'tool-proficiency')
+        .map((x) => x.moduleId)
+      const languagePicks = build.selectedModules
+        .filter((x) => x.slot.toLowerCase() === 'language')
+        .map((x) => x.moduleId)
+      const equipmentMode = build.selectedModules.find((x) => x.slot.toLowerCase() === 'starting-equipment-mode')?.moduleId
       if (subclassModule) setSelectedSubclassModuleId(subclassModule.moduleId)
       if (raceModule) setSelectedRaceModuleId(raceModule.moduleId)
       if (backgroundModule) setSelectedBackgroundModuleId(backgroundModule.moduleId)
+      setSelectedToolPicks(toolPicks)
+      setSelectedLanguagePicks(languagePicks)
+      if (equipmentMode === 'gold-only') {
+        setStartingEquipmentMode('gold-only')
+        setStartingEquipmentModeLocked(true)
+      } else {
+        setStartingEquipmentMode('package')
+        setStartingEquipmentModeLocked(false)
+      }
       setSkillTrainingBySkill(() => {
         const next = Object.fromEntries(ALL_SKILLS.map((skill) => [skill, 'None'])) as Record<SkillName, SkillTrainingLevel>
         if (build.skillTrainingBySkill) {
@@ -649,6 +792,10 @@ function App() {
     } catch {
       setSavedBuild(null)
       setBuildResult('No persisted build for selected character yet.')
+      setSelectedToolPicks([])
+      setSelectedLanguagePicks([])
+      setStartingEquipmentMode('package')
+      setStartingEquipmentModeLocked(false)
     }
 
     try {
@@ -658,6 +805,15 @@ function App() {
     } catch {
       setInventoryState(null)
       setInventoryResult('')
+    }
+
+    try {
+      const currency = await getCharacterCurrency(characterId)
+      setCurrencyState(currency)
+      setCurrencyDraft({ cp: currency.cp, sp: currency.sp, ep: currency.ep, gp: currency.gp, pp: currency.pp })
+    } catch {
+      setCurrencyState(null)
+      setCurrencyDraft({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 })
     }
 
     try {
@@ -707,6 +863,7 @@ function App() {
   async function handleSelectCharacter(characterId: string) {
     setSelectedCharacterId(characterId)
     setRecommendedSpellsByClass({})
+    setAdvancedRulesSnapshot(null)
     await loadPersistedCharacterState(characterId)
   }
 
@@ -734,13 +891,20 @@ function App() {
     setSelectedCharacterId('')
     setHistory([])
     setSavedBuild(null)
+    setSelectedToolPicks([])
+    setSelectedLanguagePicks([])
     setInventoryState(null)
+    setCurrencyState(null)
+    setCurrencyDraft({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 })
+    setStartingEquipmentMode('package')
+    setStartingEquipmentModeLocked(false)
     setActiveDraft(null)
     setSpellEntries([])
     setResourcePools([])
     setRecommendedSpellsByClass({})
     setVitals({ ...DEFAULT_VITALS })
     setSheetResult('')
+    setAdvancedRulesSnapshot(null)
     setArchivedCharacters([])
     navigate('/login')
   }
@@ -969,6 +1133,24 @@ function App() {
               })(),
             ]
           : []),
+        ...selectedToolPicks.map((tool) => ({
+          slot: 'tool-proficiency',
+          moduleId: tool,
+          displayName: tool,
+          sourceCode: selectedBackgroundOption?.sourceCode ?? selectedClassOption?.sourceCode ?? selectedRaceOption?.sourceCode ?? '',
+        })),
+        ...selectedLanguagePicks.map((language) => ({
+          slot: 'language',
+          moduleId: language,
+          displayName: language,
+          sourceCode: selectedBackgroundOption?.sourceCode ?? selectedClassOption?.sourceCode ?? selectedRaceOption?.sourceCode ?? '',
+        })),
+        {
+          slot: 'starting-equipment-mode',
+          moduleId: startingEquipmentMode,
+          displayName: startingEquipmentMode === 'gold-only' ? 'Starting gold' : 'Equipment package',
+          sourceCode: selectedClassOption?.sourceCode ?? '',
+        },
       ].filter((x): x is { slot: string; moduleId: string; displayName: string; sourceCode: string } => x !== null)
 
       const saved = await upsertCharacterBuild(currentCharacterId, {
@@ -980,8 +1162,8 @@ function App() {
         level: totalCharacterLevel,
         proficiencyBonus,
         abilityScores: totalAbilityScores,
-        proficientSkills: ALL_SKILLS.filter((skill) => skillTrainingBySkill[skill] !== 'None'),
-        skillTrainingBySkill,
+        proficientSkills: ALL_SKILLS.filter((skill) => effectiveSkillTrainingBySkill[skill] !== 'None'),
+        skillTrainingBySkill: effectiveSkillTrainingBySkill,
         classLevels,
         selectedModules,
       })
@@ -1072,7 +1254,71 @@ function App() {
   }
 
   function setSkillTraining(skill: SkillName, level: SkillTrainingLevel) {
+    const isAutoGranted = autoGrantedSkills.some((x) => x.toLowerCase() === skill.toLowerCase())
+    const isSelectableChoice = selectableSkillChoices.some((x) => x.toLowerCase() === skill.toLowerCase())
+    const currentLevel = effectiveSkillTrainingBySkill[skill]
+    const isCurrentlyPicked = currentLevel !== 'None' && !isAutoGranted
+
+    if (level === 'None' && isAutoGranted) {
+      setSkillTrainingBySkill((prev) => ({ ...prev, [skill]: 'Proficient' }))
+      return
+    }
+
+    if (level !== 'None' && !isAutoGranted && !isSelectableChoice) {
+      return
+    }
+
+    if (level !== 'None' && !isAutoGranted && !isCurrentlyPicked && nonAutoSkillPicksUsed >= skillChoiceCount) {
+      return
+    }
+
+    const nextExpertiseUsed =
+      expertiseSlotsUsed -
+      (currentLevel === 'Expertise' ? 1 : 0) +
+      (level === 'Expertise' ? 1 : 0)
+    if (level === 'Expertise' && nextExpertiseUsed > expertiseSlotsAvailable) {
+      return
+    }
+
     setSkillTrainingBySkill((prev) => ({ ...prev, [skill]: level }))
+  }
+
+  function toggleToolPick(toolName: string) {
+    const normalized = toolName.trim()
+    if (!normalized) return
+    if (!selectableTools.some((x) => x.toLowerCase() === normalized.toLowerCase())) {
+      return
+    }
+
+    setSelectedToolPicks((prev) => {
+      const exists = prev.some((x) => x.toLowerCase() === normalized.toLowerCase())
+      if (exists) {
+        return prev.filter((x) => x.toLowerCase() !== normalized.toLowerCase())
+      }
+      if (prev.length >= toolChoiceCount) {
+        return prev
+      }
+      return [...prev, normalized]
+    })
+  }
+
+  function toggleLanguagePick(languageName: string) {
+    const normalized = languageName.trim()
+    if (!normalized) return
+    if (!selectableLanguages.some((x) => x.toLowerCase() === normalized.toLowerCase())) {
+      return
+    }
+
+    setSelectedLanguagePicks((prev) => {
+      const exists = prev.some((x) => x.toLowerCase() === normalized.toLowerCase())
+      if (exists) {
+        return prev.filter((x) => x.toLowerCase() !== normalized.toLowerCase())
+      }
+      if (prev.length >= languageChoiceCount) {
+        return prev
+      }
+      return [...prev, normalized]
+    })
   }
 
   function setManualAbilityScore(ability: AbilityName, score: number) {
@@ -1134,9 +1380,54 @@ function App() {
   async function handleAddItemFromCatalog() {
     if (!currentCharacterId || !selectedCatalogItemId) return
     try {
+      if (purchaseFromCurrencyMode) {
+        const item = itemCatalog.find((x) => x.itemId === selectedCatalogItemId)
+        const costInGold = Number(item?.goldValue ?? 0)
+        if (costInGold > 0) {
+          const currency = await purchaseFromCharacterCurrency(currentCharacterId, {
+            costInGold,
+            quantity: selectedCatalogQuantity,
+          })
+          setCurrencyState(currency)
+          setCurrencyDraft({ cp: currency.cp, sp: currency.sp, ep: currency.ep, gp: currency.gp, pp: currency.pp })
+        }
+      }
       const next = await addInventoryItem(currentCharacterId, selectedCatalogItemId, selectedCatalogQuantity)
       setInventoryState(next)
       setInventoryResult(JSON.stringify(next, null, 2))
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleSaveCurrency() {
+    if (!currentCharacterId) return
+    try {
+      const next = await upsertCharacterCurrency(currentCharacterId, currencyDraft)
+      setCurrencyState(next)
+      setCurrencyDraft({ cp: next.cp, sp: next.sp, ep: next.ep, gp: next.gp, pp: next.pp })
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleConvertCurrency() {
+    if (!currentCharacterId) return
+    try {
+      const next = await convertCharacterCurrency(currentCharacterId, currencyConvert)
+      setCurrencyState(next)
+      setCurrencyDraft({ cp: next.cp, sp: next.sp, ep: next.ep, gp: next.gp, pp: next.pp })
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleConsolidateCurrency() {
+    if (!currentCharacterId) return
+    try {
+      const next = await consolidateCharacterCurrency(currentCharacterId, usePlatinumConsolidation)
+      setCurrencyState(next)
+      setCurrencyDraft({ cp: next.cp, sp: next.sp, ep: next.ep, gp: next.gp, pp: next.pp })
     } catch (e) {
       setError(String(e))
     }
@@ -1176,7 +1467,7 @@ function App() {
         advantageState,
         rollDice: true,
         additionalModifier: 0,
-        hasExpertise: skillTrainingBySkill[selectedSkill] === 'Expertise',
+        hasExpertise: effectiveSkillTrainingBySkill[selectedSkill] === 'Expertise',
       })
       setRollResult(JSON.stringify((result as { result?: unknown }).result ?? result, null, 2))
     } catch (e) {
@@ -1201,6 +1492,16 @@ function App() {
         ...prev,
         [attackKey]: JSON.stringify((result as { result?: unknown }).result ?? result),
       }))
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleLoadAdvancedRulesSnapshot() {
+    if (!currentCharacterId) return
+    try {
+      const result = await getAdvancedRulesSnapshot(currentCharacterId)
+      setAdvancedRulesSnapshot(result)
     } catch (e) {
       setError(String(e))
     }
@@ -1275,7 +1576,7 @@ function App() {
   function skillModifier(skill: SkillName) {
     const ability = SKILL_ABILITY[skill]
     const abilityMod = abilityModifier(totalAbilityScores[ability])
-    const training = skillTrainingBySkill[skill]
+    const training = effectiveSkillTrainingBySkill[skill]
     if (training === 'Expertise') {
       return abilityMod + proficiencyBonus * 2
     }
@@ -1283,6 +1584,23 @@ function App() {
       return abilityMod + proficiencyBonus
     }
     return abilityMod
+  }
+
+  function moduleCompatibilityIssues(module: ModuleCatalogItem, levelForCheck: number) {
+    const issues: string[] = []
+    if (module.minLevelRequirement > 0 && levelForCheck < module.minLevelRequirement) {
+      issues.push(`requires level ${module.minLevelRequirement}+`)
+    }
+
+    for (const [ability, required] of Object.entries(module.abilityScoreRequirements ?? {})) {
+      const key = ability as AbilityName
+      const actual = totalAbilityScores[key] ?? 0
+      if (actual < required) {
+        issues.push(`requires ${ability} ${required}+`)
+      }
+    }
+
+    return issues
   }
 
   return (
@@ -1412,6 +1730,33 @@ function App() {
             <option value="Manual">Manual entry</option>
             <option value="Roll">Roll</option>
           </select>
+          <label htmlFor="starting-equipment-mode">Starting gear mode</label>
+          <select
+            id="starting-equipment-mode"
+            value={startingEquipmentMode}
+            onChange={(e) => {
+              const next = e.target.value as 'package' | 'gold-only'
+              if (startingEquipmentModeLocked) {
+                return
+              }
+              if (next === 'gold-only') {
+                setStartingEquipmentMode('gold-only')
+                setStartingEquipmentModeLocked(true)
+                return
+              }
+              setStartingEquipmentMode('package')
+            }}
+            disabled={startingEquipmentModeLocked}
+          >
+            <option value="package">Equipment package</option>
+            <option value="gold-only">Starting gold</option>
+          </select>
+          {startingEquipmentModeLocked && (
+            <small>
+              Starting gold is locked for this character. Class/background equipment packages are disabled for downstream
+              inventory behavior.
+            </small>
+          )}
           <label>
             <input
               type="checkbox"
@@ -1468,7 +1813,7 @@ function App() {
             ) : (
               raceOptions.map((item) => (
                 <option key={item.moduleId} value={item.moduleId}>
-                  {item.displayName} ({item.sourceCode})
+                  {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, totalCharacterLevel).length > 0 ? ' - incompatible' : ''}
                 </option>
               ))
             )}
@@ -1480,7 +1825,7 @@ function App() {
             ) : (
               backgroundOptions.map((item) => (
                 <option key={item.moduleId} value={item.moduleId}>
-                  {item.displayName} ({item.sourceCode})
+                  {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, totalCharacterLevel).length > 0 ? ' - incompatible' : ''}
                 </option>
               ))
             )}
@@ -1491,8 +1836,8 @@ function App() {
             {classOptions
               .filter((x) => x.moduleId !== effectiveSelectedClassModuleId)
               .map((item) => (
-                <option key={item.moduleId} value={item.moduleId}>
-                  {item.displayName} ({item.sourceCode})
+                <option key={item.moduleId} value={item.moduleId} disabled={moduleCompatibilityIssues(item, totalCharacterLevel).length > 0}>
+                  {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, totalCharacterLevel).length > 0 ? ' - incompatible' : ''}
                 </option>
               ))}
           </select>
@@ -1522,6 +1867,9 @@ function App() {
             })}
           </div>
         )}
+        <div className="row">
+          <small>Mixed mode compatibility: incompatible options are marked and disabled with prerequisite reasons.</small>
+        </div>
         <div className="row">
           <small>Race/Species bonuses: {Object.entries(raceBonuses).map(([k, v]) => `${k}+${v}`).join(', ') || 'None'}</small>
         </div>
@@ -1652,8 +2000,8 @@ function App() {
           <select id="subclass-module" value={effectiveSelectedSubclassModuleId} onChange={(e) => setSelectedSubclassModuleId(e.target.value)}>
             <option value="">None</option>
             {subclassOptions.map((item) => (
-              <option key={item.moduleId} value={item.moduleId}>
-                {item.displayName} ({item.sourceCode}){item.minLevelRequirement > 0 ? ` - level ${item.minLevelRequirement}+` : ''}
+              <option key={item.moduleId} value={item.moduleId} disabled={moduleCompatibilityIssues(item, primaryClassLevel).length > 0}>
+                {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, primaryClassLevel).length > 0 ? ` - ${moduleCompatibilityIssues(item, primaryClassLevel).join(', ')}` : ''}
               </option>
             ))}
           </select>
@@ -1910,15 +2258,40 @@ function App() {
           {expertiseSlotsUsed} / {expertiseSlotsAvailable})
         </p>
         <small>
-          Class fixed: {selectedClassOption?.fixedSkillProficiencies.join(', ') || 'None'} | Class choices:{' '}
-          {selectedClassOption?.skillChoices.join(', ') || 'None'} | Background fixed:{' '}
-          {selectedBackgroundOption?.fixedSkillProficiencies.join(', ') || 'None'}
+          Auto skill grants: {autoGrantedSkills.join(', ') || 'None'} | Selectable skill picks:{' '}
+          {selectableSkillChoices.join(', ') || 'None'} (remaining {Math.max(0, skillChoiceCount - nonAutoSkillPicksUsed)})
         </small>
+        <small>
+          Fixed tools: {fixedTools.join(', ') || 'None'} | Selectable tools: {selectableTools.join(', ') || 'None'} (remaining{' '}
+          {Math.max(0, toolChoiceCount - selectedToolPicks.length)})
+        </small>
+        <small>
+          Fixed languages: {fixedLanguages.join(', ') || 'None'} | Selectable languages: {selectableLanguages.join(', ') || 'None'} (remaining{' '}
+          {Math.max(0, languageChoiceCount - selectedLanguagePicks.length)})
+        </small>
+        {selectableTools.length > 0 && (
+          <div className="row">
+            {selectableTools.map((tool) => (
+              <button key={tool} type="button" onClick={() => toggleToolPick(tool)}>
+                {selectedToolPicks.some((x) => x.toLowerCase() === tool.toLowerCase()) ? 'Unpick' : 'Pick'} tool: {tool}
+              </button>
+            ))}
+          </div>
+        )}
+        {selectableLanguages.length > 0 && (
+          <div className="row">
+            {selectableLanguages.map((language) => (
+              <button key={language} type="button" onClick={() => toggleLanguagePick(language)}>
+                {selectedLanguagePicks.some((x) => x.toLowerCase() === language.toLowerCase()) ? 'Unpick' : 'Pick'} language: {language}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="skills-grid">
           {ALL_SKILLS.map((skill) => (
             <label key={skill}>
               <select
-                value={skillTrainingBySkill[skill]}
+                value={effectiveSkillTrainingBySkill[skill]}
                 onChange={(e) => setSkillTraining(skill, e.target.value as SkillTrainingLevel)}
               >
                 <option value="None">None</option>
@@ -1940,6 +2313,47 @@ function App() {
 
       <section className="card">
         <h2>6. Inventory from database (persisted)</h2>
+        <h3>Coin purse</h3>
+        <div className="grid">
+          <label htmlFor="currency-cp">cp</label>
+          <input id="currency-cp" type="number" min={0} value={currencyDraft.cp} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, cp: Math.max(0, Number(e.target.value) || 0) }))} />
+          <label htmlFor="currency-sp">sp</label>
+          <input id="currency-sp" type="number" min={0} value={currencyDraft.sp} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, sp: Math.max(0, Number(e.target.value) || 0) }))} />
+          <label htmlFor="currency-ep">ep</label>
+          <input id="currency-ep" type="number" min={0} value={currencyDraft.ep} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, ep: Math.max(0, Number(e.target.value) || 0) }))} />
+          <label htmlFor="currency-gp">gp</label>
+          <input id="currency-gp" type="number" min={0} value={currencyDraft.gp} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, gp: Math.max(0, Number(e.target.value) || 0) }))} />
+          <label htmlFor="currency-pp">pp</label>
+          <input id="currency-pp" type="number" min={0} value={currencyDraft.pp} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, pp: Math.max(0, Number(e.target.value) || 0) }))} />
+        </div>
+        <div className="row">
+          <button onClick={handleSaveCurrency} disabled={!currentCharacterId}>Save purse</button>
+          <label>
+            <input type="checkbox" checked={usePlatinumConsolidation} onChange={(e) => setUsePlatinumConsolidation(e.target.checked)} /> Consolidate toward platinum
+          </label>
+          <button onClick={handleConsolidateCurrency} disabled={!currentCharacterId}>Consolidate pocket change</button>
+        </div>
+        <div className="row">
+          <label htmlFor="currency-convert-from">From</label>
+          <select id="currency-convert-from" value={currencyConvert.fromDenomination} onChange={(e) => setCurrencyConvert((prev) => ({ ...prev, fromDenomination: e.target.value }))}>
+            <option value="cp">cp</option>
+            <option value="sp">sp</option>
+            <option value="ep">ep</option>
+            <option value="gp">gp</option>
+            <option value="pp">pp</option>
+          </select>
+          <label htmlFor="currency-convert-to">To</label>
+          <select id="currency-convert-to" value={currencyConvert.toDenomination} onChange={(e) => setCurrencyConvert((prev) => ({ ...prev, toDenomination: e.target.value }))}>
+            <option value="cp">cp</option>
+            <option value="sp">sp</option>
+            <option value="ep">ep</option>
+            <option value="gp">gp</option>
+            <option value="pp">pp</option>
+          </select>
+          <label htmlFor="currency-convert-amount">Amount</label>
+          <input id="currency-convert-amount" type="number" min={1} value={currencyConvert.amount} onChange={(e) => setCurrencyConvert((prev) => ({ ...prev, amount: Math.max(1, Number(e.target.value) || 1) }))} />
+          <button onClick={handleConvertCurrency} disabled={!currentCharacterId}>Convert</button>
+        </div>
         <div className="row">
           <label htmlFor="catalog-item">Item</label>
           <select id="catalog-item" value={selectedCatalogItemId} onChange={(e) => setSelectedCatalogItemId(e.target.value)}>
@@ -1962,10 +2376,18 @@ function App() {
             onChange={(e) => setSelectedCatalogQuantity(Math.max(1, Number(e.target.value) || 1))}
             placeholder="Quantity"
           />
+          <label>
+            <input type="checkbox" checked={purchaseFromCurrencyMode} onChange={(e) => setPurchaseFromCurrencyMode(e.target.checked)} /> Purchase (deduct currency)
+          </label>
           <button onClick={() => void handleAddItemFromCatalog()} disabled={!selectedCatalogItemId || !currentCharacterId}>
             Add to persisted inventory
           </button>
         </div>
+        {currencyState && (
+          <small>
+            Current purse: {currencyState.cp} cp, {currencyState.sp} sp, {currencyState.ep} ep, {currencyState.gp} gp, {currencyState.pp} pp
+          </small>
+        )}
         <ul className="inventory-list">
           {(inventoryState?.items ?? []).map((item) => (
             <li key={item.inventoryItemId}>
@@ -2058,6 +2480,21 @@ function App() {
             )
           })}
         </ul>
+        <div className="row">
+          <button onClick={handleLoadAdvancedRulesSnapshot} disabled={!currentCharacterId}>
+            Load advanced multiclass rules snapshot
+          </button>
+        </div>
+        {advancedRulesSnapshot && (
+          <div className="row">
+            <small>
+              Extra Attack stacking: {advancedRulesSnapshot.extraAttackStacks ? 'enabled' : 'disabled'} | AC resolution:{' '}
+              {advancedRulesSnapshot.armorClassResolution} | Pact Magic separate:{' '}
+              {advancedRulesSnapshot.pactMagicTrackedSeparately ? 'yes' : 'no'}
+            </small>
+            <small>Data gaps: {advancedRulesSnapshot.dataGaps.join(' | ') || 'None'}</small>
+          </div>
+        )}
       </section>
 
       <section className="card">

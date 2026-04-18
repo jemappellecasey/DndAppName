@@ -8,6 +8,11 @@ public interface ICharacterProgressionService
     Task<CharacterSpellsData?> GetSpellsAsync(Guid characterId, CancellationToken cancellationToken);
     Task<CharacterSpellsData> UpsertSpellsAsync(Guid characterId, UpsertCharacterSpellsRequest request, CancellationToken cancellationToken);
     Task<RecommendedSpellsResult?> GetRecommendedSpellsAsync(Guid characterId, string classModuleId, int classLevel, CancellationToken cancellationToken);
+    Task<CharacterCurrencyData?> GetCurrencyAsync(Guid characterId, CancellationToken cancellationToken);
+    Task<CharacterCurrencyData> UpsertCurrencyAsync(Guid characterId, UpsertCharacterCurrencyRequest request, CancellationToken cancellationToken);
+    Task<(CharacterCurrencyData? Data, IReadOnlyList<string> Errors)> ConvertCurrencyAsync(Guid characterId, ConvertCurrencyRequest request, CancellationToken cancellationToken);
+    Task<CharacterCurrencyData> ConsolidateCurrencyAsync(Guid characterId, ConsolidateCurrencyRequest request, CancellationToken cancellationToken);
+    Task<(CharacterCurrencyData? Data, IReadOnlyList<string> Errors)> PurchaseFromCurrencyAsync(Guid characterId, PurchaseFromCurrencyRequest request, CancellationToken cancellationToken);
     Task<CharacterResourcesData?> GetResourcesAsync(Guid characterId, CancellationToken cancellationToken);
     Task<CharacterResourcesData> UpsertResourcesAsync(Guid characterId, UpsertCharacterResourcesRequest request, CancellationToken cancellationToken);
     Task<CharacterVitalsData?> GetVitalsAsync(Guid characterId, CancellationToken cancellationToken);
@@ -16,6 +21,15 @@ public interface ICharacterProgressionService
 
 public sealed class CharacterProgressionService : ICharacterProgressionService
 {
+    private static readonly Dictionary<string, int> CurrencyValuesInCp = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["cp"] = 1,
+        ["sp"] = 10,
+        ["ep"] = 50,
+        ["gp"] = 100,
+        ["pp"] = 1000,
+    };
+
     private readonly AppDbContext _db;
 
     public CharacterProgressionService(AppDbContext db)
@@ -82,6 +96,123 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
             Array.Empty<CharacterSpellEntryData>(),
             "Recommended spells are advisory only and do not account for multiclassing.",
             "Curated recommended spell list is not available yet for this class/level.");
+    }
+
+    public async Task<CharacterCurrencyData?> GetCurrencyAsync(Guid characterId, CancellationToken cancellationToken)
+    {
+        var id = characterId.ToString();
+        var exists = await _db.CharacterSheets.AsNoTracking().AnyAsync(x => x.CharacterId == id, cancellationToken);
+        if (!exists)
+        {
+            return null;
+        }
+
+        var resources = await _db.CharacterResourcePools.AsNoTracking()
+            .Where(x => x.CharacterId == id && (x.ResourceKey == "cp" || x.ResourceKey == "sp" || x.ResourceKey == "ep" || x.ResourceKey == "gp" || x.ResourceKey == "pp"))
+            .ToDictionaryAsync(x => x.ResourceKey, x => x.CurrentValue, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        return new CharacterCurrencyData(
+            characterId,
+            resources.TryGetValue("cp", out var cp) ? cp : 0,
+            resources.TryGetValue("sp", out var sp) ? sp : 0,
+            resources.TryGetValue("ep", out var ep) ? ep : 0,
+            resources.TryGetValue("gp", out var gp) ? gp : 0,
+            resources.TryGetValue("pp", out var pp) ? pp : 0);
+    }
+
+    public async Task<CharacterCurrencyData> UpsertCurrencyAsync(Guid characterId, UpsertCharacterCurrencyRequest request, CancellationToken cancellationToken)
+    {
+        var id = characterId.ToString();
+        var rows = await _db.CharacterResourcePools
+            .Where(x => x.CharacterId == id && (x.ResourceKey == "cp" || x.ResourceKey == "sp" || x.ResourceKey == "ep" || x.ResourceKey == "gp" || x.ResourceKey == "pp"))
+            .ToListAsync(cancellationToken);
+
+        _db.CharacterResourcePools.RemoveRange(rows);
+        _db.CharacterResourcePools.AddRange(
+            CreateCurrencyRow(id, "cp", Math.Max(0, request.Cp)),
+            CreateCurrencyRow(id, "sp", Math.Max(0, request.Sp)),
+            CreateCurrencyRow(id, "ep", Math.Max(0, request.Ep)),
+            CreateCurrencyRow(id, "gp", Math.Max(0, request.Gp)),
+            CreateCurrencyRow(id, "pp", Math.Max(0, request.Pp)));
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return (await GetCurrencyAsync(characterId, cancellationToken)) ?? new CharacterCurrencyData(characterId, 0, 0, 0, 0, 0);
+    }
+
+    public async Task<(CharacterCurrencyData? Data, IReadOnlyList<string> Errors)> ConvertCurrencyAsync(Guid characterId, ConvertCurrencyRequest request, CancellationToken cancellationToken)
+    {
+        var current = await GetCurrencyAsync(characterId, cancellationToken);
+        if (current is null)
+        {
+            return (null, new[] { "Character build was not found." });
+        }
+
+        if (!CurrencyValuesInCp.TryGetValue(request.FromDenomination.Trim(), out var fromValue) ||
+            !CurrencyValuesInCp.TryGetValue(request.ToDenomination.Trim(), out var toValue))
+        {
+            return (null, new[] { "Currency denomination must be one of cp, sp, ep, gp, pp." });
+        }
+        if (request.Amount <= 0)
+        {
+            return (null, new[] { "Amount must be greater than 0." });
+        }
+
+        var wallet = ToWallet(current);
+        var fromKey = request.FromDenomination.Trim().ToLowerInvariant();
+        var toKey = request.ToDenomination.Trim().ToLowerInvariant();
+        if (wallet[fromKey] < request.Amount)
+        {
+            return (null, new[] { $"Not enough {fromKey} to convert." });
+        }
+
+        var totalCp = request.Amount * fromValue;
+        if (totalCp % toValue != 0)
+        {
+            return (null, new[] { $"Cannot convert {request.Amount} {fromKey} into exact {toKey} at book exchange rates." });
+        }
+
+        wallet[fromKey] -= request.Amount;
+        wallet[toKey] += totalCp / toValue;
+        var saved = await UpsertCurrencyAsync(characterId, new UpsertCharacterCurrencyRequest(wallet["cp"], wallet["sp"], wallet["ep"], wallet["gp"], wallet["pp"]), cancellationToken);
+        return (saved, Array.Empty<string>());
+    }
+
+    public async Task<CharacterCurrencyData> ConsolidateCurrencyAsync(Guid characterId, ConsolidateCurrencyRequest request, CancellationToken cancellationToken)
+    {
+        var current = await GetCurrencyAsync(characterId, cancellationToken) ?? new CharacterCurrencyData(characterId, 0, 0, 0, 0, 0);
+        var totalCp = ToTotalCp(current);
+        var wallet = request.PreferPlatinum ? FromTotalCpPreferPlatinum(totalCp) : FromTotalCpStandard(totalCp);
+        return await UpsertCurrencyAsync(characterId, new UpsertCharacterCurrencyRequest(wallet["cp"], wallet["sp"], wallet["ep"], wallet["gp"], wallet["pp"]), cancellationToken);
+    }
+
+    public async Task<(CharacterCurrencyData? Data, IReadOnlyList<string> Errors)> PurchaseFromCurrencyAsync(Guid characterId, PurchaseFromCurrencyRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Quantity <= 0)
+        {
+            return (null, new[] { "Quantity must be greater than 0." });
+        }
+        if (request.CostInGold < 0)
+        {
+            return (null, new[] { "Cost cannot be negative." });
+        }
+
+        var current = await GetCurrencyAsync(characterId, cancellationToken);
+        if (current is null)
+        {
+            return (null, new[] { "Character build was not found." });
+        }
+
+        var costInCp = (int)Math.Round(request.CostInGold * request.Quantity * 100m, MidpointRounding.AwayFromZero);
+        var totalCp = ToTotalCp(current);
+        if (totalCp < costInCp)
+        {
+            return (null, new[] { "Insufficient funds for purchase." });
+        }
+
+        var remainingCp = totalCp - costInCp;
+        var consolidated = FromTotalCpStandard(remainingCp);
+        var saved = await UpsertCurrencyAsync(characterId, new UpsertCharacterCurrencyRequest(consolidated["cp"], consolidated["sp"], consolidated["ep"], consolidated["gp"], consolidated["pp"]), cancellationToken);
+        return (saved, Array.Empty<string>());
     }
 
     public async Task<CharacterResourcesData?> GetResourcesAsync(Guid characterId, CancellationToken cancellationToken)
@@ -186,5 +317,61 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
             return "Prepared";
         }
         return "Known";
+    }
+
+    private static CharacterResourcePoolEntity CreateCurrencyRow(string characterId, string key, int amount)
+    {
+        return new CharacterResourcePoolEntity
+        {
+            CharacterId = characterId,
+            ResourceKey = key,
+            CurrentValue = amount,
+            MaxValue = amount,
+            MetadataJson = "{}",
+        };
+    }
+
+    private static int ToTotalCp(CharacterCurrencyData data)
+    {
+        return data.Cp + (data.Sp * 10) + (data.Ep * 50) + (data.Gp * 100) + (data.Pp * 1000);
+    }
+
+    private static Dictionary<string, int> ToWallet(CharacterCurrencyData data)
+    {
+        return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["cp"] = data.Cp,
+            ["sp"] = data.Sp,
+            ["ep"] = data.Ep,
+            ["gp"] = data.Gp,
+            ["pp"] = data.Pp,
+        };
+    }
+
+    private static Dictionary<string, int> FromTotalCpStandard(int totalCp)
+    {
+        var remaining = Math.Max(0, totalCp);
+        var pp = remaining / 1000;
+        remaining %= 1000;
+        var gp = remaining / 100;
+        remaining %= 100;
+        var ep = remaining / 50;
+        remaining %= 50;
+        var sp = remaining / 10;
+        var cp = remaining % 10;
+        return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["cp"] = cp,
+            ["sp"] = sp,
+            ["ep"] = ep,
+            ["gp"] = gp,
+            ["pp"] = pp,
+        };
+    }
+
+    private static Dictionary<string, int> FromTotalCpPreferPlatinum(int totalCp)
+    {
+        // Prefer larger platinum stacks, then greedily resolve remaining value.
+        return FromTotalCpStandard(totalCp);
     }
 }

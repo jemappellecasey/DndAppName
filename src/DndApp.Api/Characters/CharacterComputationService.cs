@@ -12,6 +12,7 @@ public interface ICharacterComputationService
     Task<(SaveResult? Result, IReadOnlyList<string> Errors)> ComputeSaveAsync(Guid characterId, PersistedComputeSaveRequest request, CancellationToken cancellationToken);
     Task<(AttackResult? Result, IReadOnlyList<string> Errors)> ComputeAttackAsync(Guid characterId, PersistedComputeAttackRequest request, CancellationToken cancellationToken);
     Task<(CharacterDerivedStatsResponse? Result, IReadOnlyList<string> Errors)> GetDerivedStatsAsync(Guid characterId, CancellationToken cancellationToken);
+    Task<(AdvancedRulesSnapshotResponse? Result, IReadOnlyList<string> Errors)> GetAdvancedRulesSnapshotAsync(Guid characterId, CancellationToken cancellationToken);
 }
 
 public sealed class CharacterComputationService : ICharacterComputationService
@@ -203,6 +204,42 @@ public sealed class CharacterComputationService : ICharacterComputationService
             loaded.Derived.AvailableSpells,
             loaded.ActiveInventoryItemIds,
             loaded.SaveProficiencies), Array.Empty<string>());
+    }
+
+    public async Task<(AdvancedRulesSnapshotResponse? Result, IReadOnlyList<string> Errors)> GetAdvancedRulesSnapshotAsync(
+        Guid characterId,
+        CancellationToken cancellationToken)
+    {
+        var id = characterId.ToString();
+        var sheet = await _db.CharacterSheets.AsNoTracking().SingleOrDefaultAsync(x => x.CharacterId == id, cancellationToken);
+        if (sheet is null)
+        {
+            return (null, new[] { "Character build was not found." });
+        }
+
+        var classLevels = await _db.CharacterClassLevels.AsNoTracking()
+            .Where(x => x.CharacterId == id)
+            .OrderBy(x => x.SortOrder)
+            .Select(x => new CharacterClassLevelData(x.ClassModuleId, x.ClassName, x.Level, x.SortOrder))
+            .ToArrayAsync(cancellationToken);
+        if (classLevels.Length == 0)
+        {
+            classLevels = [new CharacterClassLevelData(sheet.ClassModuleId, sheet.ClassName, sheet.Level, 0)];
+        }
+
+        var dataGaps = new List<string>
+        {
+            "Combined multiclass spell-slot calculation is blocked until ingested slot tables are available in normalized catalog payloads.",
+            "Cantrip scaling and Pact Magic progression are blocked until verified ingested progression metadata is available.",
+        };
+
+        var hasWarlock = classLevels.Any(x => x.ClassName.Contains("Warlock", StringComparison.OrdinalIgnoreCase));
+        return (new AdvancedRulesSnapshotResponse(
+            characterId,
+            ExtraAttackStacks: false,
+            ArmorClassResolution: "Single AC formula selected; AC formulas do not stack.",
+            PactMagicTrackedSeparately: hasWarlock,
+            DataGaps: dataGaps), Array.Empty<string>());
     }
 
     private async Task<LoadStateResult> LoadStateAsync(Guid characterId, CancellationToken cancellationToken)

@@ -291,6 +291,12 @@ app.MapGet(
                 CatalogParsing.ParseStringArray(x.VariantPayloadJson, "skillChoices"),
                 CatalogParsing.ParseInt(x.VariantPayloadJson, "skillChoiceCount"),
                 CatalogParsing.ParseInt(x.VariantPayloadJson, "expertiseChoiceCount"),
+                CatalogParsing.ParseStringArray(x.VariantPayloadJson, "fixedToolProficiencies"),
+                CatalogParsing.ParseStringArray(x.VariantPayloadJson, "toolChoices"),
+                CatalogParsing.ParseInt(x.VariantPayloadJson, "toolChoiceCount"),
+                CatalogParsing.ParseStringArray(x.VariantPayloadJson, "fixedLanguages"),
+                CatalogParsing.ParseStringArray(x.VariantPayloadJson, "languageChoices"),
+                CatalogParsing.ParseInt(x.VariantPayloadJson, "languageChoiceCount"),
                 minLevelByModule.TryGetValue(x.Module.Id, out var minLevel) ? minLevel : 0,
                 abilityReqByModule.TryGetValue(x.Module.Id, out var abilities)
                     ? abilities
@@ -539,6 +545,22 @@ app.MapGet(
     async (Guid characterId, ICharacterComputationService computations, CancellationToken cancellationToken) =>
     {
         var result = await computations.GetDerivedStatsAsync(characterId, cancellationToken);
+        return result.Errors.Count > 0
+            ? Results.BadRequest(new { errors = result.Errors })
+            : Results.Ok(result.Result);
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/compute/advanced-rules",
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterComputationService computations, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        var result = await computations.GetAdvancedRulesSnapshotAsync(characterId, cancellationToken);
         return result.Errors.Count > 0
             ? Results.BadRequest(new { errors = result.Errors })
             : Results.Ok(result.Result);
@@ -919,6 +941,74 @@ app.MapPut(
     });
 
 app.MapGet(
+    "/characters/{characterId:guid}/currency",
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        var currency = await progression.GetCurrencyAsync(characterId, cancellationToken);
+        return currency is null ? Results.NotFound() : Results.Ok(currency);
+    });
+
+app.MapPut(
+    "/characters/{characterId:guid}/currency",
+    async (Guid characterId, UpsertCharacterCurrencyRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        return Results.Ok(await progression.UpsertCurrencyAsync(characterId, request, cancellationToken));
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/currency/convert",
+    async (Guid characterId, ConvertCurrencyRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        var result = await progression.ConvertCurrencyAsync(characterId, request, cancellationToken);
+        return result.Errors.Count > 0 ? Results.BadRequest(new { errors = result.Errors }) : Results.Ok(result.Data);
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/currency/consolidate",
+    async (Guid characterId, ConsolidateCurrencyRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        return Results.Ok(await progression.ConsolidateCurrencyAsync(characterId, request, cancellationToken));
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/currency/purchase",
+    async (Guid characterId, PurchaseFromCurrencyRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        var result = await progression.PurchaseFromCurrencyAsync(characterId, request, cancellationToken);
+        return result.Errors.Count > 0 ? Results.BadRequest(new { errors = result.Errors }) : Results.Ok(result.Data);
+    });
+
+app.MapGet(
     "/characters/{characterId:guid}/vitals",
     async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
     {
@@ -989,6 +1079,12 @@ public sealed record ModuleCatalogItem(
     IReadOnlyList<string> SkillChoices,
     int SkillChoiceCount,
     int ExpertiseChoiceCount,
+    IReadOnlyList<string> FixedToolProficiencies,
+    IReadOnlyList<string> ToolChoices,
+    int ToolChoiceCount,
+    IReadOnlyList<string> FixedLanguages,
+    IReadOnlyList<string> LanguageChoices,
+    int LanguageChoiceCount,
     int MinLevelRequirement,
     IReadOnlyDictionary<string, int> AbilityScoreRequirements);
 

@@ -1,6 +1,7 @@
 using DndApp.Api.Data;
 using DndApp.Api.MixedRules;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace DndApp.Api.Characters;
 
@@ -92,6 +93,12 @@ public sealed class CharacterBuildService : ICharacterBuildService
             {
                 return (null, classErrors);
             }
+        }
+
+        var proficiencyErrors = await ValidateProficiencySelectionsAsync(classLevels, selectedModules, skillTraining, cancellationToken);
+        if (proficiencyErrors.Count > 0)
+        {
+            return (null, proficiencyErrors);
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -232,6 +239,12 @@ public sealed class CharacterBuildService : ICharacterBuildService
             {
                 return (null, classErrors);
             }
+        }
+
+        var proficiencyErrors = await ValidateProficiencySelectionsAsync(mergedClassLevels, mergedSelectedModules, mergedSkillTraining, cancellationToken);
+        if (proficiencyErrors.Count > 0)
+        {
+            return (null, proficiencyErrors);
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -571,5 +584,213 @@ public sealed class CharacterBuildService : ICharacterBuildService
         }
 
         return errors;
+    }
+
+    private async Task<IReadOnlyList<string>> ValidateProficiencySelectionsAsync(
+        IReadOnlyList<CharacterClassLevelData> classLevels,
+        IReadOnlyList<CharacterSelectedModuleData> selectedModules,
+        IReadOnlyDictionary<string, string> skillTraining,
+        CancellationToken cancellationToken)
+    {
+        var moduleIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var classLevel in classLevels)
+        {
+            moduleIds.Add(classLevel.ClassModuleId);
+        }
+
+        foreach (var selected in selectedModules)
+        {
+            var normalizedSlot = selected.Slot.Trim().ToLowerInvariant();
+            if (normalizedSlot is "class" or "subclass" or "race" or "species" or "background" or "origin")
+            {
+                moduleIds.Add(selected.ModuleId);
+            }
+        }
+
+        var variants = await _db.RuleVariants.AsNoTracking()
+            .Where(x => moduleIds.Contains(x.RuleModuleId))
+            .Select(x => new { x.RuleModuleId, x.PayloadJson })
+            .ToListAsync(cancellationToken);
+
+        var fixedSkills = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var skillChoices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var toolChoices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var languageChoices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var skillChoiceCount = 0;
+        var expertiseChoiceCount = 0;
+        var toolChoiceCount = 0;
+        var languageChoiceCount = 0;
+
+        foreach (var variant in variants)
+        {
+            foreach (var skill in ParseStringArray(variant.PayloadJson, "fixedSkillProficiencies"))
+            {
+                fixedSkills.Add(skill);
+            }
+            foreach (var skill in ParseStringArray(variant.PayloadJson, "skillChoices"))
+            {
+                skillChoices.Add(skill);
+            }
+            foreach (var tool in ParseStringArray(variant.PayloadJson, "toolChoices"))
+            {
+                toolChoices.Add(tool);
+            }
+            foreach (var language in ParseStringArray(variant.PayloadJson, "languageChoices"))
+            {
+                languageChoices.Add(language);
+            }
+
+            skillChoiceCount += ParseInt(variant.PayloadJson, "skillChoiceCount");
+            expertiseChoiceCount += ParseInt(variant.PayloadJson, "expertiseChoiceCount");
+            toolChoiceCount += ParseInt(variant.PayloadJson, "toolChoiceCount");
+            languageChoiceCount += ParseInt(variant.PayloadJson, "languageChoiceCount");
+        }
+
+        var errors = new List<string>();
+
+        var hasSkillRules = fixedSkills.Count > 0 || skillChoices.Count > 0 || skillChoiceCount > 0;
+        if (hasSkillRules)
+        {
+            foreach (var fixedSkill in fixedSkills)
+            {
+                if (!skillTraining.TryGetValue(fixedSkill, out var level) || string.Equals(level, "None", StringComparison.OrdinalIgnoreCase))
+                {
+                    errors.Add($"Missing required fixed skill proficiency '{fixedSkill}'.");
+                }
+            }
+
+            var nonAutoSkillSelections = skillTraining
+                .Where(x => !string.Equals(x.Value, "None", StringComparison.OrdinalIgnoreCase) && !fixedSkills.Contains(x.Key))
+                .Select(x => x.Key)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (nonAutoSkillSelections.Length > skillChoiceCount)
+            {
+                errors.Add($"Selected {nonAutoSkillSelections.Length} non-fixed skill proficiencies but only {skillChoiceCount} are allowed.");
+            }
+            foreach (var selection in nonAutoSkillSelections)
+            {
+                if (!skillChoices.Contains(selection))
+                {
+                    errors.Add($"Skill proficiency '{selection}' is not in allowed skill choices.");
+                }
+            }
+        }
+
+        if (expertiseChoiceCount > 0)
+        {
+            var expertiseSelections = skillTraining
+                .Where(x => string.Equals(x.Value, "Expertise", StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.Key)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (expertiseSelections.Length > expertiseChoiceCount)
+            {
+                errors.Add($"Selected {expertiseSelections.Length} expertise skills but only {expertiseChoiceCount} are allowed.");
+            }
+        }
+
+        var selectedToolPicks = selectedModules
+            .Where(x => string.Equals(x.Slot, "tool-proficiency", StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.ModuleId)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var hasToolRules = toolChoices.Count > 0 || toolChoiceCount > 0;
+        if (hasToolRules)
+        {
+            if (selectedToolPicks.Length > toolChoiceCount)
+            {
+                errors.Add($"Selected {selectedToolPicks.Length} tool proficiencies but only {toolChoiceCount} are allowed.");
+            }
+            foreach (var tool in selectedToolPicks)
+            {
+                if (!toolChoices.Contains(tool))
+                {
+                    errors.Add($"Tool proficiency '{tool}' is not in allowed tool choices.");
+                }
+            }
+        }
+
+        var selectedLanguagePicks = selectedModules
+            .Where(x => string.Equals(x.Slot, "language", StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.ModuleId)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var hasLanguageRules = languageChoices.Count > 0 || languageChoiceCount > 0;
+        if (hasLanguageRules)
+        {
+            if (selectedLanguagePicks.Length > languageChoiceCount)
+            {
+                errors.Add($"Selected {selectedLanguagePicks.Length} languages but only {languageChoiceCount} are allowed.");
+            }
+            foreach (var language in selectedLanguagePicks)
+            {
+                if (!languageChoices.Contains(language))
+                {
+                    errors.Add($"Language '{language}' is not in allowed language choices.");
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    private static IReadOnlyList<string> ParseStringArray(string? payloadJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            if (!document.RootElement.TryGetProperty(propertyName, out var node) || node.ValueKind != JsonValueKind.Array)
+            {
+                return Array.Empty<string>();
+            }
+
+            return node.EnumerateArray()
+                .Where(x => x.ValueKind == JsonValueKind.String)
+                .Select(x => x.GetString())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private static int ParseInt(string? payloadJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+        {
+            return 0;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            if (!document.RootElement.TryGetProperty(propertyName, out var node))
+            {
+                return 0;
+            }
+
+            return node.ValueKind switch
+            {
+                JsonValueKind.Number when node.TryGetInt32(out var n) => n,
+                JsonValueKind.String when int.TryParse(node.GetString(), out var n) => n,
+                _ => 0,
+            };
+        }
+        catch (JsonException)
+        {
+            return 0;
+        }
     }
 }

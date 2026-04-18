@@ -33,6 +33,33 @@ public sealed record CharacterResourcesData(
 public sealed record UpsertCharacterResourcesRequest(
     IReadOnlyList<CharacterResourcePoolData> Resources);
 
+public sealed record CharacterCurrencyData(
+    Guid CharacterId,
+    int Cp,
+    int Sp,
+    int Ep,
+    int Gp,
+    int Pp);
+
+public sealed record UpsertCharacterCurrencyRequest(
+    int Cp,
+    int Sp,
+    int Ep,
+    int Gp,
+    int Pp);
+
+public sealed record ConvertCurrencyRequest(
+    string FromDenomination,
+    string ToDenomination,
+    int Amount);
+
+public sealed record ConsolidateCurrencyRequest(
+    bool PreferPlatinum);
+
+public sealed record PurchaseFromCurrencyRequest(
+    decimal CostInGold,
+    int Quantity);
+
 public sealed record CharacterVitalsData(
     Guid CharacterId,
     int MaxHitPoints,

@@ -105,6 +105,12 @@ export interface ModuleCatalogItem {
   skillChoices: SkillName[]
   skillChoiceCount: number
   expertiseChoiceCount: number
+  fixedToolProficiencies: string[]
+  toolChoices: string[]
+  toolChoiceCount: number
+  fixedLanguages: string[]
+  languageChoices: string[]
+  languageChoiceCount: number
   minLevelRequirement: number
   abilityScoreRequirements: Record<string, number>
 }
@@ -323,6 +329,15 @@ export interface CharacterResourcesData {
   resources: CharacterResourcePoolData[]
 }
 
+export interface CharacterCurrencyData {
+  characterId: string
+  cp: number
+  sp: number
+  ep: number
+  gp: number
+  pp: number
+}
+
 export interface CharacterVitalsData {
   characterId: string
   maxHitPoints: number
@@ -331,4 +346,12 @@ export interface CharacterVitalsData {
   baseMoveSpeed: number
   baseArmorClass: number
   updatedAtUtc: string
+}
+
+export interface AdvancedRulesSnapshotResponse {
+  characterId: string
+  extraAttackStacks: boolean
+  armorClassResolution: string
+  pactMagicTrackedSeparately: boolean
+  dataGaps: string[]
 }
