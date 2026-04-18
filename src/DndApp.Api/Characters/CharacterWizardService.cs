@@ -9,10 +9,12 @@ public interface ICharacterWizardService
 {
     Task<CharacterWizardResult> StartDraftAsync(StartCharacterWizardRequest request, CancellationToken cancellationToken);
     Task<CharacterWizardDraft?> GetDraftAsync(Guid characterId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(bool includeArchived, string? ownerUserId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(bool includeArchived, bool archivedOnly, string? ownerUserId, CancellationToken cancellationToken);
     Task<CharacterSummary?> GetCharacterAsync(Guid characterId, CancellationToken cancellationToken);
     Task<CharacterSummary?> UpdateCharacterAsync(Guid characterId, UpdateCharacterRequest request, CancellationToken cancellationToken);
     Task<CharacterSummary?> ArchiveCharacterAsync(Guid characterId, CancellationToken cancellationToken);
+    Task<CharacterSummary?> RestoreCharacterAsync(Guid characterId, CancellationToken cancellationToken);
+    Task<bool> DeleteCharacterAsync(Guid characterId, CancellationToken cancellationToken);
     Task<CharacterSummary?> DuplicateCharacterAsync(Guid characterId, DuplicateCharacterRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<CharacterRevisionEntry>> GetCharacterHistoryAsync(Guid characterId, CancellationToken cancellationToken);
     Task<CharacterWizardResult> SubmitStepAsync(Guid characterId, SubmitWizardStepRequest request, CancellationToken cancellationToken);
@@ -36,10 +38,6 @@ public sealed class CharacterWizardService : ICharacterWizardService
     public async Task<CharacterWizardResult> StartDraftAsync(StartCharacterWizardRequest request, CancellationToken cancellationToken)
     {
         var errors = new List<string>();
-        if (string.IsNullOrWhiteSpace(request.CharacterName))
-        {
-            errors.Add("Character name is required.");
-        }
         if (string.IsNullOrWhiteSpace(request.SessionToken))
         {
             errors.Add("Session token is required.");
@@ -55,11 +53,12 @@ public sealed class CharacterWizardService : ICharacterWizardService
 
         var now = DateTimeOffset.UtcNow;
         var characterId = Guid.NewGuid();
+        var characterName = string.IsNullOrWhiteSpace(request.CharacterName) ? "New Adventurer" : request.CharacterName.Trim();
         var draftEntity = new CharacterDraftEntity
         {
             CharacterId = characterId.ToString(),
             OwnerUserId = request.SessionToken.Trim(),
-            CharacterName = request.CharacterName.Trim(),
+            CharacterName = characterName,
             BaseRuleSystem = request.RulesProfile.BaseRuleSystem.ToString(),
             MixedModeEnabled = request.RulesProfile.MixedModeEnabled,
             OverlaySourcesJson = SerializeJson(request.RulesProfile.OverlaySources),
@@ -89,14 +88,19 @@ public sealed class CharacterWizardService : ICharacterWizardService
         return entity is null ? null : ToDraft(entity);
     }
 
-    public async Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(bool includeArchived, string? ownerUserId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<CharacterSummary>> ListCharactersAsync(bool includeArchived, bool archivedOnly, string? ownerUserId, CancellationToken cancellationToken)
     {
         var query = _db.CharacterRecords.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(ownerUserId))
         {
             query = query.Where(x => x.OwnerUserId == ownerUserId);
         }
-        if (!includeArchived)
+
+        if (archivedOnly)
+        {
+            query = query.Where(x => x.IsArchived);
+        }
+        else if (!includeArchived)
         {
             query = query.Where(x => !x.IsArchived);
         }
@@ -149,6 +153,47 @@ public sealed class CharacterWizardService : ICharacterWizardService
         AppendHistory(characterId, "character-archived", entity.OwnerUserId, "Character archived (soft delete).");
         await _db.SaveChangesAsync(cancellationToken);
         return ToSummary(entity);
+    }
+
+    public async Task<CharacterSummary?> RestoreCharacterAsync(Guid characterId, CancellationToken cancellationToken)
+    {
+        var entity = await _db.CharacterRecords.FirstOrDefaultAsync(x => x.CharacterId == characterId.ToString(), cancellationToken);
+        if (entity is null)
+        {
+            return null;
+        }
+
+        entity.IsArchived = false;
+        entity.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        AppendHistory(characterId, "character-restored", entity.OwnerUserId, "Character restored from archive.");
+        await _db.SaveChangesAsync(cancellationToken);
+        return ToSummary(entity);
+    }
+
+    public async Task<bool> DeleteCharacterAsync(Guid characterId, CancellationToken cancellationToken)
+    {
+        var id = characterId.ToString();
+        var record = await _db.CharacterRecords.FirstOrDefaultAsync(x => x.CharacterId == id, cancellationToken);
+        if (record is null)
+        {
+            return false;
+        }
+
+        _db.CharacterHistoryEntries.RemoveRange(_db.CharacterHistoryEntries.Where(x => x.CharacterId == id));
+        _db.CharacterDrafts.RemoveRange(_db.CharacterDrafts.Where(x => x.CharacterId == id));
+        _db.CharacterVitals.RemoveRange(_db.CharacterVitals.Where(x => x.CharacterId == id));
+        _db.CharacterResourcePools.RemoveRange(_db.CharacterResourcePools.Where(x => x.CharacterId == id));
+        _db.CharacterSpellEntries.RemoveRange(_db.CharacterSpellEntries.Where(x => x.CharacterId == id));
+        _db.CharacterInventoryItems.RemoveRange(_db.CharacterInventoryItems.Where(x => x.CharacterId == id));
+        _db.CharacterAbilityScores.RemoveRange(_db.CharacterAbilityScores.Where(x => x.CharacterId == id));
+        _db.CharacterSkillProficiencies.RemoveRange(_db.CharacterSkillProficiencies.Where(x => x.CharacterId == id));
+        _db.CharacterClassLevels.RemoveRange(_db.CharacterClassLevels.Where(x => x.CharacterId == id));
+        _db.CharacterSelectedModules.RemoveRange(_db.CharacterSelectedModules.Where(x => x.CharacterId == id));
+        _db.CharacterSheets.RemoveRange(_db.CharacterSheets.Where(x => x.CharacterId == id));
+        _db.CharacterRecords.Remove(record);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task<CharacterSummary?> DuplicateCharacterAsync(Guid characterId, DuplicateCharacterRequest request, CancellationToken cancellationToken)

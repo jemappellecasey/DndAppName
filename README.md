@@ -68,22 +68,24 @@ npm run build
 
 ## Frontend quick walkthrough (first-time user)
 1. The landing page shows **Login** and **About DndAppName**. Sign in with username + password (or register a new local account).
-2. After login, start in **Your characters** to refresh/select owned characters and manage archive/duplicate/history actions.
-3. In **Character build setup**, set the character name, rules mode, primary class level, and ability-score method:
+2. After login, the app routes to **Your characters** (`/characters`) and shows active characters only.
+3. Use **Archived characters** (`/characters/archived`) to restore archived entries or permanently delete them (explicit confirmation required before delete).
+4. Use **Create new character** (`/characters/new`) to start the creation flow.
+5. In **Character build setup**, set the character name (optional), rules mode, primary class level, and ability-score method:
     - **Point buy** (27-point budget),
     - **Manual** score entry, or
-    - **Roll** (4d6 drop lowest) with drag/drop assignment from roll pool into each ability slot.
-4. **Total character level** is derived from class levels (primary + multiclass entries), and proficiency bonus is auto-calculated from total level using `(level - 1) // 4 + 2`.
-5. Mixed mode now uses a **multi-select overlay source picker** instead of comma-separated text, and catalog module loading uses the currently selected overlay sources only.
-6. New-character setup now includes primary class, optional multiclass entries (primary class required), race/species, and background/origin selections.
-7. Race/species and background/origin ability bonuses (when available from catalog payload) are applied into total ability scores.
-8. In **Wizard + persistent build**, click **Start Wizard Draft**, choose a main class (from the selected base ruleset), optionally choose a subclass (mixed mode shows cross-version subclasses), apply selections, then click **Save build to persistent model**.
-9. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
-10. In **Skills menu and persisted checks**, each skill has a `None/Proficient/Expertise` dropdown with live proficiency/expertise slot counters (negative values indicate over-allocation), plus persisted advantage/disadvantage check rolling; saved builds now round-trip these training tiers.
-11. In **Inventory from database (persisted)**, add item definitions from catalog, set quantity, and manage equip/attune/unattune/remove states. Inventory rows show value, weight, attunement, equip status, and quantity.
-12. **Attacks** auto-builds from equipped weapon-style inventory entries (deduped by weapon details) and shows to-hit bonus, damage expression, and advantage/disadvantage rolling.
-13. In **Character sheet: vitals, spells, resources**, edit and save persisted HP/speed/AC values, spell entries, and resource pools.
-14. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
+    - **Roll** (4d6 drop lowest) with drag/drop plus touch-friendly tap assignment from roll pool into each ability slot. Optional **Reroll 1s once** is available.
+6. **Total character level** is derived from class levels (primary + multiclass entries), and proficiency bonus is auto-calculated from total level using `(level - 1) // 4 + 2`.
+7. Mixed mode now uses a **multi-select overlay source picker** instead of comma-separated text, and catalog module loading uses the currently selected overlay sources only.
+8. New-character setup now includes primary class, optional multiclass entries (primary class required), race/species, and background/origin selections.
+9. Race/species and background/origin ability bonuses (when available from catalog payload) are applied into total ability scores.
+10. In **Wizard + persistent build**, click **Start Wizard Draft**, choose a main class (from the selected base ruleset), optionally choose a subclass (mixed mode shows cross-version subclasses), apply selections, then click **Save build to persistent model**.
+11. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
+12. In **Skills menu and persisted checks**, each skill has a `None/Proficient/Expertise` dropdown with live proficiency/expertise slot counters (negative values indicate over-allocation), plus persisted advantage/disadvantage check rolling; saved builds now round-trip these training tiers.
+13. In **Inventory from database (persisted)**, add item definitions from catalog, set quantity, and manage equip/attune/unattune/remove states. Inventory rows show value, weight, attunement, equip status, and quantity.
+14. **Attacks** auto-builds from equipped weapon-style inventory entries (deduped by weapon details) and shows to-hit bonus, damage expression, and advantage/disadvantage rolling.
+15. In **Character sheet: vitals, spells, resources**, edit and save persisted HP/speed/AC values, spell entries, and resource pools.
+16. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
 
 ### Troubleshooting (local run)
 1. If `dotnet build` fails with `DndApp.Api.exe ... file is being used by another process`, stop the running API (`Ctrl+C` in the terminal where `dotnet run` is active), then build again.
@@ -150,9 +152,11 @@ Outputs are written under:
 10. `GET /characters/{characterId}`
 11. `PATCH /characters/{characterId}`
 12. `POST /characters/{characterId}/archive`
-13. `POST /characters/{characterId}/duplicate`
-14. `GET /characters/{characterId}/history`
-15. `POST /admin/characters/reconcile` (repairs missing persisted wizard records/drafts from existing character sheets)
+13. `POST /characters/{characterId}/restore`
+14. `DELETE /characters/{characterId}` (permanent delete)
+15. `POST /characters/{characterId}/duplicate`
+16. `GET /characters/{characterId}/history`
+17. `POST /admin/characters/reconcile` (repairs missing persisted wizard records/drafts from existing character sheets)
 
 ### Local auth
 1. `POST /auth/local/register`

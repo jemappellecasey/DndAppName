@@ -73,7 +73,7 @@ pre {
 
 .list li {
   display: grid;
-  grid-template-columns: 1.5fr 1fr auto auto auto;
+  grid-template-columns: minmax(0, 1.8fr) minmax(120px, 1fr) repeat(3, auto);
   gap: 0.5rem;
   align-items: center;
 }
@@ -152,4 +152,10 @@ pre {
   padding: 0.6rem;
   display: grid;
   gap: 0.4rem;
+}
+
+@media (max-width: 700px) {
+  .list li {
+    grid-template-columns: 1fr;
+  }
 }

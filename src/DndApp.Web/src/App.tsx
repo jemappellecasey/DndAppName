@@ -6,8 +6,10 @@ import {
   computePersistedCheck,
   computePersistedAttack,
   copyToRuleset,
+  deleteCharacter,
   duplicateCharacter,
   finalizeWizard,
+  getArchivedCharacters,
   getAttunementGuidance,
   getCharacterBuild,
   getCharacterHistory,
@@ -27,6 +29,7 @@ import {
   previewOrigin,
   previewSpecies,
   removeInventoryItem,
+  restoreCharacter,
   setSessionToken,
   startWizard,
   submitWizardStep,
@@ -168,9 +171,15 @@ function abilityModifier(score: number) {
   return Math.floor((score - 10) / 2)
 }
 
-function rollAbilityValues(): number[] {
+function rollAbilityValues(rerollOnes: boolean): number[] {
   return ABILITIES.map(() => {
-    const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1).sort((a, b) => a - b)
+    const rolls = Array.from({ length: 4 }, () => {
+      let die = Math.floor(Math.random() * 6) + 1
+      if (rerollOnes && die === 1) {
+        die = Math.floor(Math.random() * 6) + 1
+      }
+      return die
+    }).sort((a, b) => a - b)
     return rolls[1] + rolls[2] + rolls[3]
   }).sort((a, b) => b - a)
 }
@@ -194,11 +203,13 @@ function App() {
   const [loginPassword, setLoginPassword] = useState('')
   const [isRegisterMode, setIsRegisterMode] = useState(false)
   const [characters, setCharacters] = useState<CharacterSummary[]>([])
+  const [archivedCharacters, setArchivedCharacters] = useState<CharacterSummary[]>([])
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [history, setHistory] = useState<CharacterHistoryEntry[]>([])
   const [error, setError] = useState('')
+  const [currentPath, setCurrentPath] = useState(window.location.pathname || '/login')
 
-  const [wizardName, setWizardName] = useState('New Adventurer')
+  const [wizardName, setWizardName] = useState('')
   const [baseRules, setBaseRules] = useState<RuleSystemMode>('Rules2024')
   const [mixedMode, setMixedMode] = useState(false)
   const [overlaySourceOptions, setOverlaySourceOptions] = useState<ContentSourceCatalogItem[]>([])
@@ -216,6 +227,7 @@ function App() {
   const [classCatalogResult, setClassCatalogResult] = useState('')
 
   const [buildMethod, setBuildMethod] = useState<BuildMethod>('PointBuy')
+  const [rerollOnes, setRerollOnes] = useState(false)
   const [manualScores, setManualScores] = useState<Record<AbilityName, number>>({ ...DEFAULT_SCORES })
   const [pointBuyScores, setPointBuyScores] = useState<Record<AbilityName, number>>({ ...DEFAULT_SCORES })
   const [rolledPool, setRolledPool] = useState<number[]>([])
@@ -254,6 +266,9 @@ function App() {
     () => selectedCharacterId || activeDraft?.draft?.characterId || '',
     [selectedCharacterId, activeDraft?.draft?.characterId],
   )
+  const isCharactersRoute = currentPath === '/' || currentPath === '/characters'
+  const isArchivedRoute = currentPath === '/characters/archived'
+  const isNewCharacterRoute = currentPath.startsWith('/characters/new')
 
   const classOptions = useMemo(
     () =>
@@ -428,6 +443,72 @@ function App() {
       .catch(() => setStatus('API unreachable (start DndApp.Api on localhost:5080)'))
   }, [])
 
+  useEffect(() => {
+    const onPopState = () => {
+      setCurrentPath(window.location.pathname || '/')
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  useEffect(() => {
+    if (!session) {
+      return
+    }
+
+    let cancelled = false
+
+    if (isArchivedRoute) {
+      getArchivedCharacters(true)
+        .then((list) => {
+          if (!cancelled) {
+            setArchivedCharacters(list)
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) {
+            setError(String(e))
+          }
+        })
+      return
+    }
+
+    if (isCharactersRoute) {
+      getCharacters(false, true)
+        .then(async (list) => {
+          if (cancelled) {
+            return
+          }
+
+          setCharacters(list)
+          if (!selectedCharacterId && list.length > 0) {
+            setSelectedCharacterId(list[0].characterId)
+            await loadPersistedCharacterState(list[0].characterId)
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) {
+            setError(String(e))
+          }
+        })
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [isArchivedRoute, isCharactersRoute, selectedCharacterId, session])
+
+  function navigate(path: string) {
+    if (window.location.pathname === path) {
+      setCurrentPath(path)
+      return
+    }
+
+    window.history.pushState({}, '', path)
+    setCurrentPath(path)
+  }
+
   async function loadCatalogData(ruleSystem: RuleSystemMode) {
     const [classes, items, guidance, sources] = await Promise.all([
       getClassCatalog(ruleSystem),
@@ -568,12 +649,17 @@ function App() {
   }
 
   async function refreshCharacters() {
-    const list = await getCharacters(true, true)
+    const list = await getCharacters(false, true)
     setCharacters(list)
     if (!selectedCharacterId && list.length > 0) {
       setSelectedCharacterId(list[0].characterId)
       await loadPersistedCharacterState(list[0].characterId)
     }
+  }
+
+  async function refreshArchivedCharacters() {
+    const list = await getArchivedCharacters(true)
+    setArchivedCharacters(list)
   }
 
   async function handleSelectCharacter(characterId: string) {
@@ -590,7 +676,9 @@ function App() {
       setSession(result)
       setSessionToken(result.sessionToken)
       await refreshCharacters()
+      await refreshArchivedCharacters()
       await loadCatalogData(baseRules)
+      navigate('/characters')
     } catch (e) {
       setError(String(e))
     }
@@ -609,6 +697,8 @@ function App() {
     setResourcePools([])
     setVitals({ ...DEFAULT_VITALS })
     setSheetResult('')
+    setArchivedCharacters([])
+    navigate('/login')
   }
 
   async function handleBaseRulesChange(ruleSystem: RuleSystemMode) {
@@ -626,7 +716,7 @@ function App() {
       setError('')
       const result = await startWizard({
         sessionToken: session.sessionToken,
-        characterName: wizardName,
+        characterName: wizardName.trim() ? wizardName : null,
         baseRuleSystem: baseRules,
         mixedModeEnabled: mixedMode,
         overlaySources: mixedMode ? overlaySources : [],
@@ -635,6 +725,7 @@ function App() {
       if (result.draft?.characterId) {
         setSelectedCharacterId(result.draft.characterId)
       }
+      navigate('/characters/new')
     } catch (e) {
       setError(String(e))
     }
@@ -865,6 +956,35 @@ function App() {
   async function handleArchive(characterId: string) {
     await archiveCharacter(characterId)
     await refreshCharacters()
+    await refreshArchivedCharacters()
+  }
+
+  async function handleRestore(characterId: string) {
+    await restoreCharacter(characterId)
+    await refreshCharacters()
+    await refreshArchivedCharacters()
+  }
+
+  async function handleDelete(characterId: string) {
+    const confirmed = window.confirm('Permanently delete this character? This cannot be undone.')
+    if (!confirmed) {
+      return
+    }
+
+    await deleteCharacter(characterId)
+    if (selectedCharacterId === characterId) {
+      setSelectedCharacterId('')
+      setHistory([])
+      setSavedBuild(null)
+      setInventoryState(null)
+      setActiveDraft(null)
+      setSpellEntries([])
+      setResourcePools([])
+      setVitals({ ...DEFAULT_VITALS })
+      setSheetResult('')
+    }
+    await refreshCharacters()
+    await refreshArchivedCharacters()
   }
 
   async function handleDuplicate(characterId: string) {
@@ -934,7 +1054,7 @@ function App() {
   }
 
   function handleRollPoolGenerate() {
-    setRolledPool(rollAbilityValues())
+    setRolledPool(rollAbilityValues(rerollOnes))
     setRollAssignments({})
   }
 
@@ -1147,18 +1267,26 @@ function App() {
               </p>
               <button onClick={handleLogout}>Log out</button>
             </div>
+            <div className="row">
+              <button onClick={() => navigate('/characters')}>Your characters</button>
+              <button onClick={() => navigate('/characters/archived')}>Archived characters</button>
+              <button onClick={() => navigate('/characters/new')}>Create new character</button>
+            </div>
             <p>
               <strong>Getting started:</strong> pick a character (or start a wizard draft), then complete build setup and
               use the sheet sections for vitals, spells, resources, skills, and inventory.
             </p>
           </section>
 
-          <section className="card">
+          {isCharactersRoute && (
+            <section className="card">
             <h2>1. Your characters</h2>
             <div className="row">
-              <button onClick={refreshCharacters} disabled={!session}>
+              <button onClick={() => void refreshCharacters()} disabled={!session}>
                 Refresh
               </button>
+              <button onClick={() => navigate('/characters/new')}>Create new character</button>
+              <button onClick={() => navigate('/characters/archived')}>Archived characters</button>
               <button onClick={handleCopyRuleset} disabled={!selectedCharacterId}>
                 Copy to other ruleset
               </button>
@@ -1180,9 +1308,34 @@ function App() {
                 <pre>{JSON.stringify(history, null, 2)}</pre>
               </details>
             )}
-          </section>
+            </section>
+          )}
 
-          <section className="card">
+          {isArchivedRoute && (
+            <section className="card">
+              <h2>Archived characters</h2>
+              <div className="row">
+                <button onClick={() => void refreshArchivedCharacters()} disabled={!session}>
+                  Refresh archived
+                </button>
+                <button onClick={() => navigate('/characters')}>Back to active characters</button>
+              </div>
+              <ul className="list">
+                {archivedCharacters.map((c) => (
+                  <li key={c.characterId}>
+                    <button onClick={() => void handleSelectCharacter(c.characterId)}>{c.characterName}</button>
+                    <span className="ruleset-badge">{rulesetLabel(c.baseRuleSystem)}</span>
+                    <button onClick={() => void handleRestore(c.characterId)}>Restore</button>
+                    <button onClick={() => void handleDelete(c.characterId)}>Delete permanently</button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {isNewCharacterRoute && (
+            <>
+            <section className="card">
         <h2>2. Character build setup</h2>
         <div className="grid">
           <label htmlFor="character-name">Character name</label>
@@ -1321,8 +1474,12 @@ function App() {
         {buildMethod === 'Roll' && (
           <>
             <div className="row">
+              <label>
+                <input type="checkbox" checked={rerollOnes} onChange={(e) => setRerollOnes(e.target.checked)} /> Reroll 1s
+                once
+              </label>
               <button onClick={handleRollPoolGenerate}>Roll 4d6 drop lowest (6 stats)</button>
-              <p>{isRollAssignmentComplete ? 'All rolls assigned.' : 'Drag each roll to an ability to assign.'}</p>
+              <p>{isRollAssignmentComplete ? 'All rolls assigned.' : 'Drag or tap to assign each roll to an ability.'}</p>
             </div>
             <div className="roll-pool">
               {rolledPool.length === 0 ? (
@@ -1362,24 +1519,35 @@ function App() {
                   onChange={(e) => setManualAbilityScore(ability, Number(e.target.value))}
                 />
               ) : (
-                <div
-                  className="roll-target"
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    const value = Number(event.dataTransfer.getData('text/plain'))
-                    if (!Number.isNaN(value)) {
-                      assignRollToAbility(ability, value)
-                    }
-                  }}
-                >
-                  <strong>{rolledScores[ability]}</strong>
-                  {typeof rollAssignments[ability] === 'number' && (
-                    <button type="button" onClick={() => unassignRoll(ability)}>
-                      Clear
-                    </button>
+                <>
+                  <div
+                    className="roll-target"
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      const value = Number(event.dataTransfer.getData('text/plain'))
+                      if (!Number.isNaN(value)) {
+                        assignRollToAbility(ability, value)
+                      }
+                    }}
+                  >
+                    <strong>{rolledScores[ability]}</strong>
+                    {typeof rollAssignments[ability] === 'number' && (
+                      <button type="button" onClick={() => unassignRoll(ability)}>
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {rolledPool.length > 0 && (
+                    <div className="row">
+                      {rolledPool.map((value, idx) => (
+                        <button key={`${ability}-pick-${value}-${idx}`} type="button" onClick={() => assignRollToAbility(ability, value)}>
+                          Assign {value}
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </div>
+                </>
               )}
               <small>
                 total {totalAbilityScores[ability]} | mod {abilityModifier(totalAbilityScores[ability]) >= 0 ? '+' : ''}
@@ -1824,6 +1992,8 @@ function App() {
           </details>
         )}
       </section>
+            </>
+          )}
         </>
       )}
     </main>

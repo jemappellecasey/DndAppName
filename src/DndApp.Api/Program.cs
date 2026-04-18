@@ -595,7 +595,7 @@ app.MapGet(
 
 app.MapGet(
     "/characters",
-    async (bool includeArchived, bool mine, HttpContext httpContext, ILocalAuthService auth, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
+    async (bool includeArchived, bool archivedOnly, bool mine, HttpContext httpContext, ILocalAuthService auth, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
     {
         string? ownerUserId = null;
         if (mine)
@@ -609,7 +609,7 @@ app.MapGet(
             ownerUserId = session.UserId;
         }
 
-        var result = await wizardService.ListCharactersAsync(includeArchived, ownerUserId, cancellationToken);
+        var result = await wizardService.ListCharactersAsync(includeArchived, archivedOnly, ownerUserId, cancellationToken);
         return Results.Ok(result);
     });
 
@@ -635,6 +635,22 @@ app.MapPost(
     {
         var result = await wizardService.ArchiveCharacterAsync(characterId, cancellationToken);
         return result is null ? Results.NotFound() : Results.Ok(result);
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/restore",
+    async (Guid characterId, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
+    {
+        var result = await wizardService.RestoreCharacterAsync(characterId, cancellationToken);
+        return result is null ? Results.NotFound() : Results.Ok(result);
+    });
+
+app.MapDelete(
+    "/characters/{characterId:guid}",
+    async (Guid characterId, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>
+    {
+        var deleted = await wizardService.DeleteCharacterAsync(characterId, cancellationToken);
+        return deleted ? Results.NoContent() : Results.NotFound();
     });
 
 app.MapPost(

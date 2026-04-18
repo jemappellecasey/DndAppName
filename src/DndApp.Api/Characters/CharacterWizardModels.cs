@@ -9,7 +9,7 @@ public sealed record RulesProfile(
 
 public sealed record StartCharacterWizardRequest(
     string SessionToken,
-    string CharacterName,
+    string? CharacterName,
     RulesProfile RulesProfile);
 
 public sealed record WizardStepState(

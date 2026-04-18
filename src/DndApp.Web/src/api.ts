@@ -76,6 +76,10 @@ export function getCharacters(includeArchived = true, mine = false) {
   return request<CharacterSummary[]>(`/characters?includeArchived=${includeArchived}&mine=${mine}`)
 }
 
+export function getArchivedCharacters(mine = false) {
+  return request<CharacterSummary[]>(`/characters?archivedOnly=true&includeArchived=true&mine=${mine}`)
+}
+
 export function getClassCatalog(ruleSystem: RuleSystemMode) {
   return request<ClassCatalogItem[]>(`/catalog/classes?ruleSystem=${ruleSystem}`)
 }
@@ -115,6 +119,14 @@ export function archiveCharacter(characterId: string) {
   return request<CharacterSummary>(`/characters/${characterId}/archive`, { method: 'POST' })
 }
 
+export function restoreCharacter(characterId: string) {
+  return request<CharacterSummary>(`/characters/${characterId}/restore`, { method: 'POST' })
+}
+
+export function deleteCharacter(characterId: string) {
+  return request<void>(`/characters/${characterId}`, { method: 'DELETE' })
+}
+
 export function duplicateCharacter(characterId: string) {
   return request<CharacterSummary>(`/characters/${characterId}/duplicate`, {
     method: 'POST',
@@ -128,7 +140,7 @@ export function getCharacterHistory(characterId: string) {
 
 export function startWizard(input: {
   sessionToken: string
-  characterName: string
+  characterName: string | null
   baseRuleSystem: RuleSystemMode
   mixedModeEnabled: boolean
   overlaySources: string[]
