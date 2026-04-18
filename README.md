@@ -43,7 +43,13 @@ Repository folder names may vary (for example `CopilotTesting`), while the solut
    ```
 2. Start web app in another terminal:
    ```powershell
+   # Run from repository root:
    Set-Location src\DndApp.Web
+   npm install
+   npm run dev
+   ```
+   If you are already in `src\DndApp.Web`, run only:
+   ```powershell
    npm install
    npm run dev
    ```
