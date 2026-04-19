@@ -28,6 +28,10 @@ public sealed class AppDbContext : DbContext
     public DbSet<Feat2014Entity> Feats2014 => Set<Feat2014Entity>();
     public DbSet<Feat2024Entity> Feats2024 => Set<Feat2024Entity>();
     public DbSet<SpellEntity> Spells => Set<SpellEntity>();
+    public DbSet<Class2014Entity> Classes2014 => Set<Class2014Entity>();
+    public DbSet<Class2024Entity> Classes2024 => Set<Class2024Entity>();
+    public DbSet<Subclass2014Entity> Subclasses2014 => Set<Subclass2014Entity>();
+    public DbSet<Subclass2024Entity> Subclasses2024 => Set<Subclass2024Entity>();
     public DbSet<Item2014Entity> Items2014 => Set<Item2014Entity>();
     public DbSet<Item2024Entity> Items2024 => Set<Item2024Entity>();
     public DbSet<CharacterSheetEntity> CharacterSheets => Set<CharacterSheetEntity>();
@@ -337,6 +341,7 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.Id).HasMaxLength(64);
             entity.Property(x => x.ContentSourceId).HasMaxLength(40);
             entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.SourceSectionId).HasMaxLength(64);
             entity.Property(x => x.Slug).HasMaxLength(160);
             entity.Property(x => x.Name).HasMaxLength(300);
             entity.Property(x => x.EditionYear);
@@ -345,10 +350,95 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.RangeText).HasMaxLength(160);
             entity.Property(x => x.Duration).HasMaxLength(160);
             entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.IngestionConfidence).HasPrecision(5, 4);
+            entity.Property(x => x.StatBlockJson).HasColumnType("TEXT");
             entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
             entity.HasIndex(x => new { x.ContentSourceId, x.Slug, x.EditionYear }).IsUnique();
             entity.HasIndex(x => new { x.EditionYear, x.Level, x.Name });
             entity.HasIndex(x => x.LegacyRuleModuleId);
+            entity.HasIndex(x => x.SourceSectionId);
+        });
+
+        modelBuilder.Entity<Class2014Entity>(entity =>
+        {
+            entity.ToTable("catalog_class_2014");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.HitDie).HasMaxLength(16);
+            entity.Property(x => x.PrimaryAbilityJson).HasColumnType("TEXT");
+            entity.Property(x => x.SavingThrowAbilitiesJson).HasColumnType("TEXT");
+            entity.Property(x => x.SkillProficienciesJson).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.Name);
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Class2024Entity>(entity =>
+        {
+            entity.ToTable("catalog_class_2024");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.HitDie).HasMaxLength(16);
+            entity.Property(x => x.PrimaryAbilityJson).HasColumnType("TEXT");
+            entity.Property(x => x.SavingThrowAbilitiesJson).HasColumnType("TEXT");
+            entity.Property(x => x.SkillProficienciesJson).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.Name);
+            entity.HasIndex(x => x.LegacyRuleModuleId);
+        });
+
+        modelBuilder.Entity<Subclass2014Entity>(entity =>
+        {
+            entity.ToTable("catalog_subclass_2014");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.ParentClassId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.ParentClassId);
+            entity.HasIndex(x => new { x.ParentClassId, x.Name });
+            entity.HasOne<Class2014Entity>()
+                .WithMany()
+                .HasForeignKey(x => x.ParentClassId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Subclass2024Entity>(entity =>
+        {
+            entity.ToTable("catalog_subclass_2024");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
+            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
+            entity.Property(x => x.ParentClassId).HasMaxLength(64);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.Description).HasColumnType("TEXT");
+            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
+            entity.HasIndex(x => x.ParentClassId);
+            entity.HasIndex(x => new { x.ParentClassId, x.Name });
+            entity.HasOne<Class2024Entity>()
+                .WithMany()
+                .HasForeignKey(x => x.ParentClassId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Item2014Entity>(entity =>

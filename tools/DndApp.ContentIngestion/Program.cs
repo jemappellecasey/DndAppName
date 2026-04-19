@@ -329,6 +329,30 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
         db.Spells.RemoveRange(existingSpells);
     }
 
+    var existingClasses2014 = db.Classes2014.ToList();
+    if (existingClasses2014.Count > 0)
+    {
+        db.Classes2014.RemoveRange(existingClasses2014);
+    }
+
+    var existingClasses2024 = db.Classes2024.ToList();
+    if (existingClasses2024.Count > 0)
+    {
+        db.Classes2024.RemoveRange(existingClasses2024);
+    }
+
+    var existingSubclasses2014 = db.Subclasses2014.ToList();
+    if (existingSubclasses2014.Count > 0)
+    {
+        db.Subclasses2014.RemoveRange(existingSubclasses2014);
+    }
+
+    var existingSubclasses2024 = db.Subclasses2024.ToList();
+    if (existingSubclasses2024.Count > 0)
+    {
+        db.Subclasses2024.RemoveRange(existingSubclasses2024);
+    }
+
     var existingItems2014 = db.Items2014.ToList();
     if (existingItems2014.Count > 0)
     {
@@ -363,7 +387,8 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
             section.SectionOrder,
             section.StartLine,
             section.EndLine,
-            Preview = block != null ? block.RawText : string.Empty
+            Preview = block != null ? block.RawText : string.Empty,
+            ParseConfidence = block != null ? block.ParseConfidence : (decimal?)null
         })
         .OrderBy(x => x.SourceCode)
         .ThenBy(x => x.SectionOrder)
@@ -379,8 +404,15 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
     var feat2024Count = 0;
     var spell2014Count = 0;
     var spell2024Count = 0;
+    var class2014Count = 0;
+    var class2024Count = 0;
+    var subclass2014Count = 0;
+    var subclass2024Count = 0;
     var item2014Count = 0;
     var item2024Count = 0;
+    var classIdsByName2014 = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    var classIdsByName2024 = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    var pendingSubclassRows = new List<PendingSubclassRow>();
 
     foreach (var row in sectionRows)
     {
@@ -446,6 +478,7 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
         var inferredDuration = moduleType == "spell" ? InferDurationText(row.Preview) : string.Empty;
         var inferredRitual = moduleType == "spell" && Regex.IsMatch(row.Preview ?? string.Empty, @"\britual\b", RegexOptions.IgnoreCase);
         var inferredConcentration = moduleType == "spell" && Regex.IsMatch(row.Preview ?? string.Empty, @"\bconcentration\b", RegexOptions.IgnoreCase);
+        var inferredSpellConfidence = moduleType == "spell" ? InferSpellIngestionConfidence(row.Preview, row.ParseConfidence) : 0m;
         var payloadJson = variant.PayloadJson;
 
         if (moduleType is "race" or "subrace" && string.Equals(ruleSystemId, "rules-2014", StringComparison.Ordinal))
@@ -556,11 +589,23 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
             var editionYear = string.Equals(ruleSystemId, "rules-2014", StringComparison.Ordinal)
                 ? Rules2014EditionYear
                 : Rules2024EditionYear;
+            var statBlockJson = JsonSerializer.Serialize(new
+            {
+                inferredSpellLevel,
+                inferredSpellSchool,
+                inferredCastingTime,
+                inferredRange,
+                inferredDuration,
+                inferredRitual,
+                inferredConcentration,
+                spellClasses
+            });
             db.Spells.Add(new SpellEntity
             {
                 Id = moduleId,
                 ContentSourceId = contentSourceId,
                 LegacyRuleModuleId = moduleId,
+                SourceSectionId = row.Id,
                 Slug = slug,
                 Name = displayName,
                 EditionYear = editionYear,
@@ -572,6 +617,8 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
                 Ritual = inferredRitual,
                 Concentration = inferredConcentration,
                 Description = moduleDescription,
+                IngestionConfidence = inferredSpellConfidence,
+                StatBlockJson = statBlockJson,
                 EditionPayloadJson = payloadJson
             });
             if (editionYear == Rules2014EditionYear)
@@ -582,6 +629,66 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
             {
                 spell2024Count++;
             }
+        }
+        else if (moduleType == "class")
+        {
+            var classPayloadJson = JsonSerializer.Serialize(new
+            {
+                sourceSectionId = row.Id,
+                hitDie = InferClassHitDie(displayName, row.Preview),
+                primaryAbilities = InferClassPrimaryAbilities(displayName),
+                savingThrowAbilities = InferClassSavingThrowAbilities(displayName)
+            });
+            if (string.Equals(ruleSystemId, "rules-2014", StringComparison.Ordinal))
+            {
+                db.Classes2014.Add(new Class2014Entity
+                {
+                    Id = moduleId,
+                    ContentSourceId = contentSourceId,
+                    LegacyRuleModuleId = moduleId,
+                    Slug = slug,
+                    Name = displayName,
+                    Description = moduleDescription,
+                    HitDie = InferClassHitDie(displayName, row.Preview),
+                    PrimaryAbilityJson = JsonSerializer.Serialize(InferClassPrimaryAbilities(displayName)),
+                    SavingThrowAbilitiesJson = JsonSerializer.Serialize(InferClassSavingThrowAbilities(displayName)),
+                    SkillProficienciesJson = JsonSerializer.Serialize(new { fixedSkills = Array.Empty<string>(), choices = skillChoices, choose = skillChoiceCount }),
+                    EditionPayloadJson = classPayloadJson
+                });
+                classIdsByName2014[displayName] = moduleId;
+                class2014Count++;
+            }
+            else
+            {
+                db.Classes2024.Add(new Class2024Entity
+                {
+                    Id = moduleId,
+                    ContentSourceId = contentSourceId,
+                    LegacyRuleModuleId = moduleId,
+                    Slug = slug,
+                    Name = displayName,
+                    Description = moduleDescription,
+                    HitDie = InferClassHitDie(displayName, row.Preview),
+                    PrimaryAbilityJson = JsonSerializer.Serialize(InferClassPrimaryAbilities(displayName)),
+                    SavingThrowAbilitiesJson = JsonSerializer.Serialize(InferClassSavingThrowAbilities(displayName)),
+                    SkillProficienciesJson = JsonSerializer.Serialize(new { fixedSkills = Array.Empty<string>(), choices = skillChoices, choose = skillChoiceCount }),
+                    EditionPayloadJson = classPayloadJson
+                });
+                classIdsByName2024[displayName] = moduleId;
+                class2024Count++;
+            }
+        }
+        else if (moduleType == "subclass")
+        {
+            pendingSubclassRows.Add(new PendingSubclassRow(
+                ModuleId: moduleId,
+                ContentSourceId: contentSourceId,
+                RuleSystemId: ruleSystemId,
+                Slug: slug,
+                DisplayName: displayName,
+                Description: moduleDescription,
+                Preview: row.Preview,
+                PayloadJson: payloadJson));
         }
 
         if (moduleType == "item")
@@ -657,13 +764,68 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
         }
     }
 
+    foreach (var subclass in pendingSubclassRows)
+    {
+        var classLookup = string.Equals(subclass.RuleSystemId, "rules-2014", StringComparison.Ordinal)
+            ? classIdsByName2014
+            : classIdsByName2024;
+        var parentClassName = InferSubclassParentClassName(subclass.DisplayName, subclass.Preview);
+        var parentClassId = !string.IsNullOrWhiteSpace(parentClassName) && classLookup.TryGetValue(parentClassName, out var resolvedClassId)
+            ? resolvedClassId
+            : classLookup.Values.FirstOrDefault() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(parentClassId))
+        {
+            continue;
+        }
+
+        var subclassFeatureStartLevel = InferSubclassFeatureStartLevel(parentClassName, subclass.DisplayName, subclass.RuleSystemId);
+        var subclassPayloadJson = JsonSerializer.Serialize(new
+        {
+            parentClassName,
+            source = "heuristic",
+            subclass.PayloadJson
+        });
+        if (string.Equals(subclass.RuleSystemId, "rules-2014", StringComparison.Ordinal))
+        {
+            db.Subclasses2014.Add(new Subclass2014Entity
+            {
+                Id = subclass.ModuleId,
+                ContentSourceId = subclass.ContentSourceId,
+                LegacyRuleModuleId = subclass.ModuleId,
+                ParentClassId = parentClassId,
+                Slug = subclass.Slug,
+                Name = subclass.DisplayName,
+                SubclassFeatureStartLevel = subclassFeatureStartLevel,
+                Description = subclass.Description,
+                EditionPayloadJson = subclassPayloadJson
+            });
+            subclass2014Count++;
+        }
+        else
+        {
+            db.Subclasses2024.Add(new Subclass2024Entity
+            {
+                Id = subclass.ModuleId,
+                ContentSourceId = subclass.ContentSourceId,
+                LegacyRuleModuleId = subclass.ModuleId,
+                ParentClassId = parentClassId,
+                Slug = subclass.Slug,
+                Name = subclass.DisplayName,
+                SubclassFeatureStartLevel = subclassFeatureStartLevel,
+                Description = subclass.Description,
+                EditionPayloadJson = subclassPayloadJson
+            });
+            subclass2024Count++;
+        }
+    }
+
     await db.SaveChangesAsync();
 
     Console.WriteLine("Normalization complete.");
     Console.WriteLine($"Rule modules created: {moduleCount}");
     Console.WriteLine($"Rule variants created: {variantCount}");
     Console.WriteLine($"Catalog split rows: race2014={race2014Count}, species2024={species2024Count}, background2014={background2014Count}, background2024={background2024Count}");
-    Console.WriteLine($"Catalog split rows: feat2014={feat2014Count}, feat2024={feat2024Count}, spell2014={spell2014Count}, spell2024={spell2024Count}, item2014={item2014Count}, item2024={item2024Count}");
+    Console.WriteLine($"Catalog split rows: feat2014={feat2014Count}, feat2024={feat2024Count}, spell2014={spell2014Count}, spell2024={spell2024Count}, class2014={class2014Count}, class2024={class2024Count}, subclass2014={subclass2014Count}, subclass2024={subclass2024Count}, item2014={item2014Count}, item2024={item2024Count}");
     Console.WriteLine($"SQLite file: {sqlitePath}");
 }
 
@@ -694,6 +856,7 @@ static async Task ValidateCatalogCoverageAsync(string repoRoot)
             .ToArrayAsync();
 
         var classCount = moduleRows.Count(x => string.Equals(x, "class", StringComparison.OrdinalIgnoreCase));
+        var subclassCount = moduleRows.Count(x => string.Equals(x, "subclass", StringComparison.OrdinalIgnoreCase));
         var speciesCount = moduleRows.Count(x =>
             string.Equals(x, "race", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(x, "species", StringComparison.OrdinalIgnoreCase));
@@ -723,23 +886,55 @@ static async Task ValidateCatalogCoverageAsync(string repoRoot)
         var splitSpellCount = ruleSystemId == "rules-2014"
             ? await db.Spells.CountAsync(x => x.EditionYear == Rules2014EditionYear)
             : await db.Spells.CountAsync(x => x.EditionYear == Rules2024EditionYear);
+        var splitClassCount = ruleSystemId == "rules-2014"
+            ? await db.Classes2014.CountAsync()
+            : await db.Classes2024.CountAsync();
+        var splitSubclassCount = ruleSystemId == "rules-2014"
+            ? await db.Subclasses2014.CountAsync()
+            : await db.Subclasses2024.CountAsync();
         var splitItemCount = ruleSystemId == "rules-2014"
             ? await db.Items2014.CountAsync()
             : await db.Items2024.CountAsync();
 
-        Console.WriteLine($"{label}: classes={classCount}, species={speciesCount}, backgrounds={backgroundCount}, spells={spellCount}, items={itemCount}");
-        Console.WriteLine($"{label}: split tables races/species={splitRaceCount}, backgrounds={splitBackgroundCount}, feats={splitFeatCount}, spells={splitSpellCount}, items={splitItemCount}");
+        Console.WriteLine($"{label}: classes={classCount}, subclasses={subclassCount}, species={speciesCount}, backgrounds={backgroundCount}, spells={spellCount}, items={itemCount}");
+        Console.WriteLine($"{label}: split tables classes={splitClassCount}, subclasses={splitSubclassCount}, races/species={splitRaceCount}, backgrounds={splitBackgroundCount}, feats={splitFeatCount}, spells={splitSpellCount}, items={splitItemCount}");
 
         if (classCount == 0) errors.Add($"{label}: missing class catalog entries.");
+        if (subclassCount == 0) errors.Add($"{label}: missing subclass catalog entries.");
         if (speciesCount == 0) errors.Add($"{label}: missing race/species catalog entries.");
         if (backgroundCount == 0) errors.Add($"{label}: missing background/origin catalog entries.");
         if (spellCount == 0) errors.Add($"{label}: missing spell catalog entries.");
         if (itemCount == 0) errors.Add($"{label}: missing item catalog entries.");
+        if (classCount > 0 && splitClassCount == 0) errors.Add($"{label}: missing split class table entries.");
+        if (subclassCount > 0 && splitSubclassCount == 0) errors.Add($"{label}: missing split subclass table entries.");
         if (speciesCount > 0 && splitRaceCount == 0) errors.Add($"{label}: missing split race/species table entries.");
         if (backgroundCount > 0 && splitBackgroundCount == 0) errors.Add($"{label}: missing split background table entries.");
         if (featCount > 0 && splitFeatCount == 0) errors.Add($"{label}: missing split feat table entries.");
         if (spellCount > 0 && splitSpellCount == 0) errors.Add($"{label}: missing split spell table entries.");
         if (itemCount > 0 && splitItemCount == 0) errors.Add($"{label}: missing split item table entries.");
+
+        if (ruleSystemId == "rules-2014")
+        {
+            var orphanCount = await (
+                from subclass in db.Subclasses2014
+                join parent in db.Classes2014 on subclass.ParentClassId equals parent.Id into parentJoin
+                from parent in parentJoin.DefaultIfEmpty()
+                where subclass.ParentClassId == string.Empty || parent == null
+                select subclass.Id)
+                .CountAsync();
+            if (orphanCount > 0) errors.Add($"{label}: subclass rows missing valid parent class links.");
+        }
+        else
+        {
+            var orphanCount = await (
+                from subclass in db.Subclasses2024
+                join parent in db.Classes2024 on subclass.ParentClassId equals parent.Id into parentJoin
+                from parent in parentJoin.DefaultIfEmpty()
+                where subclass.ParentClassId == string.Empty || parent == null
+                select subclass.Id)
+                .CountAsync();
+            if (orphanCount > 0) errors.Add($"{label}: subclass rows missing valid parent class links.");
+        }
     }
 
     if (errors.Count > 0)
@@ -759,8 +954,11 @@ static string ComputeSha256(string value)
 static string InferModuleType(string title, string? preview)
 {
     var text = $"{title} {preview}".Trim();
+    var previewText = preview ?? string.Empty;
 
-    if (Regex.IsMatch(text, @"\bspell\b", RegexOptions.IgnoreCase))
+    if (Regex.IsMatch(title, @"\bspells?\b", RegexOptions.IgnoreCase) ||
+        Regex.IsMatch(previewText, @"\bCasting Time[:\s]|Range[:\s]|Duration[:\s]|Components?[:\s]\b", RegexOptions.IgnoreCase) ||
+        Regex.IsMatch(previewText, @"\b(cantrip|[1-9](?:st|nd|rd|th)?[- ]level)\b", RegexOptions.IgnoreCase))
     {
         return "spell";
     }
@@ -1149,7 +1347,7 @@ static string BuildCatalogDescription(string? preview)
     }
 
     var compact = Regex.Replace(preview, @"\s+", " ").Trim();
-    return compact.Length <= 400 ? compact : compact[..400];
+    return compact;
 }
 
 static IReadOnlyList<string> InferLanguages(string? preview)
@@ -1298,6 +1496,163 @@ static string InferDurationText(string? preview)
 
     var match = Regex.Match(preview, @"Duration[:\s]+([^.;\n]+)", RegexOptions.IgnoreCase);
     return match.Success ? match.Groups[1].Value.Trim() : string.Empty;
+}
+
+static decimal InferSpellIngestionConfidence(string? preview, decimal? parseConfidence)
+{
+    var score = parseConfidence ?? 0.55m;
+    if (string.IsNullOrWhiteSpace(preview))
+    {
+        return Math.Clamp(score - 0.15m, 0.05m, 0.99m);
+    }
+
+    if (Regex.IsMatch(preview, @"\bCasting Time[:\s]", RegexOptions.IgnoreCase))
+    {
+        score += 0.10m;
+    }
+    if (Regex.IsMatch(preview, @"\bRange[:\s]", RegexOptions.IgnoreCase))
+    {
+        score += 0.10m;
+    }
+    if (Regex.IsMatch(preview, @"\bDuration[:\s]", RegexOptions.IgnoreCase))
+    {
+        score += 0.10m;
+    }
+    if (Regex.IsMatch(preview, @"\b(Abjuration|Conjuration|Divination|Enchantment|Evocation|Illusion|Necromancy|Transmutation)\b", RegexOptions.IgnoreCase))
+    {
+        score += 0.05m;
+    }
+
+    return Math.Clamp(score, 0.05m, 0.99m);
+}
+
+static string InferClassHitDie(string displayName, string? preview)
+{
+    var text = $"{displayName} {preview}";
+    var explicitMatch = Regex.Match(text, @"\bd\s*(6|8|10|12)\b", RegexOptions.IgnoreCase);
+    if (explicitMatch.Success)
+    {
+        return $"d{explicitMatch.Groups[1].Value}";
+    }
+
+    return displayName.ToLowerInvariant() switch
+    {
+        var name when name.Contains("wizard") || name.Contains("sorcerer") => "d6",
+        var name when name.Contains("artificer") || name.Contains("bard") || name.Contains("cleric") ||
+                         name.Contains("druid") || name.Contains("monk") || name.Contains("rogue") ||
+                         name.Contains("warlock") => "d8",
+        var name when name.Contains("fighter") || name.Contains("paladin") || name.Contains("ranger") => "d10",
+        var name when name.Contains("barbarian") => "d12",
+        _ => "d8"
+    };
+}
+
+static IReadOnlyList<string> InferClassPrimaryAbilities(string displayName)
+{
+    var lowered = displayName.ToLowerInvariant();
+    return lowered switch
+    {
+        var name when name.Contains("barbarian") => new[] { "Strength" },
+        var name when name.Contains("bard") => new[] { "Charisma" },
+        var name when name.Contains("cleric") => new[] { "Wisdom" },
+        var name when name.Contains("druid") => new[] { "Wisdom" },
+        var name when name.Contains("fighter") => new[] { "Strength", "Dexterity" },
+        var name when name.Contains("monk") => new[] { "Dexterity", "Wisdom" },
+        var name when name.Contains("paladin") => new[] { "Strength", "Charisma" },
+        var name when name.Contains("ranger") => new[] { "Dexterity", "Wisdom" },
+        var name when name.Contains("rogue") => new[] { "Dexterity" },
+        var name when name.Contains("sorcerer") => new[] { "Charisma" },
+        var name when name.Contains("warlock") => new[] { "Charisma" },
+        var name when name.Contains("wizard") => new[] { "Intelligence" },
+        var name when name.Contains("artificer") => new[] { "Intelligence" },
+        _ => Array.Empty<string>()
+    };
+}
+
+static IReadOnlyList<string> InferClassSavingThrowAbilities(string displayName)
+{
+    var lowered = displayName.ToLowerInvariant();
+    return lowered switch
+    {
+        var name when name.Contains("barbarian") => new[] { "Strength", "Constitution" },
+        var name when name.Contains("bard") => new[] { "Dexterity", "Charisma" },
+        var name when name.Contains("cleric") => new[] { "Wisdom", "Charisma" },
+        var name when name.Contains("druid") => new[] { "Intelligence", "Wisdom" },
+        var name when name.Contains("fighter") => new[] { "Strength", "Constitution" },
+        var name when name.Contains("monk") => new[] { "Strength", "Dexterity" },
+        var name when name.Contains("paladin") => new[] { "Wisdom", "Charisma" },
+        var name when name.Contains("ranger") => new[] { "Strength", "Dexterity" },
+        var name when name.Contains("rogue") => new[] { "Dexterity", "Intelligence" },
+        var name when name.Contains("sorcerer") => new[] { "Constitution", "Charisma" },
+        var name when name.Contains("warlock") => new[] { "Wisdom", "Charisma" },
+        var name when name.Contains("wizard") => new[] { "Intelligence", "Wisdom" },
+        var name when name.Contains("artificer") => new[] { "Constitution", "Intelligence" },
+        _ => Array.Empty<string>()
+    };
+}
+
+static string InferSubclassParentClassName(string displayName, string? preview)
+{
+    var text = $"{displayName} {preview}".ToLowerInvariant();
+    var mapping = new (string Pattern, string ClassName)[]
+    {
+        ("wizard", "Wizard"),
+        ("school of", "Wizard"),
+        ("arcane tradition", "Wizard"),
+        ("bard", "Bard"),
+        ("college", "Bard"),
+        ("cleric", "Cleric"),
+        ("domain", "Cleric"),
+        ("druid", "Druid"),
+        ("circle", "Druid"),
+        ("fighter", "Fighter"),
+        ("martial archetype", "Fighter"),
+        ("rogue", "Rogue"),
+        ("roguish archetype", "Rogue"),
+        ("sorcerer", "Sorcerer"),
+        ("sorcerous origin", "Sorcerer"),
+        ("warlock", "Warlock"),
+        ("otherworldly patron", "Warlock"),
+        ("monk", "Monk"),
+        ("monastic tradition", "Monk"),
+        ("way of", "Monk"),
+        ("paladin", "Paladin"),
+        ("oath", "Paladin"),
+        ("ranger", "Ranger"),
+        ("ranger archetype", "Ranger"),
+        ("barbarian", "Barbarian"),
+        ("path of", "Barbarian"),
+        ("artificer", "Artificer"),
+        ("alchemist", "Artificer"),
+        ("armorer", "Artificer"),
+        ("artillerist", "Artificer"),
+        ("battle smith", "Artificer")
+    };
+
+    foreach (var (pattern, className) in mapping)
+    {
+        if (text.Contains(pattern, StringComparison.Ordinal))
+        {
+            return className;
+        }
+    }
+
+    return string.Empty;
+}
+
+static int InferSubclassFeatureStartLevel(string? parentClassName, string subclassDisplayName, string ruleSystemId)
+{
+    if (string.Equals(ruleSystemId, "rules-2014", StringComparison.Ordinal) &&
+        string.Equals(parentClassName, "Wizard", StringComparison.OrdinalIgnoreCase))
+    {
+        return 2;
+    }
+    if (subclassDisplayName.Contains("Wizard", StringComparison.OrdinalIgnoreCase))
+    {
+        return 2;
+    }
+
+    return 3;
 }
 
 static string Slugify(string value)
@@ -1462,3 +1817,13 @@ sealed record IngestionSummary(
     int SectionCount,
     int LowConfidenceCount,
     string OutputPath);
+
+sealed record PendingSubclassRow(
+    string ModuleId,
+    string ContentSourceId,
+    string RuleSystemId,
+    string Slug,
+    string DisplayName,
+    string Description,
+    string? Preview,
+    string PayloadJson);

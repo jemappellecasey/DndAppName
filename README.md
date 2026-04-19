@@ -119,7 +119,8 @@ Normalization now classifies modules into expandable categories (`class`, `subcl
 It also enriches class/background module payloads with proficiency metadata (`fixedSkillProficiencies`, `skillChoices`, `skillChoiceCount`, `expertiseChoiceCount`) used by the frontend skill planner.
 Normalization now dual-writes into split edition catalog tables:
 `catalog_race_2014`, `catalog_species_2024`, `catalog_background_2014`, `catalog_background_2024`,
-`catalog_feat_2014`, `catalog_feat_2024`, unified `catalog_spell` (with `EditionYear`),
+`catalog_feat_2014`, `catalog_feat_2024`, unified `catalog_spell` (with `EditionYear`, `SourceSectionId`, `IngestionConfidence`, and `StatBlockJson`),
+`catalog_class_2014`, `catalog_subclass_2014`, `catalog_class_2024`, `catalog_subclass_2024`,
 `catalog_item_2014`, and `catalog_item_2024`.
 
 Outputs are written under:
@@ -234,9 +235,10 @@ The React app now uses persisted build/inventory/computation endpoints for core 
 
 ### Content catalogs (database-backed)
 1. `GET /catalog/classes?ruleSystem={Rules2014|Rules2024}`
-2. `GET /catalog/items`
-3. `GET /catalog/content-sources?ruleSystem={Rules2014|Rules2024}`
-4. `GET /catalog/modules?baseRuleSystem={Rules2014|Rules2024}&mixedMode={true|false}&overlaySources=...&moduleTypes=...`
+2. `GET /catalog/subclasses?ruleSystem={Rules2014|Rules2024}&classId={classModuleId}`
+3. `GET /catalog/items`
+4. `GET /catalog/content-sources?ruleSystem={Rules2014|Rules2024}`
+5. `GET /catalog/modules?baseRuleSystem={Rules2014|Rules2024}&mixedMode={true|false}&overlaySources=...&moduleTypes=...`
 
 ## Documentation update policy
 For this repository, **README.md must be updated whenever behavior, setup steps, or user workflows change**. Treat README updates as part of done criteria for every future feature phase.

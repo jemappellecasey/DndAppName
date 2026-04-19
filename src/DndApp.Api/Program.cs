@@ -93,7 +93,44 @@ app.MapGet(
     "/catalog/classes",
     async (RuleSystemMode ruleSystem, AppDbContext db, CancellationToken cancellationToken) =>
     {
-        var classes = await (
+        if (ruleSystem == RuleSystemMode.Rules2014)
+        {
+            var typedRows = await (
+                from item in db.Classes2014
+                join source in db.ContentSources on item.ContentSourceId equals source.Id into sourceJoin
+                from source in sourceJoin.DefaultIfEmpty()
+                orderby item.Name
+                select new ClassCatalogItem(
+                    item.Id,
+                    item.Name,
+                    source != null ? source.Code : item.ContentSourceId,
+                    "v1"))
+                .ToArrayAsync(cancellationToken);
+            if (typedRows.Length > 0)
+            {
+                return Results.Ok(typedRows);
+            }
+        }
+        else
+        {
+            var typedRows = await (
+                from item in db.Classes2024
+                join source in db.ContentSources on item.ContentSourceId equals source.Id into sourceJoin
+                from source in sourceJoin.DefaultIfEmpty()
+                orderby item.Name
+                select new ClassCatalogItem(
+                    item.Id,
+                    item.Name,
+                    source != null ? source.Code : item.ContentSourceId,
+                    "v1"))
+                .ToArrayAsync(cancellationToken);
+            if (typedRows.Length > 0)
+            {
+                return Results.Ok(typedRows);
+            }
+        }
+
+        var fallbackRows = await (
             from module in db.RuleModules
             where module.ModuleType == "class"
             join source in db.ContentSources on module.ContentSourceId equals source.Id into sourceJoin
@@ -110,20 +147,73 @@ app.MapGet(
                 module.VersionTag))
             .ToArrayAsync(cancellationToken);
 
-        var knownClassNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        return Results.Ok(fallbackRows);
+    });
+
+app.MapGet(
+    "/catalog/subclasses",
+    async (RuleSystemMode ruleSystem, string classId, AppDbContext db, CancellationToken cancellationToken) =>
+    {
+        if (ruleSystem == RuleSystemMode.Rules2014)
         {
-            "Artificer", "Barbarian", "Bard", "Cleric", "Druid", "Fighter",
-            "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"
-        };
+            var typedRows = await (
+                from item in db.Subclasses2014
+                join source in db.ContentSources on item.ContentSourceId equals source.Id into sourceJoin
+                from source in sourceJoin.DefaultIfEmpty()
+                where item.ParentClassId == classId
+                orderby item.Name
+                select new SubclassCatalogItem(
+                    item.Id,
+                    item.ParentClassId,
+                    item.Name,
+                    source != null ? source.Code : item.ContentSourceId,
+                    item.SubclassFeatureStartLevel))
+                .ToArrayAsync(cancellationToken);
+            if (typedRows.Length > 0)
+            {
+                return Results.Ok(typedRows);
+            }
+        }
+        else
+        {
+            var typedRows = await (
+                from item in db.Subclasses2024
+                join source in db.ContentSources on item.ContentSourceId equals source.Id into sourceJoin
+                from source in sourceJoin.DefaultIfEmpty()
+                where item.ParentClassId == classId
+                orderby item.Name
+                select new SubclassCatalogItem(
+                    item.Id,
+                    item.ParentClassId,
+                    item.Name,
+                    source != null ? source.Code : item.ContentSourceId,
+                    item.SubclassFeatureStartLevel))
+                .ToArrayAsync(cancellationToken);
+            if (typedRows.Length > 0)
+            {
+                return Results.Ok(typedRows);
+            }
+        }
 
-        var deduped = classes
-            .GroupBy(x => $"{x.ClassName}\u001F{x.SourceCode}".ToUpperInvariant())
-            .Select(g => g.First())
-            .Where(x => knownClassNames.Contains(x.ClassName))
-            .OrderBy(x => x.ClassName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var fallbackRows = await (
+            from module in db.RuleModules
+            where module.ModuleType == "subclass"
+            join source in db.ContentSources on module.ContentSourceId equals source.Id into sourceJoin
+            from source in sourceJoin.DefaultIfEmpty()
+            where source == null
+                || (ruleSystem == RuleSystemMode.Rules2014
+                    ? source.RuleSystemId == "rules-2014"
+                    : source.RuleSystemId == "rules-2024")
+            orderby module.DisplayName
+            select new SubclassCatalogItem(
+                module.Id,
+                classId,
+                module.DisplayName,
+                source != null ? source.Code : module.ContentSourceId,
+                3))
+            .ToArrayAsync(cancellationToken);
 
-        return Results.Ok(deduped);
+        return Results.Ok(fallbackRows);
     });
 
 app.MapGet(
@@ -1043,6 +1133,13 @@ public sealed record ClassCatalogItem(
     string ClassName,
     string SourceCode,
     string VersionTag);
+
+public sealed record SubclassCatalogItem(
+    string ModuleId,
+    string ParentClassId,
+    string SubclassName,
+    string SourceCode,
+    int SubclassFeatureStartLevel);
 
 public sealed record ItemCatalogEffect(
     string EffectId,

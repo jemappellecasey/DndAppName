@@ -90,6 +90,7 @@ public sealed class SpellEntity
     public string Id { get; set; } = string.Empty;
     public string ContentSourceId { get; set; } = string.Empty;
     public string LegacyRuleModuleId { get; set; } = string.Empty;
+    public string SourceSectionId { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public int EditionYear { get; set; }
@@ -100,6 +101,64 @@ public sealed class SpellEntity
     public string Duration { get; set; } = string.Empty;
     public bool Ritual { get; set; }
     public bool Concentration { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public decimal IngestionConfidence { get; set; }
+    public string StatBlockJson { get; set; } = "{}";
+    public string EditionPayloadJson { get; set; } = "{}";
+}
+
+public sealed class Class2014Entity
+{
+    public string Id { get; set; } = string.Empty;
+    public string ContentSourceId { get; set; } = string.Empty;
+    public string LegacyRuleModuleId { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string HitDie { get; set; } = string.Empty;
+    public string PrimaryAbilityJson { get; set; } = "[]";
+    public string SavingThrowAbilitiesJson { get; set; } = "[]";
+    public string SkillProficienciesJson { get; set; } = "{}";
+    public string EditionPayloadJson { get; set; } = "{}";
+}
+
+public sealed class Class2024Entity
+{
+    public string Id { get; set; } = string.Empty;
+    public string ContentSourceId { get; set; } = string.Empty;
+    public string LegacyRuleModuleId { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string HitDie { get; set; } = string.Empty;
+    public string PrimaryAbilityJson { get; set; } = "[]";
+    public string SavingThrowAbilitiesJson { get; set; } = "[]";
+    public string SkillProficienciesJson { get; set; } = "{}";
+    public string EditionPayloadJson { get; set; } = "{}";
+}
+
+public sealed class Subclass2014Entity
+{
+    public string Id { get; set; } = string.Empty;
+    public string ContentSourceId { get; set; } = string.Empty;
+    public string LegacyRuleModuleId { get; set; } = string.Empty;
+    public string ParentClassId { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public int SubclassFeatureStartLevel { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public string EditionPayloadJson { get; set; } = "{}";
+}
+
+public sealed class Subclass2024Entity
+{
+    public string Id { get; set; } = string.Empty;
+    public string ContentSourceId { get; set; } = string.Empty;
+    public string LegacyRuleModuleId { get; set; } = string.Empty;
+    public string ParentClassId { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public int SubclassFeatureStartLevel { get; set; }
     public string Description { get; set; } = string.Empty;
     public string EditionPayloadJson { get; set; } = "{}";
 }
