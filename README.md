@@ -140,6 +140,8 @@ Outputs are written under:
    dotnet ef database update --project src\DndApp.Api\DndApp.Api.csproj --startup-project src\DndApp.Api\DndApp.Api.csproj
    ```
 5. Edition-split catalog tables are additive and coexist with current `rule_module`/`rule_variant`/`item_definition` tables so existing endpoints remain operational during cutover.
+6. Catalog cleanup safety migration is available as `20260419011649_CleanupJunkCatalogRows` and removes obvious junk rows (page/chapter stubs, empty names) only when they are not referenced by live character rows.
+7. SQL preview/reference script for manual review is available at `src\DndApp.Api\Data\Sql\CleanupIncorrectCatalogData.sql` (keep migration and script logic aligned).
 
 ### Database provider config
 - `Database:Provider` currently supports `sqlite`.
