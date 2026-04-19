@@ -85,31 +85,14 @@ public sealed class Feat2024Entity
     public string EditionPayloadJson { get; set; } = "{}";
 }
 
-public sealed class Spell2014Entity
+public sealed class SpellEntity
 {
     public string Id { get; set; } = string.Empty;
     public string ContentSourceId { get; set; } = string.Empty;
     public string LegacyRuleModuleId { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public int Level { get; set; }
-    public string School { get; set; } = string.Empty;
-    public string CastingTime { get; set; } = string.Empty;
-    public string RangeText { get; set; } = string.Empty;
-    public string Duration { get; set; } = string.Empty;
-    public bool Ritual { get; set; }
-    public bool Concentration { get; set; }
-    public string Description { get; set; } = string.Empty;
-    public string EditionPayloadJson { get; set; } = "{}";
-}
-
-public sealed class Spell2024Entity
-{
-    public string Id { get; set; } = string.Empty;
-    public string ContentSourceId { get; set; } = string.Empty;
-    public string LegacyRuleModuleId { get; set; } = string.Empty;
-    public string Slug { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
+    public int EditionYear { get; set; }
     public int Level { get; set; }
     public string School { get; set; } = string.Empty;
     public string CastingTime { get; set; } = string.Empty;

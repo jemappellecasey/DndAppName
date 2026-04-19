@@ -9,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 var repoRoot = ResolveRepoRoot(args);
 var outputRoot = Path.Combine(repoRoot, "data");
 var now = DateTimeOffset.UtcNow;
+const int Rules2014EditionYear = 2014;
+const int Rules2024EditionYear = 2024;
 
 if (args.Any(a => string.Equals(a, "--import-db", StringComparison.OrdinalIgnoreCase)))
 {
@@ -321,16 +323,10 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
         db.Feats2024.RemoveRange(existingFeats2024);
     }
 
-    var existingSpells2014 = db.Spells2014.ToList();
-    if (existingSpells2014.Count > 0)
+    var existingSpells = db.Spells.ToList();
+    if (existingSpells.Count > 0)
     {
-        db.Spells2014.RemoveRange(existingSpells2014);
-    }
-
-    var existingSpells2024 = db.Spells2024.ToList();
-    if (existingSpells2024.Count > 0)
-    {
-        db.Spells2024.RemoveRange(existingSpells2024);
+        db.Spells.RemoveRange(existingSpells);
     }
 
     var existingItems2014 = db.Items2014.ToList();
@@ -555,15 +551,19 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
             });
             feat2024Count++;
         }
-        else if (moduleType == "spell" && string.Equals(ruleSystemId, "rules-2014", StringComparison.Ordinal))
+        else if (moduleType == "spell")
         {
-            db.Spells2014.Add(new Spell2014Entity
+            var editionYear = string.Equals(ruleSystemId, "rules-2014", StringComparison.Ordinal)
+                ? Rules2014EditionYear
+                : Rules2024EditionYear;
+            db.Spells.Add(new SpellEntity
             {
                 Id = moduleId,
                 ContentSourceId = contentSourceId,
                 LegacyRuleModuleId = moduleId,
                 Slug = slug,
                 Name = displayName,
+                EditionYear = editionYear,
                 Level = inferredSpellLevel,
                 School = inferredSpellSchool,
                 CastingTime = inferredCastingTime,
@@ -574,28 +574,14 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
                 Description = moduleDescription,
                 EditionPayloadJson = payloadJson
             });
-            spell2014Count++;
-        }
-        else if (moduleType == "spell" && string.Equals(ruleSystemId, "rules-2024", StringComparison.Ordinal))
-        {
-            db.Spells2024.Add(new Spell2024Entity
+            if (editionYear == Rules2014EditionYear)
             {
-                Id = moduleId,
-                ContentSourceId = contentSourceId,
-                LegacyRuleModuleId = moduleId,
-                Slug = slug,
-                Name = displayName,
-                Level = inferredSpellLevel,
-                School = inferredSpellSchool,
-                CastingTime = inferredCastingTime,
-                RangeText = inferredRange,
-                Duration = inferredDuration,
-                Ritual = inferredRitual,
-                Concentration = inferredConcentration,
-                Description = moduleDescription,
-                EditionPayloadJson = payloadJson
-            });
-            spell2024Count++;
+                spell2014Count++;
+            }
+            else
+            {
+                spell2024Count++;
+            }
         }
 
         if (moduleType == "item")
@@ -735,8 +721,8 @@ static async Task ValidateCatalogCoverageAsync(string repoRoot)
             ? await db.Feats2014.CountAsync()
             : await db.Feats2024.CountAsync();
         var splitSpellCount = ruleSystemId == "rules-2014"
-            ? await db.Spells2014.CountAsync()
-            : await db.Spells2024.CountAsync();
+            ? await db.Spells.CountAsync(x => x.EditionYear == Rules2014EditionYear)
+            : await db.Spells.CountAsync(x => x.EditionYear == Rules2024EditionYear);
         var splitItemCount = ruleSystemId == "rules-2014"
             ? await db.Items2014.CountAsync()
             : await db.Items2024.CountAsync();

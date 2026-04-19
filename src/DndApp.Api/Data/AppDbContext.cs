@@ -27,8 +27,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Background2024Entity> Backgrounds2024 => Set<Background2024Entity>();
     public DbSet<Feat2014Entity> Feats2014 => Set<Feat2014Entity>();
     public DbSet<Feat2024Entity> Feats2024 => Set<Feat2024Entity>();
-    public DbSet<Spell2014Entity> Spells2014 => Set<Spell2014Entity>();
-    public DbSet<Spell2024Entity> Spells2024 => Set<Spell2024Entity>();
+    public DbSet<SpellEntity> Spells => Set<SpellEntity>();
     public DbSet<Item2014Entity> Items2014 => Set<Item2014Entity>();
     public DbSet<Item2024Entity> Items2024 => Set<Item2024Entity>();
     public DbSet<CharacterSheetEntity> CharacterSheets => Set<CharacterSheetEntity>();
@@ -331,43 +330,24 @@ public sealed class AppDbContext : DbContext
             entity.HasIndex(x => x.LegacyRuleModuleId);
         });
 
-        modelBuilder.Entity<Spell2014Entity>(entity =>
+        modelBuilder.Entity<SpellEntity>(entity =>
         {
-            entity.ToTable("catalog_spell_2014");
+            entity.ToTable("catalog_spell");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasMaxLength(64);
             entity.Property(x => x.ContentSourceId).HasMaxLength(40);
             entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
             entity.Property(x => x.Slug).HasMaxLength(160);
             entity.Property(x => x.Name).HasMaxLength(300);
+            entity.Property(x => x.EditionYear);
             entity.Property(x => x.School).HasMaxLength(40);
             entity.Property(x => x.CastingTime).HasMaxLength(120);
             entity.Property(x => x.RangeText).HasMaxLength(160);
             entity.Property(x => x.Duration).HasMaxLength(160);
             entity.Property(x => x.Description).HasColumnType("TEXT");
             entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
-            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
-            entity.HasIndex(x => new { x.Level, x.Name });
-            entity.HasIndex(x => x.LegacyRuleModuleId);
-        });
-
-        modelBuilder.Entity<Spell2024Entity>(entity =>
-        {
-            entity.ToTable("catalog_spell_2024");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.Id).HasMaxLength(64);
-            entity.Property(x => x.ContentSourceId).HasMaxLength(40);
-            entity.Property(x => x.LegacyRuleModuleId).HasMaxLength(64);
-            entity.Property(x => x.Slug).HasMaxLength(160);
-            entity.Property(x => x.Name).HasMaxLength(300);
-            entity.Property(x => x.School).HasMaxLength(40);
-            entity.Property(x => x.CastingTime).HasMaxLength(120);
-            entity.Property(x => x.RangeText).HasMaxLength(160);
-            entity.Property(x => x.Duration).HasMaxLength(160);
-            entity.Property(x => x.Description).HasColumnType("TEXT");
-            entity.Property(x => x.EditionPayloadJson).HasColumnType("TEXT");
-            entity.HasIndex(x => new { x.ContentSourceId, x.Slug }).IsUnique();
-            entity.HasIndex(x => new { x.Level, x.Name });
+            entity.HasIndex(x => new { x.ContentSourceId, x.Slug, x.EditionYear }).IsUnique();
+            entity.HasIndex(x => new { x.EditionYear, x.Level, x.Name });
             entity.HasIndex(x => x.LegacyRuleModuleId);
         });
 

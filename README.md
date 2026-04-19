@@ -119,7 +119,7 @@ Normalization now classifies modules into expandable categories (`class`, `subcl
 It also enriches class/background module payloads with proficiency metadata (`fixedSkillProficiencies`, `skillChoices`, `skillChoiceCount`, `expertiseChoiceCount`) used by the frontend skill planner.
 Normalization now dual-writes into split edition catalog tables:
 `catalog_race_2014`, `catalog_species_2024`, `catalog_background_2014`, `catalog_background_2024`,
-`catalog_feat_2014`, `catalog_feat_2024`, `catalog_spell_2014`, `catalog_spell_2024`,
+`catalog_feat_2014`, `catalog_feat_2024`, unified `catalog_spell` (with `EditionYear`),
 `catalog_item_2014`, and `catalog_item_2024`.
 
 Outputs are written under:
