@@ -65,9 +65,34 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
         }
 
         var baseRuleSystem = Enum.Parse<RuleSystemMode>(sheet.BaseRuleSystem, ignoreCase: true);
+        var mixedModeEnabled = await _db.CharacterRecords.AsNoTracking()
+            .Where(x => x.CharacterId == characterIdText)
+            .Select(x => (bool?)x.MixedModeEnabled)
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? await _db.CharacterDrafts.AsNoTracking()
+                .Where(x => x.CharacterId == characterIdText)
+                .Select(x => (bool?)x.MixedModeEnabled)
+                .SingleOrDefaultAsync(cancellationToken)
+            ?? false;
+        if (!mixedModeEnabled)
+        {
+            var selectedSourceCodes = await _db.CharacterSelectedModules
+                .AsNoTracking()
+                .Where(x => x.CharacterId == characterIdText)
+                .Select(x => x.SourceCode)
+                .ToArrayAsync(cancellationToken);
+            var hasCrossRulesSelection = selectedSourceCodes.Any(
+                sourceCode =>
+                    !string.IsNullOrWhiteSpace(sourceCode) &&
+                    (baseRuleSystem == RuleSystemMode.Rules2014
+                        ? sourceCode.Contains("2024", StringComparison.OrdinalIgnoreCase)
+                        : sourceCode.Contains("2014", StringComparison.OrdinalIgnoreCase)));
+            mixedModeEnabled = hasCrossRulesSelection;
+        }
         var validationErrors = await _validation.ValidateInventoryItemAsync(
             request.ItemDefinitionId,
             baseRuleSystem,
+            mixedModeEnabled,
             abilityScores,
             sheet.Level,
             cancellationToken);

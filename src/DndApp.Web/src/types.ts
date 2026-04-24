@@ -113,6 +113,10 @@ export interface ModuleCatalogItem {
   languageChoiceCount: number
   minLevelRequirement: number
   abilityScoreRequirements: Record<string, number>
+  spellClasses: string[]
+  walkingSpeed: number | null
+  parentClassModuleId: string | null
+  subclassFeatureStartLevel: number | null
 }
 
 export interface ItemCatalogEffect {
@@ -128,6 +132,7 @@ export interface ItemCatalogItem {
   sourceCode: string
   itemType: string
   rarity: string
+  description?: string
   requiresAttunement: boolean
   goldValue: number
   weight: number

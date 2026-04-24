@@ -43,6 +43,7 @@ builder.Services.AddSingleton<ICustomContentValidationService, CustomContentVali
 builder.Services.AddSingleton<IItemEffectPipelineService, ItemEffectPipelineService>();
 builder.Services.AddSingleton<ICalculationEngineService, CalculationEngineService>();
 builder.Services.AddSingleton<IMixedRulesResolutionService, MixedRulesResolutionService>();
+builder.Services.AddSingleton<ICatalogCacheService, CatalogCacheService>();
 builder.Services.AddScoped<ICharacterWizardService, CharacterWizardService>();
 builder.Services.AddScoped<ILocalAuthService, LocalAuthService>();
 builder.Services.AddScoped<ICharacterBuildService, CharacterBuildService>();
@@ -57,6 +58,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    var cacheService = scope.ServiceProvider.GetRequiredService<ICatalogCacheService>();
+    await cacheService.InitializeAsync(CancellationToken.None);
 }
 
 if (app.Environment.IsDevelopment())
@@ -364,6 +368,29 @@ app.MapGet(
                 x => x.Key,
                 x => CatalogParsing.ParseAbilityRequirements(x.Select(y => y.PredicateJson)),
                 StringComparer.OrdinalIgnoreCase);
+        var subclassMetadataByModule = (await db.Subclasses2014
+            .AsNoTracking()
+            .Select(x => new
+            {
+                ModuleId = x.Id,
+                ParentClassId = x.ParentClassId,
+                x.SubclassFeatureStartLevel
+            })
+            .Concat(
+                db.Subclasses2024
+                    .AsNoTracking()
+                    .Select(x => new
+                    {
+                        ModuleId = x.Id,
+                        ParentClassId = x.ParentClassId,
+                        x.SubclassFeatureStartLevel
+                    }))
+            .ToArrayAsync(cancellationToken))
+            .GroupBy(x => x.ModuleId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                x => x.Key,
+                x => x.First(),
+                StringComparer.OrdinalIgnoreCase);
 
         var filtered = rows
             .Where(x => requestedModuleTypes.Count == 0 || requestedModuleTypes.Contains(x.Module.ModuleType))
@@ -390,7 +417,15 @@ app.MapGet(
                 minLevelByModule.TryGetValue(x.Module.Id, out var minLevel) ? minLevel : 0,
                 abilityReqByModule.TryGetValue(x.Module.Id, out var abilities)
                     ? abilities
-                    : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)))
+                    : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
+                CatalogParsing.ParseStringArray(x.VariantPayloadJson, "spellClasses"),
+                CatalogParsing.ParseWalkingSpeed(x.VariantPayloadJson),
+                subclassMetadataByModule.TryGetValue(x.Module.Id, out var subclassMetadata)
+                    ? subclassMetadata.ParentClassId
+                    : null,
+                subclassMetadataByModule.TryGetValue(x.Module.Id, out subclassMetadata)
+                    ? subclassMetadata.SubclassFeatureStartLevel
+                    : null))
             .ToArray();
 
         return Results.Ok(filtered);
@@ -1186,7 +1221,11 @@ public sealed record ModuleCatalogItem(
     IReadOnlyList<string> LanguageChoices,
     int LanguageChoiceCount,
     int MinLevelRequirement,
-    IReadOnlyDictionary<string, int> AbilityScoreRequirements);
+    IReadOnlyDictionary<string, int> AbilityScoreRequirements,
+    IReadOnlyList<string> SpellClasses,
+    int? WalkingSpeed,
+    string? ParentClassModuleId,
+    int? SubclassFeatureStartLevel);
 
 public static class CatalogParsing
 {
@@ -1267,6 +1306,40 @@ public static class CatalogParsing
             JsonValueKind.String when int.TryParse(value.GetString(), out var n) => n,
             _ => 0
         };
+    }
+
+    public static int? ParseWalkingSpeed(string? payloadJson)
+    {
+        var root = ParseRoot(payloadJson);
+        if (root is null || root.Value.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        static int? ReadInt(JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                JsonValueKind.Number when element.TryGetInt32(out var n) => n,
+                JsonValueKind.String when int.TryParse(element.GetString(), out var n) => n,
+                _ => null
+            };
+        }
+
+        if (root.Value.TryGetProperty("walkingSpeed", out var walkingSpeed))
+        {
+            return ReadInt(walkingSpeed);
+        }
+        if (root.Value.TryGetProperty("baseMoveSpeed", out var baseMoveSpeed))
+        {
+            return ReadInt(baseMoveSpeed);
+        }
+        if (root.Value.TryGetProperty("speed", out var speed))
+        {
+            return ReadInt(speed);
+        }
+
+        return null;
     }
 
     public static int ParseMinLevelRequirement(IEnumerable<string?> predicateJsonValues)
@@ -1394,7 +1467,23 @@ public static class EndpointAuth
             .SingleOrDefaultAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(ownerUserId))
         {
-            return null;
+            ownerUserId = await db.CharacterRecords
+                .AsNoTracking()
+                .Where(x => x.CharacterId == characterId.ToString())
+                .Select(x => x.OwnerUserId)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+        if (string.IsNullOrWhiteSpace(ownerUserId))
+        {
+            ownerUserId = await db.CharacterDrafts
+                .AsNoTracking()
+                .Where(x => x.CharacterId == characterId.ToString())
+                .Select(x => x.OwnerUserId)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+        if (string.IsNullOrWhiteSpace(ownerUserId))
+        {
+            return Results.NotFound();
         }
 
         return string.Equals(ownerUserId, session.UserId, StringComparison.Ordinal)

@@ -1,96 +1,35 @@
-# Copilot Questions and Directions (Completed)
+# Phase 1 Fixes - COMPLETED ✅
+- ✅ Removed proficiency bonus display from character build setup
+- ✅ Added stat entry limit validation: -10,000 to 10,000 with "Ambitions... but no." message
+- ✅ Verified currency consolidation endpoint and handler (working)
+- ✅ Verified skill proficiency selection UI (working)
 
-## 1. Direction: Rolling stats should be drag-and-drop
-**Status:** Implemented.
+# Remaining items for Phase 2-5:
 
-**Current behavior:** Roll mode generates a roll pool (4d6 drop lowest), each rolled value is draggable, and each ability slot is a drop target. Assigned rolls can be cleared/reassigned, and saving is blocked until all six values are assigned.
+4. Primary class selection needs to be just Artificer, Barbarian, Bard, etc. Not "artificer alchemist" that "alchemist" should be on the subclass dropdown if the person has enough levels entered in a class for a subclass.
 
----
+5. Race/Species bonuses are not being calculated, they need to be.
 
-## 2. Direction: Build out login for multiple users
-**Status:** Implemented for local multi-user sessions.
+6. Background/Origin bonuses are not being calculated, they need to be.
 
-**Current behavior:**
-- `POST /auth/local/register` and `POST /auth/local/login` use persistent user accounts in SQLite.
-- Passwords are hashed (PBKDF2) before storage.
-- Sessions are persisted and validated from `X-Session-Token`.
-- Persisted build/inventory/persisted-computation routes enforce character ownership.
+7. After selecting a race/species/background/origin/class/subclass from a drop down a "show info" button should pop up that displays the details for that specific thing.
 
----
+8. Starting gear/gold is not being calculated, it needs to be.
 
-## 3. Explain each input in "2. Character build setup"
-1. **Character name**: Display name saved to character records/build.
-2. **Rules mode** (`Rules2024` / `Rules2014`): Selects ruleset context and class compatibility validation.
-3. **Build method** (`PointBuy` / `Manual` / `Roll`): Determines how ability scores are entered/generated.
-4. **Mixed mode**: Enables cross-source overlays for wizard flow.
-5. **Overlay sources**: Comma-separated source codes used when mixed mode is enabled.
-6. **Proficiency bonus**: Base proficiency used in persisted check/save/attack computations.
-7. **Ability score controls**:
-   - **Point buy**: +/- with 27-point budget checks.
-   - **Manual**: Direct numeric entry.
-   - **Roll**: 4d6 drop-lowest generation with drag/drop assignment to abilities.
+9. some of the entries for backgrounds should not be there. Please fix the imports and database so they are not included. Do you need help identifying which ones do not belong?
 
----
+10. when rolling for hp, remember from the rulebook that level 1 is always the max value of their hit die.
 
-## 4. Question: Where are SQLite DB files located?
-Configured in API settings:
-- `src\DndApp.Api\appsettings.Development.json` → `Data Source=dndapp-dev.sqlite`
-- `src\DndApp.Api\appsettings.json` → `Data Source=dndapp.sqlite`
+11. when rolling for hp, display the roll for each level on character creation.
 
-In local development, the active file is typically:
-- `src\DndApp.Api\dndapp-dev.sqlite`
+12. the add spells part of character creation isn't working, please fully implement that part of the project. Do you need more direction on this?
 
----
+13. proficiencies/expertise available for skill setup is not being calculated correctly, this needs to be fully implemented, make any changes that need to be made.
 
-## 5. Question: Is Docker still necessary / what is it doing?
-Docker is **optional** for local development, but useful for:
-1. Running API in a consistent containerized environment.
-2. Testing deployment-like behavior (port binding, runtime image, publish output).
-3. Sharing/reproducing runtime setup without local SDK parity issues.
+14. Selecting items should display their value in gp if applicable. These also need a "details" button when selected so the user can see the details of the item.
 
-What the Dockerfile does:
-1. Uses `dotnet/sdk:10.0` to restore + publish.
-2. Copies published API output into `dotnet/aspnet:10.0`.
-3. Exposes port `8080` and runs `dotnet DndApp.Api.dll`.
+15. Adding items to persisted inventory isn't working, this needs to be fixed.
 
----
+16. A user should be able to click and drag to rearrange their active characters. Newly created characters should go on the top of the list of active characters. Archived characters should be ordered by when they were archived.
 
-## 6. Backend error resolution: `SQLite Error 1: no such table: character_sheet`
-### Root cause
-The DB file existed but schema migrations for newer tables (including `character_sheet`) had not been applied.
-
-### Resolution applied
-Startup now automatically applies EF Core migrations:
-- `src\DndApp.Api\Program.cs` now runs `db.Database.Migrate()` during app startup.
-
-### Manual fallback command
-If needed, run:
-```powershell
-dotnet ef database update --project src\DndApp.Api\DndApp.Api.csproj --startup-project src\DndApp.Api\DndApp.Api.csproj
-```
-
----
-
-## 7. Docker build error explanation
-Error seen:
-`failed to prepare extraction snapshot ... parent snapshot ... does not exist`
-
-### What it means
-This is a Docker Desktop/buildkit layer-cache corruption/state issue, not an application code compile/publish error.
-
-### Fix steps
-1. Restart Docker Desktop.
-2. Rebuild without cache:
-   ```powershell
-   docker build --no-cache -t dndappname-api .
-   ```
-3. If still failing, clean builder cache:
-   ```powershell
-   docker builder prune -af
-   ```
-4. Retry build.
-
----
-
-## Error context cleanup
-Raw repeated terminal stack traces and build logs were removed from this file as requested.
+17. the "view activity" button isn't needed for active characters. Please remove that button.

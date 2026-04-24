@@ -17,6 +17,7 @@ public interface IRuleValidationService
     Task<IReadOnlyList<string>> ValidateInventoryItemAsync(
         string itemDefinitionId,
         RuleSystemMode baseRuleSystem,
+        bool mixedModeEnabled,
         IReadOnlyDictionary<string, int> abilityScores,
         int level,
         CancellationToken cancellationToken);
@@ -67,6 +68,7 @@ public sealed class RuleValidationService : IRuleValidationService
     public async Task<IReadOnlyList<string>> ValidateInventoryItemAsync(
         string itemDefinitionId,
         RuleSystemMode baseRuleSystem,
+        bool mixedModeEnabled,
         IReadOnlyDictionary<string, int> abilityScores,
         int level,
         CancellationToken cancellationToken)
@@ -90,7 +92,9 @@ public sealed class RuleValidationService : IRuleValidationService
 
         var contentSource = await _db.ContentSources.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == module.ContentSourceId, cancellationToken);
-        if (contentSource is not null && !string.Equals(contentSource.RuleSystemId, ToRuleSystemId(baseRuleSystem), StringComparison.OrdinalIgnoreCase))
+        if (!mixedModeEnabled &&
+            contentSource is not null &&
+            !string.Equals(contentSource.RuleSystemId, ToRuleSystemId(baseRuleSystem), StringComparison.OrdinalIgnoreCase))
         {
             errors.Add($"Item '{itemDefinitionId}' source '{contentSource.Code}' is incompatible with {baseRuleSystem}.");
         }

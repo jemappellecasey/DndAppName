@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.Globalization;
 using DndApp.Api.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 var repoRoot = ResolveRepoRoot(args);
 var outputRoot = Path.Combine(repoRoot, "data");
@@ -115,23 +116,15 @@ static async Task ImportSectionsToDatabaseAsync(string repoRoot, DateTimeOffset 
     db.IngestionRuns.Add(run);
     await db.SaveChangesAsync();
 
-    var sectionsFiles = Directory
-        .EnumerateFiles(Path.Combine(repoRoot, "data", "ingested"), "sections.json", SearchOption.AllDirectories)
-        .OrderBy(x => x)
-        .ToArray();
+    var payloads = await LoadIngestionPayloadsForImportAsync(repoRoot);
 
     var importedSections = 0;
     var importedBlocks = 0;
     var reviewCount = 0;
 
-    foreach (var sectionsFile in sectionsFiles)
+    foreach (var payload in payloads.OrderBy(x => x.SourceCode, StringComparer.OrdinalIgnoreCase))
     {
-        var json = await File.ReadAllTextAsync(sectionsFile);
-        var payload = JsonSerializer.Deserialize<IngestionPayload>(json);
-        if (payload is null)
-        {
-            continue;
-        }
+        var json = JsonSerializer.Serialize(payload);
 
         var versionTag = "v1";
         var book = db.SourceBooks.SingleOrDefault(x => x.SourceCode == payload.SourceCode && x.VersionTag == versionTag);
@@ -265,6 +258,8 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
         new ContentSourceEntity { Id = "PHB2024", RuleSystemId = "rules-2024", Code = "PHB2024", Name = "Player's Handbook 2024" },
         new ContentSourceEntity { Id = "DMG2014", RuleSystemId = "rules-2014", Code = "DMG2014", Name = "Dungeon Master's Guide 2014" },
         new ContentSourceEntity { Id = "DMG2024", RuleSystemId = "rules-2024", Code = "DMG2024", Name = "Dungeon Master's Guide 2024" },
+        new ContentSourceEntity { Id = "WIKIDOT2014", RuleSystemId = "rules-2014", Code = "2014WIKIDOT", Name = "Wikidot Archive 2014" },
+        new ContentSourceEntity { Id = "WIKIDOT2024", RuleSystemId = "rules-2024", Code = "2024WIKIDOT", Name = "Wikidot Archive 2024" },
     };
     foreach (var source in sources)
     {
@@ -279,6 +274,12 @@ static async Task NormalizeCoreEntitiesAsync(string repoRoot)
     if (existingVariants.Count > 0)
     {
         db.RuleVariants.RemoveRange(existingVariants);
+    }
+
+    var existingCharacterInventoryItems = db.CharacterInventoryItems.ToList();
+    if (existingCharacterInventoryItems.Count > 0)
+    {
+        db.CharacterInventoryItems.RemoveRange(existingCharacterInventoryItems);
     }
 
     var existingItems = db.ItemDefinitions.ToList();
@@ -1670,8 +1671,119 @@ static string ResolveContentSourceId(string sourceCode)
         "phb2024" => "PHB2024",
         "dmg2014" => "DMG2014",
         "dmg2024" => "DMG2024",
+        "2014wikidot" => "WIKIDOT2014",
+        "2024wikidot" => "WIKIDOT2024",
         _ => throw new InvalidOperationException($"Unknown source code '{sourceCode}'.")
     };
+}
+
+static async Task<IReadOnlyList<IngestionPayload>> LoadIngestionPayloadsForImportAsync(string repoRoot)
+{
+    var payloads = new List<IngestionPayload>();
+    var sectionsFiles = Directory
+        .EnumerateFiles(Path.Combine(repoRoot, "data", "ingested"), "sections.json", SearchOption.AllDirectories)
+        .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+    foreach (var sectionsFile in sectionsFiles)
+    {
+        var json = await File.ReadAllTextAsync(sectionsFile);
+        var payload = JsonSerializer.Deserialize<IngestionPayload>(json);
+        if (payload is not null)
+        {
+            payloads.Add(payload);
+        }
+    }
+
+    var wikidotSpecs = new[]
+    {
+        ("2014wikidot", Path.Combine(repoRoot, "data", "ingested", "2014wikidot", "dnd5ewikidot.json")),
+        ("2024wikidot", Path.Combine(repoRoot, "data", "ingested", "2024wikidot", "dnd2024wikidot.json")),
+    };
+
+    foreach (var (sourceCode, path) in wikidotSpecs)
+    {
+        if (!File.Exists(path))
+        {
+            continue;
+        }
+
+        var json = await File.ReadAllTextAsync(path);
+        var snapshot = JsonSerializer.Deserialize<WikidotSnapshot>(json);
+        if (snapshot is null || snapshot.Pages.Count == 0)
+        {
+            continue;
+        }
+
+        payloads.Add(BuildWikidotPayload(sourceCode, Path.GetFileName(path), snapshot));
+    }
+
+    return payloads;
+}
+
+static IngestionPayload BuildWikidotPayload(string sourceCode, string sourceFile, WikidotSnapshot snapshot)
+{
+    var dedupe = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var sections = new List<SectionRecord>();
+    foreach (var page in snapshot.Pages)
+    {
+        var rawText = page.Text?.Trim() ?? string.Empty;
+        if (rawText.Length == 0)
+        {
+            continue;
+        }
+
+        var dedupeKey = !string.IsNullOrWhiteSpace(page.ContentHash)
+            ? page.ContentHash.Trim()
+            : page.Url.Trim();
+        if (!dedupe.Add(dedupeKey))
+        {
+            continue;
+        }
+
+        var normalizedText = rawText.Replace("\r\n", "\n").Replace('\r', '\n');
+        var lines = normalizedText.Split('\n', StringSplitOptions.None);
+        var title = BuildWikidotTitle(page.Url);
+        var lineCount = Math.Max(1, lines.Length);
+        var confidence = normalizedText.Length >= 200 ? 0.85m : 0.7m;
+        var preview = normalizedText.Length > 220 ? normalizedText[..220] : normalizedText;
+        sections.Add(new SectionRecord(
+            SectionIndex: sections.Count + 1,
+            Title: title,
+            StartLine: 1,
+            EndLine: lineCount,
+            LineCount: lineCount,
+            Confidence: confidence,
+            Preview: preview));
+    }
+
+    return new IngestionPayload(
+        SourceCode: sourceCode,
+        SourceFile: sourceFile,
+        GeneratedAtUtc: DateTimeOffset.UtcNow,
+        SectionCount: sections.Count,
+        Sections: sections);
+}
+
+static string BuildWikidotTitle(string url)
+{
+    if (string.IsNullOrWhiteSpace(url))
+    {
+        return "Wikidot page";
+    }
+
+    if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+    {
+        return url.Trim();
+    }
+
+    var segment = uri.AbsolutePath.Trim('/');
+    if (string.IsNullOrWhiteSpace(segment))
+    {
+        return uri.Host;
+    }
+
+    var normalized = segment.Replace('_', ' ').Replace('-', ' ').Replace(':', ' ').Trim();
+    return Regex.Replace(normalized, @"\s+", " ");
 }
 
 static string ResolveRepoRoot(string[] args)
@@ -1827,3 +1939,13 @@ sealed record PendingSubclassRow(
     string Description,
     string? Preview,
     string PayloadJson);
+
+sealed record WikidotSnapshot(
+    [property: JsonPropertyName("pages_fetched")] int PagesFetched,
+    [property: JsonPropertyName("pages")] IReadOnlyList<WikidotPage> Pages);
+
+sealed record WikidotPage(
+    [property: JsonPropertyName("url")] string Url,
+    [property: JsonPropertyName("incoming_link_count")] int IncomingLinkCount,
+    [property: JsonPropertyName("content_hash")] string ContentHash,
+    [property: JsonPropertyName("text")] string Text);

@@ -13,7 +13,7 @@ Repository folder names may vary (for example `CopilotTesting`), while the solut
 7. Persistent inventory model with equip/attune/unattune and attunement-cap enforcement.
 8. Persisted calculations for checks/saves/attacks, derived stats, and advanced-rules snapshot output.
 9. Custom origin/species validation and preview endpoints.
-10. Frontend character sheet sections for persisted vitals, spells, and resources.
+10. Frontend character sheet sections for persisted vitals, spells, resources, and ruleset-filtered item management.
 
 ## Prerequisites
 1. .NET SDK 10.x
@@ -68,7 +68,7 @@ npm run build
 
 ## Frontend quick walkthrough (first-time user)
 1. The landing page shows **Login** and **About DndAppName**. Sign in with username + password (or register a new local account).
-2. After login, the app routes to **Your characters** (`/characters`) and shows active characters only.
+2. After login, the app routes to **Your characters** (`/characters`) and shows active characters only, including class summaries and mixed-mode badges.
 3. Use **Archived characters** (`/characters/archived`) to restore archived entries or permanently delete them (explicit confirmation required before delete).
 4. Use **Create new character** (`/characters/new`) to start the creation flow.
 5. In **Character build setup**, set the character name (optional), rules mode, primary class level, and ability-score method:
@@ -76,18 +76,20 @@ npm run build
     - **Manual** score entry, or
     - **Roll** (4d6 drop lowest) with drag/drop plus touch-friendly tap assignment from roll pool into each ability slot. Optional **Reroll 1s once** is available.
 6. **Total character level** is derived from class levels (primary + multiclass entries), and proficiency bonus is auto-calculated from total level using `(level - 1) // 4 + 2`.
-7. Mixed mode now uses a **multi-select overlay source picker** instead of comma-separated text, and catalog module loading uses the currently selected overlay sources only.
+7. Mixed mode is toggled on the **Ruleset selection** page and automatically includes cross-ruleset catalog content.
 8. New-character setup now includes primary class, optional multiclass entries (primary class required), race/species, and background/origin selections.
 9. Race/species and background/origin ability bonuses (when available from catalog payload) are applied into total ability scores.
-10. In **Wizard + persistent build**, click **Start Wizard Draft**, choose a main class (from the selected base ruleset), optionally choose a subclass (mixed mode shows cross-version subclasses), apply selections, then click **Save build to persistent model**.
-11. Click **Finalize** to create the character record (wizard path) and use persisted character ID in the library.
+10. In **Wizard + persistent build**, choose a main class and optional unlocked subclass; the app submits wizard + persisted selections automatically during final submit.
+11. On the last creation page, click **Submit character** to complete creation.
 12. In **Skills menu and persisted checks**, each skill has a `None/Proficient/Expertise` dropdown with live proficiency/expertise slot counters (negative values indicate over-allocation), plus persisted advantage/disadvantage check rolling; saved builds now round-trip these training tiers.
 13. In **Inventory from database (persisted)**, add item definitions from catalog, set quantity, and manage equip/attune/unattune/remove states. Inventory rows show value, weight, attunement, equip status, and quantity.
-14. Use the **Coin purse** controls for cp/sp/ep/gp/pp tracking, conversion, consolidation, and purchase-mode deduction with change-making.
-15. **Attacks** auto-builds from equipped weapon-style inventory entries (deduped by weapon details) and shows to-hit bonus, damage expression, and advantage/disadvantage rolling.
-16. Use **Load advanced multiclass rules snapshot** for non-stacking Extra Attack and AC-formula resolution status, plus explicit data-gap reporting for blocked advanced tables.
-17. In **Character sheet: vitals, spells, resources**, edit and save persisted HP/speed/AC values, spell entries, and resource pools.
-18. In **Custom builder previews**, click preview buttons to test guided custom payload validation.
+14. Use the **Coin purse** controls for cp/sp/ep/gp/pp tracking, auto-save on blur, consolidation, and purchase-mode deduction with change-making.
+15. During character creation, attack tooling is hidden to keep focus on core setup.
+16. Vitals base move speed auto-fills from the selected race/species when available in catalog metadata.
+17. Use **View** from the characters list to open `/characters/view/{id}` with character-focused controls (Back to characters + Logout in header).
+18. In character view, **Current HP** and **Temp HP** save on blur, and death-save tracking uses 3 success + 3 failure toggles.
+19. Character view includes an **Edit** mode for ability scores, skill proficiencies/expertise, AC mode (manual/calculated), spell-slot resource values, and reset-to-default controls.
+20. Use **Settings** (`/settings`) from the authenticated header to switch frontend themes (Pulse default, Zephyr alternate).
 
 ### Troubleshooting (local run)
 1. If `dotnet build` fails with `DndApp.Api.exe ... file is being used by another process`, stop the running API (`Ctrl+C` in the terminal where `dotnet run` is active), then build again.
@@ -104,6 +106,10 @@ Import generated section artifacts into SQLite raw tables:
 ```powershell
 dotnet run --project tools\DndApp.ContentIngestion\DndApp.ContentIngestion.csproj -- --import-db
 ```
+
+`--import-db` also ingests Wikidot snapshots when present at:
+- `data\ingested\2014wikidot\dnd5ewikidot.json`
+- `data\ingested\2024wikidot\dnd2024wikidot.json`
 
 Normalize imported raw sections into core domain entities (`rule_system`, `content_source`, `rule_module`, `rule_variant`):
 ```powershell
@@ -128,6 +134,9 @@ Outputs are written under:
 - `data\ingested\phb2024\v1\sections.json`
 - `data\ingested\dmg2014\v1\sections.json`
 - `data\ingested\dmg2024\v1\sections.json`
+- Wikidot snapshots are read directly from:
+  - `data\ingested\2014wikidot\dnd5ewikidot.json`
+  - `data\ingested\2024wikidot\dnd2024wikidot.json`
 
 ## Database foundation (SQLite now)
 1. The API is configured for SQLite by default in `appsettings*.json`.

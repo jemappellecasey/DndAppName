@@ -1,18 +1,15 @@
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import {
   addInventoryItem,
   archiveCharacter,
   consolidateCharacterCurrency,
   convertCharacterCurrency,
-  computePersistedCheck,
-  computePersistedAttack,
   copyToRuleset,
   deleteCharacter,
   duplicateCharacter,
   finalizeWizard,
   getArchivedCharacters,
-  getAttunementGuidance,
   getCharacterBuild,
   getCharacterHistory,
   getCharacterInventory,
@@ -26,13 +23,10 @@ import {
   getRecommendedSpells,
   getModuleCatalog,
   getItemCatalog,
-  getAdvancedRulesSnapshot,
   health,
   loginLocal,
   registerLocal,
   patchInventoryItem,
-  previewOrigin,
-  previewSpecies,
   purchaseFromCharacterCurrency,
   removeInventoryItem,
   restoreCharacter,
@@ -47,8 +41,6 @@ import {
 } from './api'
 import type {
   AbilityName,
-  AdvancedRulesSnapshotResponse,
-  AdvantageState,
   BuildMethod,
   CharacterBuildData,
   CharacterHistoryEntry,
@@ -60,13 +52,16 @@ import type {
   CharacterVitalsData,
   CharacterWizardResult,
   ClassCatalogItem,
-  ContentSourceCatalogItem,
   ItemCatalogItem,
   LocalSession,
   ModuleCatalogItem,
   RuleSystemMode,
   SkillName,
+  UpsertCharacterBuildPayload,
 } from './types'
+import CharactersPage from './pages/CharactersPage'
+import ArchivedCharactersPage from './pages/ArchivedCharactersPage'
+import SettingsPage from './pages/SettingsPage'
 
 const ABILITIES: AbilityName[] = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
 
@@ -160,21 +155,89 @@ const KNOWN_RACES = new Set([
   'Half-Elf',
   'Half-Orc',
 ])
-const KNOWN_BACKGROUNDS = new Set([
-  'Acolyte',
-  'Artisan',
-  'Charlatan',
-  'Criminal',
-  'Entertainer',
-  'Folk Hero',
-  'Guild Artisan',
-  'Hermit',
-  'Noble',
-  'Sage',
-  'Sailor',
-  'Soldier',
-  'Urchin',
-])
+const CURRENCY_RESOURCE_KEYS = new Set(['cp', 'sp', 'ep', 'gp', 'pp'])
+const THEME_STORAGE_KEY = 'dndapp-theme'
+const DEFAULT_THEME = 'pulse'
+const CLASS_SPELLCASTING_ABILITY: Partial<Record<string, AbilityName>> = {
+  artificer: 'Intelligence',
+  bard: 'Charisma',
+  cleric: 'Wisdom',
+  druid: 'Wisdom',
+  paladin: 'Charisma',
+  ranger: 'Wisdom',
+  sorcerer: 'Charisma',
+  warlock: 'Charisma',
+  wizard: 'Intelligence',
+}
+const FULL_CASTER_SLOTS_BY_LEVEL: ReadonlyArray<ReadonlyArray<number>> = [
+  [],
+  [2, 0, 0, 0, 0, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0, 0, 0, 0, 0],
+  [4, 2, 0, 0, 0, 0, 0, 0, 0],
+  [4, 3, 0, 0, 0, 0, 0, 0, 0],
+  [4, 3, 2, 0, 0, 0, 0, 0, 0],
+  [4, 3, 3, 0, 0, 0, 0, 0, 0],
+  [4, 3, 3, 1, 0, 0, 0, 0, 0],
+  [4, 3, 3, 2, 0, 0, 0, 0, 0],
+  [4, 3, 3, 3, 1, 0, 0, 0, 0],
+  [4, 3, 3, 3, 2, 0, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 2, 1, 1],
+]
+const HALF_CASTER_SLOTS_BY_LEVEL: ReadonlyArray<ReadonlyArray<number>> = [
+  [],
+  [0, 0, 0, 0, 0],
+  [2, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0],
+  [4, 2, 0, 0, 0],
+  [4, 2, 0, 0, 0],
+  [4, 3, 0, 0, 0],
+  [4, 3, 0, 0, 0],
+  [4, 3, 2, 0, 0],
+  [4, 3, 2, 0, 0],
+  [4, 3, 3, 0, 0],
+  [4, 3, 3, 0, 0],
+  [4, 3, 3, 1, 0],
+  [4, 3, 3, 1, 0],
+  [4, 3, 3, 2, 0],
+  [4, 3, 3, 2, 0],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 2],
+  [4, 3, 3, 3, 2],
+]
+const ARTIFICER_SLOTS_BY_LEVEL: ReadonlyArray<ReadonlyArray<number>> = [
+  [],
+  [2, 0, 0, 0, 0],
+  [2, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0],
+  [4, 2, 0, 0, 0],
+  [4, 2, 0, 0, 0],
+  [4, 3, 0, 0, 0],
+  [4, 3, 0, 0, 0],
+  [4, 3, 2, 0, 0],
+  [4, 3, 2, 0, 0],
+  [4, 3, 3, 0, 0],
+  [4, 3, 3, 0, 0],
+  [4, 3, 3, 1, 0],
+  [4, 3, 3, 1, 0],
+  [4, 3, 3, 2, 0],
+  [4, 3, 3, 2, 0],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 2],
+  [4, 3, 3, 3, 2],
+]
 
 function abilityModifier(score: number) {
   return Math.floor((score - 10) / 2)
@@ -205,6 +268,38 @@ function rulesetLabel(ruleSystem: RuleSystemMode): string {
   return ruleSystem === 'Rules2024' ? '2024 rules' : '2014 rules'
 }
 
+function mixedModeLabel(baseRuleSystem: RuleSystemMode, mixedModeEnabled: boolean): string {
+  if (!mixedModeEnabled) {
+    return 'Single ruleset'
+  }
+
+  return baseRuleSystem === 'Rules2024' ? 'Plus 2014 content' : 'Plus 2024 content'
+}
+
+function parseHitDieSides(className: string): number {
+  const normalized = className.trim().toLowerCase()
+  if (normalized === 'barbarian') return 12
+  if (normalized === 'fighter' || normalized === 'paladin' || normalized === 'ranger') return 10
+  if (normalized === 'artificer' || normalized === 'bard' || normalized === 'cleric' || normalized === 'druid' || normalized === 'monk' || normalized === 'rogue' || normalized === 'warlock') return 8
+  if (normalized === 'sorcerer' || normalized === 'wizard') return 6
+  return 8
+}
+
+function rollHitPointsForLevel(level: number, hitDieSides: number, generousRolls: boolean): number {
+  const boundedLevel = Math.max(1, Math.trunc(level))
+  const boundedSides = Math.max(1, Math.trunc(hitDieSides))
+  const averageFloor = Math.floor(boundedSides / 2) + 1
+  let total = boundedSides
+  for (let i = 2; i <= boundedLevel; i += 1) {
+    let roll = Math.floor(Math.random() * boundedSides) + 1
+    if (generousRolls && roll < averageFloor) {
+      roll = averageFloor
+    }
+    total += roll
+  }
+  return total
+}
+
 function sourceMatchesBaseRules(sourceCode: string, baseRules: RuleSystemMode): boolean {
   if (!sourceCode) {
     return true
@@ -212,6 +307,51 @@ function sourceMatchesBaseRules(sourceCode: string, baseRules: RuleSystemMode): 
 
   const normalized = sourceCode.toLowerCase()
   return baseRules === 'Rules2014' ? normalized.includes('2014') : normalized.includes('2024')
+}
+
+function toSpellSlotResources(slotCounts: ReadonlyArray<number>): CharacterResourcePoolData[] {
+  return slotCounts.flatMap((maxValue, index) =>
+    maxValue > 0
+      ? [
+          {
+            resourceKey: `spell-slot-${index + 1}`,
+            currentValue: maxValue,
+            maxValue,
+            metadataJson: '{"source":"auto"}',
+          },
+        ]
+      : [],
+  )
+}
+
+function getDefaultSpellSlotResources(className: string, classLevel: number): CharacterResourcePoolData[] {
+  const level = Math.max(1, Math.min(20, Math.trunc(classLevel)))
+  const normalized = className.trim().toLowerCase()
+  const fullCasterClasses = new Set(['bard', 'cleric', 'druid', 'sorcerer', 'wizard'])
+  const halfCasterClasses = new Set(['paladin', 'ranger'])
+  if (fullCasterClasses.has(normalized)) {
+    return toSpellSlotResources(FULL_CASTER_SLOTS_BY_LEVEL[level] ?? [])
+  }
+  if (halfCasterClasses.has(normalized)) {
+    return toSpellSlotResources(HALF_CASTER_SLOTS_BY_LEVEL[level] ?? [])
+  }
+  if (normalized === 'artificer') {
+    return toSpellSlotResources(ARTIFICER_SLOTS_BY_LEVEL[level] ?? [])
+  }
+  if (normalized === 'warlock') {
+    const pactSlotCount = level >= 17 ? 4 : level >= 11 ? 3 : 2
+    const pactSlotLevel = level >= 9 ? 5 : level >= 7 ? 4 : level >= 5 ? 3 : level >= 3 ? 2 : 1
+    return [
+      {
+        resourceKey: `pact-slot-level-${pactSlotLevel}`,
+        currentValue: pactSlotCount,
+        maxValue: pactSlotCount,
+        metadataJson: '{"source":"auto"}',
+      },
+    ]
+  }
+
+  return []
 }
 
 function App() {
@@ -224,13 +364,17 @@ function App() {
   const [archivedCharacters, setArchivedCharacters] = useState<CharacterSummary[]>([])
   const [selectedCharacterId, setSelectedCharacterId] = useState('')
   const [history, setHistory] = useState<CharacterHistoryEntry[]>([])
+  const [classSummaryByCharacterId, setClassSummaryByCharacterId] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
   const [currentPath, setCurrentPath] = useState(window.location.pathname || '/login')
+  const [themeName, setThemeName] = useState<'pulse' | 'zephyr'>(() => {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+    return stored === 'pulse' || stored === 'zephyr' ? stored : DEFAULT_THEME
+  })
 
   const [wizardName, setWizardName] = useState('')
   const [baseRules, setBaseRules] = useState<RuleSystemMode>('Rules2024')
   const [mixedMode, setMixedMode] = useState(false)
-  const [overlaySourceOptions, setOverlaySourceOptions] = useState<ContentSourceCatalogItem[]>([])
   const [overlaySources, setOverlaySources] = useState<string[]>([])
   const [activeDraft, setActiveDraft] = useState<CharacterWizardResult | null>(null)
 
@@ -273,17 +417,8 @@ function App() {
   const [currencyDraft, setCurrencyDraft] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 })
   const [currencyConvert, setCurrencyConvert] = useState({ fromDenomination: 'gp', toDenomination: 'sp', amount: 1 })
   const [usePlatinumConsolidation, setUsePlatinumConsolidation] = useState(false)
-  const [inventoryResult, setInventoryResult] = useState('')
-  const [attunementGuidance, setAttunementGuidance] = useState('')
   const [startingEquipmentMode, setStartingEquipmentMode] = useState<'package' | 'gold-only'>('package')
-  const [startingEquipmentModeLocked, setStartingEquipmentModeLocked] = useState(false)
 
-  const [selectedSkill, setSelectedSkill] = useState<SkillName>('Stealth')
-  const [advantageState, setAdvantageState] = useState<AdvantageState>('None')
-  const [rollResult, setRollResult] = useState('')
-  const [attackAdvantageState, setAttackAdvantageState] = useState<AdvantageState>('None')
-  const [attackResults, setAttackResults] = useState<Record<string, string>>({})
-  const [advancedRulesSnapshot, setAdvancedRulesSnapshot] = useState<AdvancedRulesSnapshotResponse | null>(null)
   const [spellEntries, setSpellEntries] = useState<CharacterSpellEntryData[]>([])
   const [recommendedSpellsByClass, setRecommendedSpellsByClass] = useState<Record<string, string>>({})
   const [resourcePools, setResourcePools] = useState<CharacterResourcePoolData[]>([])
@@ -291,9 +426,19 @@ function App() {
     ...DEFAULT_VITALS,
   })
   const [sheetResult, setSheetResult] = useState('')
-
-  const [originPreview, setOriginPreview] = useState('')
-  const [speciesPreview, setSpeciesPreview] = useState('')
+  const [characterNotes, setCharacterNotes] = useState('')
+  const [viewSkillSort, setViewSkillSort] = useState<'name' | 'ability'>('ability')
+  const [maxHpMethod, setMaxHpMethod] = useState<'manual' | 'roll'>('manual')
+  const [generousHitPointRolls, setGenerousHitPointRolls] = useState(false)
+  const [deathSaveSuccesses, setDeathSaveSuccesses] = useState(0)
+  const [deathSaveFailures, setDeathSaveFailures] = useState(0)
+  const [viewEditMode, setViewEditMode] = useState(false)
+  const [acMode, setAcMode] = useState<'manual' | 'calculated'>('calculated')
+  const [defaultBuildSnapshot, setDefaultBuildSnapshot] = useState<CharacterBuildData | null>(null)
+  const [defaultVitalsSnapshot, setDefaultVitalsSnapshot] = useState<Omit<CharacterVitalsData, 'characterId' | 'updatedAtUtc'>>({
+    ...DEFAULT_VITALS,
+  })
+  const [defaultResourcesSnapshot, setDefaultResourcesSnapshot] = useState<CharacterResourcePoolData[]>([])
 
   const currentCharacterId = useMemo(
     () => selectedCharacterId || activeDraft?.draft?.characterId || '',
@@ -302,14 +447,35 @@ function App() {
   const isCharactersRoute = currentPath === '/' || currentPath === '/characters'
   const isArchivedRoute = currentPath === '/characters/archived'
   const isNewCharacterRoute = currentPath.startsWith('/characters/new')
-
-  const classOptions = useMemo(
-    () =>
-      moduleCatalog.filter(
-        (x) => x.moduleType.toLowerCase() === 'class' && KNOWN_CLASSES.has(x.displayName),
-      ),
-    [moduleCatalog],
+  const isCharacterViewRoute = currentPath.startsWith('/characters/view/')
+  const isSettingsRoute = currentPath === '/settings'
+  const viewCharacterIdFromPath = useMemo(
+    () => (isCharacterViewRoute ? currentPath.replace('/characters/view/', '') : ''),
+    [currentPath, isCharacterViewRoute],
   )
+
+  const classOptions = useMemo(() => {
+    const allClassOptions = moduleCatalog.filter(
+      (x) => x.moduleType.toLowerCase() === 'class' && KNOWN_CLASSES.has(x.displayName),
+    )
+    const byClassName = new Map<string, ModuleCatalogItem>()
+    for (const item of allClassOptions) {
+      const key = item.displayName.trim().toLowerCase()
+      const current = byClassName.get(key)
+      if (!current) {
+        byClassName.set(key, item)
+        continue
+      }
+
+      const currentIsPhb = current.sourceCode.toLowerCase().includes('phb')
+      const nextIsPhb = item.sourceCode.toLowerCase().includes('phb')
+      if (!currentIsPhb && nextIsPhb) {
+        byClassName.set(key, item)
+      }
+    }
+
+    return Array.from(byClassName.values()).sort((a, b) => a.displayName.localeCompare(b.displayName))
+  }, [moduleCatalog])
   const mainClassOptions = useMemo(() => {
     const byClassName = new Map<string, ClassCatalogItem>()
     for (const item of classCatalog) {
@@ -329,6 +495,18 @@ function App() {
 
     return Array.from(byClassName.values()).sort((a, b) => a.className.localeCompare(b.className))
   }, [classCatalog])
+  const classNameByModuleId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const item of mainClassOptions) {
+      map.set(item.moduleId.toLowerCase(), item.className)
+    }
+    for (const item of classOptions) {
+      if (!map.has(item.moduleId.toLowerCase())) {
+        map.set(item.moduleId.toLowerCase(), item.displayName)
+      }
+    }
+    return map
+  }, [classOptions, mainClassOptions])
   const subclassOptions = useMemo(
     () =>
       moduleCatalog.filter((x) => {
@@ -337,8 +515,8 @@ function App() {
         return baseRules === 'Rules2014'
           ? x.sourceCode.toLowerCase().includes('2014')
           : x.sourceCode.toLowerCase().includes('2024')
-      }).filter((x) => x.minLevelRequirement <= primaryClassLevel),
-    [baseRules, mixedMode, moduleCatalog, primaryClassLevel],
+      }),
+    [baseRules, mixedMode, moduleCatalog],
   )
   const raceOptions = useMemo(
     () =>
@@ -352,9 +530,7 @@ function App() {
   const backgroundOptions = useMemo(
     () =>
       moduleCatalog.filter(
-        (x) =>
-          (x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin') &&
-          KNOWN_BACKGROUNDS.has(x.displayName),
+        (x) => x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin',
       ),
     [moduleCatalog],
   )
@@ -464,12 +640,100 @@ function App() {
         : (mainClassOptions[0]?.moduleId ?? ''),
     [mainClassOptions, selectedClassModuleId],
   )
+  const selectedPrimaryClassName = useMemo(() => {
+    const classFromCatalog = mainClassOptions.find((x) => x.moduleId === effectiveSelectedClassModuleId)?.className
+    const classFromModules = classOptions.find((x) => x.moduleId === effectiveSelectedClassModuleId)?.displayName
+    return classFromCatalog ?? classFromModules ?? ''
+  }, [classOptions, effectiveSelectedClassModuleId, mainClassOptions])
+  const selectedSubclassName = useMemo(
+    () => subclassOptions.find((x) => x.moduleId === selectedSubclassModuleId)?.displayName ?? '',
+    [selectedSubclassModuleId, subclassOptions],
+  )
+  const spellOriginNames = useMemo(() => {
+    const origins = new Set<string>()
+    if (selectedPrimaryClassName) {
+      origins.add(selectedPrimaryClassName.toLowerCase())
+    }
+    for (const multiClass of multiClassSelections) {
+      const name = classOptions.find((x) => x.moduleId === multiClass.moduleId)?.displayName
+      if (name) {
+        origins.add(name.toLowerCase())
+      }
+    }
+    if (selectedSubclassName) {
+      origins.add(selectedSubclassName.toLowerCase())
+    }
+    return origins
+  }, [classOptions, multiClassSelections, selectedPrimaryClassName, selectedSubclassName])
+  const availableSpellOptions = useMemo(() => {
+    return moduleCatalog.filter((item) => {
+      if (item.moduleType.toLowerCase() !== 'spell') {
+        return false
+      }
+      if (!selectedPrimaryClassName && spellOriginNames.size === 0) {
+        return true
+      }
+      if (item.spellClasses.length === 0) {
+        return false
+      }
+
+      return item.spellClasses.some((className) => spellOriginNames.has(className.toLowerCase()))
+    })
+  }, [moduleCatalog, selectedPrimaryClassName, spellOriginNames])
+  const filteredItemCatalog = useMemo(
+    () => itemCatalog.filter((item) => mixedMode || sourceMatchesBaseRules(item.sourceCode, baseRules)),
+    [baseRules, itemCatalog, mixedMode],
+  )
+  const effectiveSelectedCatalogItemId = useMemo(
+    () =>
+      selectedCatalogItemId && filteredItemCatalog.some((x) => x.itemId === selectedCatalogItemId)
+        ? selectedCatalogItemId
+        : (filteredItemCatalog[0]?.itemId ?? ''),
+    [filteredItemCatalog, selectedCatalogItemId],
+  )
+  const primaryClassSubclassOptions = useMemo(
+    () => {
+      const selectedClassName = classNameByModuleId.get(effectiveSelectedClassModuleId.toLowerCase())?.toLowerCase() ?? ''
+      return subclassOptions.filter((item) => {
+        if (!item.parentClassModuleId) {
+          return selectedClassName.length > 0 && item.displayName.toLowerCase().includes(selectedClassName)
+        }
+        if (item.parentClassModuleId.toLowerCase() === effectiveSelectedClassModuleId.toLowerCase()) {
+          return true
+        }
+        const parentClassName = classNameByModuleId.get(item.parentClassModuleId.toLowerCase())?.toLowerCase() ?? ''
+        if (selectedClassName && parentClassName && selectedClassName === parentClassName) {
+          return true
+        }
+        return selectedClassName.length > 0 && item.displayName.toLowerCase().includes(selectedClassName)
+      })
+    },
+    [classNameByModuleId, effectiveSelectedClassModuleId, subclassOptions],
+  )
+  const unlockedPrimarySubclassOptions = useMemo(
+    () =>
+      primaryClassSubclassOptions.filter((item) => {
+        if (item.minLevelRequirement > primaryClassLevel) {
+          return false
+        }
+
+        for (const [ability, required] of Object.entries(item.abilityScoreRequirements ?? {})) {
+          const key = ability as AbilityName
+          if ((totalAbilityScores[key] ?? 0) < required) {
+            return false
+          }
+        }
+
+        return true
+      }),
+    [primaryClassLevel, primaryClassSubclassOptions, totalAbilityScores],
+  )
   const effectiveSelectedSubclassModuleId = useMemo(
     () =>
-      selectedSubclassModuleId && subclassOptions.some((x) => x.moduleId === selectedSubclassModuleId)
+      selectedSubclassModuleId && primaryClassSubclassOptions.some((x) => x.moduleId === selectedSubclassModuleId)
         ? selectedSubclassModuleId
         : '',
-    [selectedSubclassModuleId, subclassOptions],
+    [selectedSubclassModuleId, primaryClassSubclassOptions],
   )
 
   const pointBuySpent = useMemo(
@@ -630,30 +894,6 @@ function App() {
     [selectedBackgroundOption, selectedClassOption, selectedRaceOption],
   )
 
-  const attacks = useMemo(() => {
-    const grouped = new Map<string, NonNullable<CharacterInventoryState['items']>[number]>()
-    for (const item of inventoryState?.items ?? []) {
-      if (!item.isWeapon) continue
-      const key = [
-        getDisplayItemName(item.itemName, item.itemDefinitionId),
-        item.damageDice,
-        item.weaponAbility,
-        item.attackBonus,
-        item.damageBonus,
-      ].join('|')
-      if (!grouped.has(key)) {
-        grouped.set(key, item)
-      }
-    }
-    return Array.from(grouped.values()).map((item) => {
-      const abilityName = (item.weaponAbility || 'Strength') as AbilityName
-      const abilityMod = abilityModifier(totalAbilityScores[abilityName] ?? 10)
-      const toHit = abilityMod + proficiencyBonus + item.attackBonus
-      const damageBonus = abilityMod + item.damageBonus
-      return { ...item, abilityName, toHit, damageBonus }
-    })
-  }, [inventoryState, proficiencyBonus, totalAbilityScores])
-
   const classSections = useMemo(() => {
     const primaryClass = classCatalog.find((x) => x.moduleId === effectiveSelectedClassModuleId)
     const primaryName = primaryClass?.className ?? classOptions.find((x) => x.moduleId === effectiveSelectedClassModuleId)?.displayName
@@ -678,6 +918,18 @@ function App() {
       .then((r) => setStatus(`API online (${r.status})`))
       .catch(() => setStatus('API unreachable (start DndApp.Api on localhost:5080)'))
   }, [])
+
+  useEffect(() => {
+    let link = document.getElementById('app-theme') as HTMLLinkElement | null
+    if (!link) {
+      link = document.createElement('link')
+      link.id = 'app-theme'
+      link.rel = 'stylesheet'
+      document.head.appendChild(link)
+    }
+    link.href = `/themes/${themeName}.min.css`
+    window.localStorage.setItem(THEME_STORAGE_KEY, themeName)
+  }, [themeName])
 
   useEffect(() => {
     const onPopState = () => {
@@ -718,6 +970,7 @@ function App() {
           }
 
           setCharacters(list)
+          void refreshClassSummaries(list)
           if (!selectedCharacterId && list.length > 0) {
             setSelectedCharacterId(list[0].characterId)
             await loadPersistedCharacterState(list[0].characterId)
@@ -746,13 +999,12 @@ function App() {
   }
 
   async function loadCatalogData(ruleSystem: RuleSystemMode) {
-    const [classes, items, guidance, sources] = await Promise.all([
+    const [classes, items, sources] = await Promise.all([
       getClassCatalog(ruleSystem),
       getItemCatalog(),
-      getAttunementGuidance(),
       getContentSources(ruleSystem),
     ])
-    const validOverlaySources = overlaySources.filter((code) => sources.some((src) => src.sourceCode === code))
+    const validOverlaySources = sources.map((src) => src.sourceCode)
     const effectiveOverlaySources = mixedMode ? validOverlaySources : []
     const modules = await getModuleCatalog({
       baseRuleSystem: ruleSystem,
@@ -766,16 +1018,12 @@ function App() {
         KNOWN_RACES.has(x.displayName),
     )
     const filteredBackgroundOptions = modules.filter(
-      (x) =>
-        (x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin') &&
-        KNOWN_BACKGROUNDS.has(x.displayName),
+      (x) => x.moduleType.toLowerCase() === 'background' || x.moduleType.toLowerCase() === 'origin',
     )
     setClassCatalog(classes)
     setModuleCatalog(modules)
     setItemCatalog(items)
-    setAttunementGuidance(JSON.stringify(guidance, null, 2))
-    setOverlaySourceOptions(sources)
-    setOverlaySources(validOverlaySources)
+    setOverlaySources(effectiveOverlaySources)
     if (!selectedClassModuleId && classes.length > 0) {
       setSelectedClassModuleId(classes[0].moduleId)
     }
@@ -784,6 +1032,10 @@ function App() {
       const firstRace = filteredRaceOptions[0]
       if (firstRace) {
         setSelectedRaceModuleId(firstRace.moduleId)
+        setVitals((prev) => ({
+          ...prev,
+          baseMoveSpeed: firstRace.walkingSpeed && firstRace.walkingSpeed > 0 ? firstRace.walkingSpeed : 30,
+        }))
       }
     }
     const selectedBackgroundStillVisible = filteredBackgroundOptions.some((x) => x.moduleId === selectedBackgroundModuleId)
@@ -805,6 +1057,8 @@ function App() {
       setBuildMethod(build.buildMethod)
       setWizardName(build.characterName)
       setBaseRules(build.baseRuleSystem)
+      const summary = characters.find((entry) => entry.characterId === characterId)
+      setMixedMode(summary?.mixedModeEnabled ?? false)
       const persistedClassLevels = build.classLevels.length > 0 ? build.classLevels : [{ classModuleId: build.classModuleId, className: build.className, level: build.level, sortOrder: 0 }]
       const primaryPersistedClass = persistedClassLevels[0]
       setSelectedClassModuleId(primaryPersistedClass.classModuleId)
@@ -831,6 +1085,8 @@ function App() {
         .filter((x) => x.slot.toLowerCase() === 'language')
         .map((x) => x.moduleId)
       const equipmentMode = build.selectedModules.find((x) => x.slot.toLowerCase() === 'starting-equipment-mode')?.moduleId
+      const notesModule = build.selectedModules.find((x) => x.slot.toLowerCase() === 'character-notes')
+      const acModeModule = build.selectedModules.find((x) => x.slot.toLowerCase() === 'ac-mode')
       if (subclassModule) setSelectedSubclassModuleId(subclassModule.moduleId)
       if (raceModule) setSelectedRaceModuleId(raceModule.moduleId)
       if (subraceModule) setSelectedSubraceModuleId(subraceModule.moduleId)
@@ -839,11 +1095,11 @@ function App() {
       setSelectedLanguagePicks(languagePicks)
       if (equipmentMode === 'gold-only') {
         setStartingEquipmentMode('gold-only')
-        setStartingEquipmentModeLocked(true)
       } else {
         setStartingEquipmentMode('package')
-        setStartingEquipmentModeLocked(false)
       }
+      setCharacterNotes(notesModule?.displayName ?? '')
+      setAcMode(acModeModule?.moduleId === 'manual' ? 'manual' : 'calculated')
       setSkillTrainingBySkill(() => {
         const next = Object.fromEntries(ALL_SKILLS.map((skill) => [skill, 'None'])) as Record<SkillName, SkillTrainingLevel>
         if (build.skillTrainingBySkill) {
@@ -862,23 +1118,24 @@ function App() {
       setRollAssignments(build.abilityScores)
       setRolledPool([])
       setBuildResult('Loaded persisted character build.')
+      setDefaultBuildSnapshot(build)
     } catch {
       setSavedBuild(null)
+      setDefaultBuildSnapshot(null)
       setBuildResult('No persisted build for selected character yet.')
       setSelectedToolPicks([])
       setSelectedLanguagePicks([])
       setSelectedSubraceModuleId('')
       setStartingEquipmentMode('package')
-      setStartingEquipmentModeLocked(false)
+      setCharacterNotes('')
+      setAcMode('calculated')
     }
 
     try {
       const inventory = await getCharacterInventory(characterId)
       setInventoryState(inventory)
-      setInventoryResult(JSON.stringify(inventory, null, 2))
     } catch {
       setInventoryState(null)
-      setInventoryResult('')
     }
 
     try {
@@ -900,8 +1157,10 @@ function App() {
     try {
       const resources = await getCharacterResources(characterId)
       setResourcePools(resources.resources)
+      setDefaultResourcesSnapshot(resources.resources)
     } catch {
       setResourcePools([])
+      setDefaultResourcesSnapshot([])
     }
 
     try {
@@ -913,20 +1172,50 @@ function App() {
         baseMoveSpeed: nextVitals.baseMoveSpeed,
         baseArmorClass: nextVitals.baseArmorClass,
       })
+      setDefaultVitalsSnapshot({
+        maxHitPoints: nextVitals.maxHitPoints,
+        currentHitPoints: nextVitals.currentHitPoints,
+        tempHitPoints: nextVitals.tempHitPoints,
+        baseMoveSpeed: nextVitals.baseMoveSpeed,
+        baseArmorClass: nextVitals.baseArmorClass,
+      })
     } catch {
       setVitals({ ...DEFAULT_VITALS })
+      setDefaultVitalsSnapshot({ ...DEFAULT_VITALS })
     }
 
     setSheetResult('')
+    setDeathSaveSuccesses(0)
+    setDeathSaveFailures(0)
+    setViewEditMode(false)
   }
 
   async function refreshCharacters() {
     const list = await getCharacters(false, true)
     setCharacters(list)
+    await refreshClassSummaries(list)
     if (!selectedCharacterId && list.length > 0) {
       setSelectedCharacterId(list[0].characterId)
       await loadPersistedCharacterState(list[0].characterId)
     }
+  }
+
+  async function refreshClassSummaries(list: CharacterSummary[]) {
+    const next: Record<string, string> = {}
+    await Promise.all(
+      list.map(async (character) => {
+        try {
+          const build = await getCharacterBuild(character.characterId)
+          const classSummary = build.classLevels.length > 0
+            ? build.classLevels.map((entry) => `${entry.className} ${entry.level}`).join(', ')
+            : `${build.className} ${build.level}`
+          next[character.characterId] = classSummary
+        } catch {
+          next[character.characterId] = 'No class build saved'
+        }
+      }),
+    )
+    setClassSummaryByCharacterId(next)
   }
 
   async function refreshArchivedCharacters() {
@@ -937,8 +1226,22 @@ function App() {
   async function handleSelectCharacter(characterId: string) {
     setSelectedCharacterId(characterId)
     setRecommendedSpellsByClass({})
-    setAdvancedRulesSnapshot(null)
     await loadPersistedCharacterState(characterId)
+  }
+
+  function handlePrimaryClassChange(nextClassModuleId: string) {
+    setSelectedClassModuleId(nextClassModuleId)
+    setMultiClassSelections((prev) => prev.filter((entry) => entry.moduleId !== nextClassModuleId))
+  }
+
+  function handleRaceModuleChange(nextRaceModuleId: string) {
+    setSelectedRaceModuleId(nextRaceModuleId)
+    const selectedRace = raceOptions.find((item) => item.moduleId === nextRaceModuleId)
+    if (!selectedRace) {
+      return
+    }
+    const walkingSpeed = selectedRace.walkingSpeed && selectedRace.walkingSpeed > 0 ? selectedRace.walkingSpeed : 30
+    setVitals((prev) => ({ ...prev, baseMoveSpeed: walkingSpeed }))
   }
 
   async function handleLogin() {
@@ -962,6 +1265,7 @@ function App() {
     setSession(null)
     setSessionToken(null)
     setCharacters([])
+    setClassSummaryByCharacterId({})
     setSelectedCharacterId('')
     setHistory([])
     setSavedBuild(null)
@@ -972,14 +1276,23 @@ function App() {
     setCurrencyState(null)
     setCurrencyDraft({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 })
     setStartingEquipmentMode('package')
-    setStartingEquipmentModeLocked(false)
     setActiveDraft(null)
     setSpellEntries([])
     setResourcePools([])
     setRecommendedSpellsByClass({})
     setVitals({ ...DEFAULT_VITALS })
     setSheetResult('')
-    setAdvancedRulesSnapshot(null)
+    setCharacterNotes('')
+    setViewSkillSort('ability')
+    setMaxHpMethod('manual')
+    setGenerousHitPointRolls(false)
+    setDeathSaveSuccesses(0)
+    setDeathSaveFailures(0)
+    setViewEditMode(false)
+    setAcMode('calculated')
+    setDefaultBuildSnapshot(null)
+    setDefaultVitalsSnapshot({ ...DEFAULT_VITALS })
+    setDefaultResourcesSnapshot([])
     setArchivedCharacters([])
     navigate('/login')
   }
@@ -993,34 +1306,100 @@ function App() {
     }
   }
 
-  async function handleStartWizard() {
-    if (!session) return
-    try {
-      setError('')
-      const result = await startWizard({
-        sessionToken: session.sessionToken,
-        characterName: wizardName.trim() ? wizardName : null,
-        baseRuleSystem: baseRules,
-        mixedModeEnabled: mixedMode,
-        overlaySources: mixedMode ? overlaySources : [],
-      })
-      setActiveDraft(result)
-      setNewCharacterStep(1)
-      if (result.draft?.characterId) {
-        setSelectedCharacterId(result.draft.characterId)
-      }
-      navigate('/characters/new')
-    } catch (e) {
-      setError(String(e))
+  function resetCharacterCreationState() {
+    setWizardName('')
+    setBaseRules('Rules2024')
+    setMixedMode(false)
+    setOverlaySources([])
+    setActiveDraft(null)
+    setSelectedCharacterId('')
+    setSelectedClassModuleId('')
+    setSelectedSubclassModuleId('')
+    setSelectedRaceModuleId('')
+    setSelectedSubraceModuleId('')
+    setSelectedBackgroundModuleId('')
+    setSecondaryClassModuleId('')
+    setMultiClassSelections([])
+    setClassCatalogResult('')
+    setNewCharacterStep(1)
+    setBuildMethod('PointBuy')
+    setRerollOnes(false)
+    setManualScores({ ...DEFAULT_SCORES })
+    setPointBuyScores({ ...DEFAULT_SCORES })
+    setRolledPool([])
+    setRollAssignments({})
+    setPrimaryClassLevel(1)
+    setSkillTrainingBySkill(
+      Object.fromEntries(ALL_SKILLS.map((skill) => [skill, 'None'])) as Record<SkillName, SkillTrainingLevel>,
+    )
+    setSavedBuild(null)
+    setBuildResult('')
+    setSelectedToolPicks([])
+    setSelectedLanguagePicks([])
+    setSelectedCatalogItemId('')
+    setSelectedCatalogQuantity(1)
+    setPurchaseFromCurrencyMode(false)
+    setInventoryState(null)
+    setCurrencyState(null)
+    setCurrencyDraft({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 })
+    setCurrencyConvert({ fromDenomination: 'gp', toDenomination: 'sp', amount: 1 })
+    setUsePlatinumConsolidation(false)
+    setStartingEquipmentMode('package')
+    setSpellEntries([])
+    setRecommendedSpellsByClass({})
+    setResourcePools([])
+    setVitals({ ...DEFAULT_VITALS })
+    setSheetResult('')
+    setCharacterNotes('')
+    setViewSkillSort('ability')
+    setMaxHpMethod('manual')
+    setGenerousHitPointRolls(false)
+    setDeathSaveSuccesses(0)
+    setDeathSaveFailures(0)
+    setViewEditMode(false)
+    setAcMode('calculated')
+    setDefaultBuildSnapshot(null)
+    setDefaultVitalsSnapshot({ ...DEFAULT_VITALS })
+    setDefaultResourcesSnapshot([])
+  }
+
+  async function ensureActiveDraft() {
+    if (activeDraft?.draft) {
+      return activeDraft
     }
+    if (!session) {
+      setError('Start a session before creating a character draft.')
+      return null
+    }
+
+    const result = await startWizard({
+      sessionToken: session.sessionToken,
+      characterName: wizardName.trim() ? wizardName : null,
+      baseRuleSystem: baseRules,
+      mixedModeEnabled: mixedMode,
+      overlaySources: mixedMode ? overlaySources : [],
+    })
+    setActiveDraft(result)
+    if (result.draft?.characterId) {
+      setSelectedCharacterId(result.draft.characterId)
+    }
+    return result
+  }
+
+  function startNewCharacterFlow() {
+    resetCharacterCreationState()
+    navigate('/characters/new')
   }
 
   async function handleApplySelectedClassToWizard() {
-    if (!activeDraft?.draft || !effectiveSelectedClassModuleId) return
+    if (!effectiveSelectedClassModuleId) return
     const selectedClass = classCatalog.find((x) => x.moduleId === effectiveSelectedClassModuleId)
     const selectedClassModule = classOptions.find((x) => x.moduleId === effectiveSelectedClassModuleId)
     if (!selectedClass && !selectedClassModule) return
     try {
+      const draft = await ensureActiveDraft()
+      const draftCharacterId = draft?.draft?.characterId
+      if (!draftCharacterId) return
       const classSelections = [
         {
           slot: 'class',
@@ -1041,12 +1420,12 @@ function App() {
         }),
       ]
 
-      let result = await submitWizardStep(activeDraft.draft.characterId, 'class', classSelections)
+      let result = await submitWizardStep(draftCharacterId, 'class', classSelections)
 
       if (effectiveSelectedRaceModuleId) {
         const race = raceOptions.find((x) => x.moduleId === effectiveSelectedRaceModuleId)
         if (race) {
-          result = await submitWizardStep(activeDraft.draft.characterId, 'race', [
+          result = await submitWizardStep(draftCharacterId, 'race', [
             {
               slot: 'race',
               moduleId: race.moduleId,
@@ -1061,7 +1440,7 @@ function App() {
       if (effectiveSelectedSubraceModuleId) {
         const subrace = subraceOptions.find((x) => x.moduleId === effectiveSelectedSubraceModuleId)
         if (subrace) {
-          result = await submitWizardStep(activeDraft.draft.characterId, 'race', [
+          result = await submitWizardStep(draftCharacterId, 'race', [
             {
               slot: 'subrace',
               moduleId: subrace.moduleId,
@@ -1076,7 +1455,7 @@ function App() {
       if (effectiveSelectedBackgroundModuleId) {
         const background = backgroundOptions.find((x) => x.moduleId === effectiveSelectedBackgroundModuleId)
         if (background) {
-          result = await submitWizardStep(activeDraft.draft.characterId, 'background', [
+          result = await submitWizardStep(draftCharacterId, 'background', [
             {
               slot: 'background',
               moduleId: background.moduleId,
@@ -1089,9 +1468,9 @@ function App() {
       }
 
       if (effectiveSelectedSubclassModuleId) {
-        const subclass = subclassOptions.find((x) => x.moduleId === effectiveSelectedSubclassModuleId)
+        const subclass = primaryClassSubclassOptions.find((x) => x.moduleId === effectiveSelectedSubclassModuleId)
         if (subclass) {
-          result = await submitWizardStep(activeDraft.draft.characterId, 'subclass', [
+          result = await submitWizardStep(draftCharacterId, 'subclass', [
             {
               slot: 'subclass',
               moduleId: subclass.moduleId,
@@ -1113,10 +1492,12 @@ function App() {
   }
 
   async function handleFinalizeWizard() {
-    if (!activeDraft?.draft) return
     try {
+      const draft = await ensureActiveDraft()
+      const draftCharacterId = draft?.draft?.characterId
+      if (!draftCharacterId) return
       setError('')
-      const result = await finalizeWizard(activeDraft.draft.characterId)
+      const result = await finalizeWizard(draftCharacterId)
       setActiveDraft(result)
       await refreshCharacters()
     } catch (e) {
@@ -1125,9 +1506,14 @@ function App() {
   }
 
   async function handleSaveBuildToDb() {
-    if (!currentCharacterId) {
-      setError('Select or create a character first.')
-      return
+    let targetCharacterId = currentCharacterId
+    if (!targetCharacterId) {
+      const draft = await ensureActiveDraft()
+      targetCharacterId = draft?.draft?.characterId ?? ''
+      if (!targetCharacterId) {
+        setError('Select or create a character first.')
+        return
+      }
     }
     if (buildMethod === 'Roll' && !isRollAssignmentComplete) {
       setError('Assign all rolled values to abilities before saving.')
@@ -1227,7 +1613,7 @@ function App() {
         ...(effectiveSelectedSubclassModuleId
           ? [
               (() => {
-                const subclass = subclassOptions.find((x) => x.moduleId === effectiveSelectedSubclassModuleId)
+                const subclass = primaryClassSubclassOptions.find((x) => x.moduleId === effectiveSelectedSubclassModuleId)
                 return subclass
                   ? {
                       slot: 'subclass',
@@ -1241,7 +1627,7 @@ function App() {
           : []),
         ...multiClassSelections.map((entry) => {
           const subclass = entry.subclassModuleId
-            ? subclassOptions.find((x) => x.moduleId === entry.subclassModuleId)
+            ? getSubclassChoicesForClass(entry.moduleId).find((x) => x.moduleId === entry.subclassModuleId)
             : null
           return subclass
             ? {
@@ -1270,9 +1656,25 @@ function App() {
           displayName: startingEquipmentMode === 'gold-only' ? 'Starting gold' : 'Equipment package',
           sourceCode: selectedClassOption?.sourceCode ?? '',
         },
+        {
+          slot: 'ac-mode',
+          moduleId: acMode,
+          displayName: acMode === 'manual' ? 'Manual armor class' : 'Calculated armor class',
+          sourceCode: 'user',
+        },
+        ...(characterNotes.trim().length > 0
+          ? [
+              {
+                slot: 'character-notes',
+                moduleId: 'notes',
+                displayName: characterNotes.trim(),
+                sourceCode: 'user',
+              },
+            ]
+          : []),
       ].filter((x): x is { slot: string; moduleId: string; displayName: string; sourceCode: string } => x !== null)
 
-      const saved = await upsertCharacterBuild(currentCharacterId, {
+      const saved = await upsertCharacterBuild(targetCharacterId, {
         characterName: wizardName,
         baseRuleSystem: baseRules,
         buildMethod,
@@ -1288,10 +1690,9 @@ function App() {
       })
       setSavedBuild(saved)
       setBuildResult(JSON.stringify(saved, null, 2))
-      const inventory = await getCharacterInventory(currentCharacterId).catch(() => null)
+      const inventory = await getCharacterInventory(targetCharacterId).catch(() => null)
       if (inventory) {
         setInventoryState(inventory)
-        setInventoryResult(JSON.stringify(inventory, null, 2))
       }
     } catch (e) {
       setError(String(e))
@@ -1348,19 +1749,47 @@ function App() {
     await refreshCharacters()
   }
 
-  function handleOverlaySourcesChange(event: ChangeEvent<HTMLSelectElement>) {
-    const selected = Array.from(event.target.selectedOptions).map((x) => x.value)
-    setOverlaySources(selected)
-    if (session) {
-      void loadCatalogData(baseRules).catch((e) => setError(String(e)))
-    }
-  }
-
   function addMultiClassSelection() {
     if (!secondaryClassModuleId) return
+    const secondaryClassName = classNameByModuleId.get(secondaryClassModuleId.toLowerCase())?.toLowerCase() ?? ''
+    const primaryClassName = classNameByModuleId.get(effectiveSelectedClassModuleId.toLowerCase())?.toLowerCase() ?? ''
     if (secondaryClassModuleId === effectiveSelectedClassModuleId) return
+    if (secondaryClassName && primaryClassName && secondaryClassName === primaryClassName) return
     if (multiClassSelections.some((x) => x.moduleId === secondaryClassModuleId)) return
+    if (
+      secondaryClassName &&
+      multiClassSelections.some((entry) => {
+        const entryClassName = classNameByModuleId.get(entry.moduleId.toLowerCase())?.toLowerCase() ?? ''
+        return entryClassName.length > 0 && entryClassName === secondaryClassName
+      })
+    ) {
+      return
+    }
     setMultiClassSelections((prev) => [...prev, { moduleId: secondaryClassModuleId, level: 1, subclassModuleId: '' }])
+  }
+
+  function getSubclassChoicesForClass(classModuleId: string) {
+    const normalizedClassId = classModuleId.toLowerCase()
+    const selectedClassName = classNameByModuleId.get(normalizedClassId)?.toLowerCase() ?? ''
+    return subclassOptions.filter((item) => {
+      if (!item.parentClassModuleId) {
+        return selectedClassName.length > 0 && item.displayName.toLowerCase().includes(selectedClassName)
+      }
+      if (item.parentClassModuleId.toLowerCase() === normalizedClassId) {
+        return true
+      }
+      const parentClassName = classNameByModuleId.get(item.parentClassModuleId.toLowerCase())?.toLowerCase() ?? ''
+      if (selectedClassName && parentClassName && selectedClassName === parentClassName) {
+        return true
+      }
+      return selectedClassName.length > 0 && item.displayName.toLowerCase().includes(selectedClassName)
+    })
+  }
+
+  function getUnlockedSubclassChoicesForClass(classModuleId: string, classLevel: number) {
+    return getSubclassChoicesForClass(classModuleId).filter(
+      (item) => moduleCompatibilityIssues(item, classLevel).length === 0,
+    )
   }
 
   function removeMultiClassSelection(moduleId: string) {
@@ -1369,10 +1798,29 @@ function App() {
 
   function setMultiClassLevel(moduleId: string, level: number) {
     const bounded = Math.max(1, Math.min(20, level))
-    setMultiClassSelections((prev) => prev.map((x) => (x.moduleId === moduleId ? { ...x, level: bounded } : x)))
+    setMultiClassSelections((prev) =>
+      prev.map((x) => {
+        if (x.moduleId !== moduleId) {
+          return x
+        }
+        const unlocked = getUnlockedSubclassChoicesForClass(moduleId, bounded)
+        return {
+          ...x,
+          level: bounded,
+          subclassModuleId: x.subclassModuleId && unlocked.some((item) => item.moduleId === x.subclassModuleId) ? x.subclassModuleId : '',
+        }
+      }),
+    )
   }
 
   function setMultiClassSubclass(moduleId: string, subclassModuleId: string) {
+    const unlocked = getUnlockedSubclassChoicesForClass(
+      moduleId,
+      multiClassSelections.find((x) => x.moduleId === moduleId)?.level ?? 1,
+    )
+    if (subclassModuleId && !unlocked.some((item) => item.moduleId === subclassModuleId)) {
+      return
+    }
     setMultiClassSelections((prev) =>
       prev.map((x) => (x.moduleId === moduleId ? { ...x, subclassModuleId } : x)),
     )
@@ -1380,6 +1828,180 @@ function App() {
 
   function moveNewCharacterStep(delta: number) {
     setNewCharacterStep((prev) => Math.max(1, Math.min(4, prev + delta)))
+  }
+
+  async function handleViewCharacter(characterId: string) {
+    await handleSelectCharacter(characterId)
+    navigate(`/characters/view/${characterId}`)
+  }
+
+  function buildNotesUpsertPayload(build: CharacterBuildData, notes: string): UpsertCharacterBuildPayload {
+    const noteText = notes.trim()
+    const withoutNotes = build.selectedModules.filter((module) => module.slot.toLowerCase() !== 'character-notes')
+    const selectedModules = noteText.length > 0
+      ? [
+          ...withoutNotes,
+          {
+            slot: 'character-notes',
+            moduleId: 'notes',
+            displayName: noteText,
+            sourceCode: 'user',
+          },
+        ]
+      : withoutNotes
+
+    return {
+      characterName: build.characterName,
+      baseRuleSystem: build.baseRuleSystem,
+      buildMethod: build.buildMethod,
+      classModuleId: build.classModuleId,
+      className: build.className,
+      level: build.level,
+      proficiencyBonus: build.proficiencyBonus,
+      abilityScores: build.abilityScores,
+      proficientSkills: build.proficientSkills,
+      skillTrainingBySkill: build.skillTrainingBySkill,
+      classLevels: build.classLevels,
+      selectedModules,
+    }
+  }
+
+  async function handleSaveCharacterNotes() {
+    if (!currentCharacterId || !savedBuild) {
+      return
+    }
+
+    try {
+      const saved = await upsertCharacterBuild(currentCharacterId, buildNotesUpsertPayload(savedBuild, characterNotes))
+      setSavedBuild(saved)
+      setSheetResult('Saved notes.')
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleSaveViewEdits() {
+    if (!currentCharacterId || !savedBuild || isViewingArchivedCharacter) {
+      return
+    }
+
+    try {
+      const withoutNotesOrAcMode = savedBuild.selectedModules.filter((module) => {
+        const slot = module.slot.toLowerCase()
+        return slot !== 'character-notes' && slot !== 'ac-mode'
+      })
+      const nextSelectedModules = [
+        ...withoutNotesOrAcMode,
+        {
+          slot: 'ac-mode',
+          moduleId: acMode,
+          displayName: acMode === 'manual' ? 'Manual armor class' : 'Calculated armor class',
+          sourceCode: 'user',
+        },
+        ...(characterNotes.trim().length > 0
+          ? [
+              {
+                slot: 'character-notes',
+                moduleId: 'notes',
+                displayName: characterNotes.trim(),
+                sourceCode: 'user',
+              },
+            ]
+          : []),
+      ]
+      const nextBuild = await upsertCharacterBuild(currentCharacterId, {
+        characterName: savedBuild.characterName,
+        baseRuleSystem: savedBuild.baseRuleSystem,
+        buildMethod: savedBuild.buildMethod,
+        classModuleId: savedBuild.classModuleId,
+        className: savedBuild.className,
+        level: savedBuild.level,
+        proficiencyBonus: savedBuild.proficiencyBonus,
+        abilityScores: totalAbilityScores,
+        proficientSkills: ALL_SKILLS.filter((skill) => effectiveSkillTrainingBySkill[skill] !== 'None'),
+        skillTrainingBySkill: effectiveSkillTrainingBySkill,
+        classLevels: savedBuild.classLevels,
+        selectedModules: nextSelectedModules,
+      })
+      const nextVitals = await upsertCharacterVitals(currentCharacterId, vitals)
+      const nextResources = await upsertCharacterResources(currentCharacterId, resourcePools)
+      setSavedBuild(nextBuild)
+      setVitals({
+        maxHitPoints: nextVitals.maxHitPoints,
+        currentHitPoints: nextVitals.currentHitPoints,
+        tempHitPoints: nextVitals.tempHitPoints,
+        baseMoveSpeed: nextVitals.baseMoveSpeed,
+        baseArmorClass: nextVitals.baseArmorClass,
+      })
+      setResourcePools(nextResources.resources)
+      setSheetResult('Saved character edits.')
+      setViewEditMode(false)
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleResetViewDefaults() {
+    const defaultScores = defaultBuildSnapshot?.abilityScores ?? { ...DEFAULT_SCORES }
+    setManualScores(defaultScores)
+    setPointBuyScores(
+      ABILITIES.reduce(
+        (acc, ability) => ({ ...acc, [ability]: Math.max(8, Math.min(15, defaultScores[ability])) }),
+        { ...DEFAULT_SCORES },
+      ),
+    )
+    setRollAssignments(defaultScores)
+    setRolledPool([])
+    setSkillTrainingBySkill(
+      (defaultBuildSnapshot?.skillTrainingBySkill as Record<SkillName, SkillTrainingLevel>) ??
+      (Object.fromEntries(ALL_SKILLS.map((skill) => [skill, 'None'])) as Record<SkillName, SkillTrainingLevel>),
+    )
+    setVitals({ ...defaultVitalsSnapshot })
+    setResourcePools(defaultResourcesSnapshot.map((resource) => ({ ...resource })))
+    setAcMode('calculated')
+    setSheetResult('Reset editable fields to creation defaults. Save to persist.')
+  }
+
+  async function handleSubmitCharacter() {
+    let targetCharacterId = currentCharacterId
+    if (!targetCharacterId) {
+      const draft = await ensureActiveDraft()
+      targetCharacterId = draft?.draft?.characterId ?? ''
+    }
+    if (!targetCharacterId) {
+      setError('Unable to create character draft.')
+      return
+    }
+
+    await handleSaveBuildToDb()
+    await handleApplySelectedClassToWizard()
+    await handleFinalizeWizard()
+    await upsertCharacterVitals(targetCharacterId, {
+      maxHitPoints: vitals.maxHitPoints,
+      currentHitPoints: Math.max(vitals.currentHitPoints, vitals.maxHitPoints),
+      tempHitPoints: vitals.tempHitPoints,
+      baseMoveSpeed: vitals.baseMoveSpeed,
+      baseArmorClass: vitals.baseArmorClass,
+    })
+    await upsertCharacterSpells(targetCharacterId, spellEntries)
+    const hasSpellSlotResources = resourcePools.some((resource) =>
+      resource.resourceKey.toLowerCase().includes('slot'),
+    )
+    const autoSpellSlotResources = hasSpellSlotResources
+      ? []
+      : getDefaultSpellSlotResources(selectedPrimaryClassName, primaryClassLevel)
+    const resourcesToSave =
+      autoSpellSlotResources.length > 0
+        ? [...resourcePools, ...autoSpellSlotResources]
+        : resourcePools
+    await upsertCharacterResources(targetCharacterId, resourcesToSave)
+    await upsertCharacterCurrency(targetCharacterId, currencyDraft)
+    await refreshCharacters()
+    resetCharacterCreationState()
+    if (session) {
+      await loadCatalogData('Rules2024')
+    }
+    navigate('/characters')
   }
 
   async function handleDiscardNewCharacter() {
@@ -1404,6 +2026,10 @@ function App() {
       setInventoryState(null)
       setCurrencyState(null)
       setNewCharacterStep(1)
+      resetCharacterCreationState()
+      if (session) {
+        await loadCatalogData('Rules2024')
+      }
       navigate('/characters')
       await refreshCharacters()
     } catch (e) {
@@ -1438,6 +2064,10 @@ function App() {
       return
     }
 
+    setSkillTrainingBySkill((prev) => ({ ...prev, [skill]: level }))
+  }
+
+  function setSkillTrainingInView(skill: SkillName, level: SkillTrainingLevel) {
     setSkillTrainingBySkill((prev) => ({ ...prev, [skill]: level }))
   }
 
@@ -1480,6 +2110,10 @@ function App() {
   }
 
   function setManualAbilityScore(ability: AbilityName, score: number) {
+    if (score < -10000 || score > 10000) {
+      alert('Ambitions... but no.')
+      return
+    }
     const bounded = Math.max(1, Math.min(30, score))
     setManualScores((prev) => ({ ...prev, [ability]: bounded }))
   }
@@ -1536,10 +2170,10 @@ function App() {
   }
 
   async function handleAddItemFromCatalog() {
-    if (!currentCharacterId || !selectedCatalogItemId) return
+    if (!currentCharacterId || !effectiveSelectedCatalogItemId) return
     try {
       if (purchaseFromCurrencyMode) {
-        const item = itemCatalog.find((x) => x.itemId === selectedCatalogItemId)
+        const item = filteredItemCatalog.find((x) => x.itemId === effectiveSelectedCatalogItemId)
         const costInGold = Number(item?.goldValue ?? 0)
         if (costInGold > 0) {
           const currency = await purchaseFromCharacterCurrency(currentCharacterId, {
@@ -1550,9 +2184,8 @@ function App() {
           setCurrencyDraft({ cp: currency.cp, sp: currency.sp, ep: currency.ep, gp: currency.gp, pp: currency.pp })
         }
       }
-      const next = await addInventoryItem(currentCharacterId, selectedCatalogItemId, selectedCatalogQuantity)
+      const next = await addInventoryItem(currentCharacterId, effectiveSelectedCatalogItemId, selectedCatalogQuantity)
       setInventoryState(next)
-      setInventoryResult(JSON.stringify(next, null, 2))
     } catch (e) {
       setError(String(e))
     }
@@ -1599,7 +2232,6 @@ function App() {
     try {
       const next = await patchInventoryItem(currentCharacterId, inventoryItemId, update)
       setInventoryState(next)
-      setInventoryResult(JSON.stringify(next, null, 2))
     } catch (e) {
       setError(String(e))
     }
@@ -1611,55 +2243,6 @@ function App() {
       await removeInventoryItem(currentCharacterId, inventoryItemId)
       const next = await getCharacterInventory(currentCharacterId)
       setInventoryState(next)
-      setInventoryResult(JSON.stringify(next, null, 2))
-    } catch (e) {
-      setError(String(e))
-    }
-  }
-
-  async function handleRollSkillCheck() {
-    if (!currentCharacterId) return
-    try {
-      const result = await computePersistedCheck(currentCharacterId, {
-        skillName: selectedSkill,
-        advantageState,
-        rollDice: true,
-        additionalModifier: 0,
-        hasExpertise: effectiveSkillTrainingBySkill[selectedSkill] === 'Expertise',
-      })
-      setRollResult(JSON.stringify((result as { result?: unknown }).result ?? result, null, 2))
-    } catch (e) {
-      setError(String(e))
-    }
-  }
-
-  async function handleRollAttack(attackKey: string, attack: (typeof attacks)[number]) {
-    if (!currentCharacterId) return
-    try {
-      const result = await computePersistedAttack(currentCharacterId, {
-        weaponName: getDisplayItemName(attack.itemName, attack.itemDefinitionId),
-        abilityName: attack.abilityName,
-        isProficientWithWeapon: true,
-        additionalAttackModifier: attack.attackBonus,
-        damageDice: attack.damageDice || '1d6',
-        additionalDamageModifier: attack.damageBonus,
-        advantageState: attackAdvantageState,
-        rollDice: true,
-      })
-      setAttackResults((prev) => ({
-        ...prev,
-        [attackKey]: JSON.stringify((result as { result?: unknown }).result ?? result),
-      }))
-    } catch (e) {
-      setError(String(e))
-    }
-  }
-
-  async function handleLoadAdvancedRulesSnapshot() {
-    if (!currentCharacterId) return
-    try {
-      const result = await getAdvancedRulesSnapshot(currentCharacterId)
-      setAdvancedRulesSnapshot(result)
     } catch (e) {
       setError(String(e))
     }
@@ -1702,16 +2285,6 @@ function App() {
     } catch (e) {
       setError(String(e))
     }
-  }
-
-  async function handlePreviewOrigin() {
-    const result = await previewOrigin({ name: 'Wanderer-Born', mode: 'GuidedCustom' })
-    setOriginPreview(JSON.stringify(result, null, 2))
-  }
-
-  async function handlePreviewSpecies() {
-    const result = await previewSpecies({ name: 'Stormkin', mode: 'GuidedCustom' })
-    setSpeciesPreview(JSON.stringify(result, null, 2))
   }
 
   async function handleLoadRecommendedSpells(classModuleId: string, className: string, classLevel: number) {
@@ -1761,12 +2334,57 @@ function App() {
     return issues
   }
 
+  const viewedCharacter = [...characters, ...archivedCharacters].find(
+    (entry) => entry.characterId === (viewCharacterIdFromPath || selectedCharacterId),
+  )
+  const isViewingArchivedCharacter = viewedCharacter?.isArchived ?? false
+  const saveModifiers = ABILITIES.map((ability) => {
+    const baseMod = abilityModifier(totalAbilityScores[ability])
+    const isProficient = savedBuild?.saveProficiencies.includes(ability) ?? false
+    return { ability, value: baseMod + (isProficient ? proficiencyBonus : 0), isProficient }
+  })
+  const sortedSkillsForView = [...ALL_SKILLS].sort((a, b) => {
+    if (viewSkillSort === 'name') {
+      return a.localeCompare(b)
+    }
+    const abilityDiff = SKILL_ABILITY[a].localeCompare(SKILL_ABILITY[b])
+    if (abilityDiff !== 0) {
+      return abilityDiff
+    }
+    const skillDiff = skillModifier(b) - skillModifier(a)
+    return skillDiff !== 0 ? skillDiff : a.localeCompare(b)
+  })
+  const viewSkillGroups = viewSkillSort === 'ability'
+    ? ABILITIES.map((ability) => ({
+        ability,
+        skills: sortedSkillsForView.filter((skill) => SKILL_ABILITY[skill] === ability),
+      })).filter((group) => group.skills.length > 0)
+    : [{ ability: null, skills: sortedSkillsForView }]
+  const featSelections = (savedBuild?.selectedModules ?? []).filter((module) => module.slot.toLowerCase() === 'feat')
+  const equippedItems = (inventoryState?.items ?? []).filter((item) => item.isEquipped)
+  const unequippedItems = (inventoryState?.items ?? []).filter((item) => !item.isEquipped)
+  const weaponItems = (inventoryState?.items ?? []).filter((item) => item.isWeapon)
+  const normalizedClassName = selectedPrimaryClassName.trim().toLowerCase()
+  const casterAbility = CLASS_SPELLCASTING_ABILITY[normalizedClassName]
+  const spellAttackBonus = casterAbility ? abilityModifier(totalAbilityScores[casterAbility]) + proficiencyBonus : null
+  const spellSaveDc = casterAbility ? 8 + proficiencyBonus + abilityModifier(totalAbilityScores[casterAbility]) : null
+  const calculatedAc = Math.max(
+    10 + abilityModifier(totalAbilityScores.Dexterity),
+    inventoryState?.pipelineResult?.derivedStats?.armorClass ?? 10 + abilityModifier(totalAbilityScores.Dexterity),
+  )
+  const displayedAc = acMode === 'manual' ? vitals.baseArmorClass : calculatedAc
+  const totalSpellSlots = resourcePools
+    .filter((resource) => resource.resourceKey.toLowerCase().includes('slot'))
+    .reduce((sum, resource) => sum + Math.max(0, resource.maxValue), 0)
+
   return (
     <main className="layout">
-      <header>
-        <h1>Welcome to DndAppName</h1>
-        <p>{status}</p>
-      </header>
+      {!isNewCharacterRoute && (
+        <header>
+          <h1>Welcome to DndAppName</h1>
+          <p>{status}</p>
+        </header>
+      )}
 
       {error && <p className="error">{error}</p>}
 
@@ -1796,6 +2414,7 @@ function App() {
         </>
       ) : (
         <>
+          {!isCharacterViewRoute && (
           <section className="card">
             <h2>Session</h2>
             <div className="row">
@@ -1808,79 +2427,387 @@ function App() {
               <button onClick={() => navigate('/characters')}>Your characters</button>
               <button onClick={() => navigate('/characters/archived')}>Archived characters</button>
               <button
-                onClick={() => {
-                  setNewCharacterStep(1)
-                  navigate('/characters/new')
-                }}
+                onClick={startNewCharacterFlow}
               >
                 Create new character
               </button>
+              <button onClick={() => navigate('/settings')}>Settings</button>
             </div>
             <p>
-              <strong>Getting started:</strong> pick a character (or start a wizard draft), then complete build setup and
+              <strong>Getting started:</strong> pick a character (or create a new one), then complete build setup and
               use the sheet sections for vitals, spells, resources, skills, and inventory.
             </p>
           </section>
+          )}
 
           {isCharactersRoute && (
-            <section className="card">
-            <h2>1. Your characters</h2>
-            <div className="row">
-              <button onClick={() => void refreshCharacters()} disabled={!session}>
-                Refresh
-              </button>
-              <button
-                onClick={() => {
-                  setNewCharacterStep(1)
-                  navigate('/characters/new')
-                }}
-              >
-                Create new character
-              </button>
-              <button onClick={() => navigate('/characters/archived')}>Archived characters</button>
-              <button onClick={handleCopyRuleset} disabled={!selectedCharacterId}>
-                Copy to other ruleset
-              </button>
-            </div>
-            <ul className="list">
-              {characters.map((c) => (
-                <li key={c.characterId} className={selectedCharacterId === c.characterId ? 'selected' : ''}>
-                  <button onClick={() => void handleSelectCharacter(c.characterId)}>{c.characterName}</button>
-                  <span className="ruleset-badge">{rulesetLabel(c.baseRuleSystem)}</span>
-                  <button onClick={() => void handleArchive(c.characterId)}>Archive</button>
-                  <button onClick={() => void handleDuplicate(c.characterId)}>Duplicate</button>
-                  <button onClick={() => void handleLoadHistory(c.characterId)}>History</button>
-                </li>
-              ))}
-            </ul>
-            {history.length > 0 && (
-              <details>
-                <summary>Technical details</summary>
-                <pre>{JSON.stringify(history, null, 2)}</pre>
-              </details>
-            )}
-            </section>
+            <CharactersPage
+              sessionReady={Boolean(session)}
+              selectedCharacterId={selectedCharacterId}
+              characters={characters}
+              classSummaryByCharacterId={classSummaryByCharacterId}
+              history={history}
+              rulesetLabel={rulesetLabel}
+              onRefresh={() => void refreshCharacters()}
+              onCreateNew={startNewCharacterFlow}
+              onOpenArchived={() => navigate('/characters/archived')}
+              onCopyRuleset={() => void handleCopyRuleset()}
+              onSelectCharacter={(characterId) => void handleSelectCharacter(characterId)}
+              onViewCharacter={(characterId) => void handleViewCharacter(characterId)}
+              onArchiveCharacter={(characterId) => void handleArchive(characterId)}
+              onDuplicateCharacter={(characterId) => void handleDuplicate(characterId)}
+              onLoadHistory={(characterId) => void handleLoadHistory(characterId)}
+            />
           )}
 
           {isArchivedRoute && (
+            <ArchivedCharactersPage
+              sessionReady={Boolean(session)}
+              archivedCharacters={archivedCharacters}
+              rulesetLabel={rulesetLabel}
+              onRefreshArchived={() => void refreshArchivedCharacters()}
+              onBackToCharacters={() => navigate('/characters')}
+              onSelectCharacter={(characterId) => void handleSelectCharacter(characterId)}
+              onViewCharacter={(characterId) => void handleViewCharacter(characterId)}
+              onRestoreCharacter={(characterId) => void handleRestore(characterId)}
+              onDeleteCharacter={(characterId) => void handleDelete(characterId)}
+            />
+          )}
+
+          {isSettingsRoute && (
+            <SettingsPage
+              themeName={themeName}
+              onBackToCharacters={() => navigate('/characters')}
+              onThemeChange={setThemeName}
+            />
+          )}
+
+          {isCharacterViewRoute && (
             <section className="card">
-              <h2>Archived characters</h2>
+              <h2>Character view</h2>
               <div className="row">
-                <button onClick={() => void refreshArchivedCharacters()} disabled={!session}>
-                  Refresh archived
+                <button onClick={() => navigate('/characters')}>Back to characters</button>
+                <button onClick={handleLogout}>Logout</button>
+                <button
+                  onClick={() => {
+                    if (viewEditMode) {
+                      void handleSaveViewEdits()
+                      return
+                    }
+                    setViewEditMode(true)
+                  }}
+                  disabled={isViewingArchivedCharacter}
+                >
+                  {viewEditMode ? 'Done editing' : 'Edit'}
                 </button>
-                <button onClick={() => navigate('/characters')}>Back to active characters</button>
               </div>
-              <ul className="list">
-                {archivedCharacters.map((c) => (
-                  <li key={c.characterId}>
-                    <button onClick={() => void handleSelectCharacter(c.characterId)}>{c.characterName}</button>
-                    <span className="ruleset-badge">{rulesetLabel(c.baseRuleSystem)}</span>
-                    <button onClick={() => void handleRestore(c.characterId)}>Restore</button>
-                    <button onClick={() => void handleDelete(c.characterId)}>Delete permanently</button>
+              {isViewingArchivedCharacter && <small>This character is archived. Restore it to enable editing.</small>}
+              <p>
+                <strong>{(viewedCharacter?.characterName ?? wizardName) || 'Character'}</strong> |{' '}
+                {viewedCharacter ? rulesetLabel(viewedCharacter.baseRuleSystem) : rulesetLabel(baseRules)} |{' '}
+                {mixedModeLabel(
+                  viewedCharacter?.baseRuleSystem ?? baseRules,
+                  viewedCharacter?.mixedModeEnabled ?? mixedMode,
+                )}
+              </p>
+              <p>
+                Classes: {classSections.map((entry) => `${entry.className} ${entry.level}`).join(', ') || 'None'} | Hit
+                dice:{' '}
+                {classSections.map((entry) => `${entry.className} d${parseHitDieSides(entry.className)} x${entry.level}`).join(', ') ||
+                  'Not tracked'}
+              </p>
+              <div className="grid">
+                <label>Max HP</label>
+                {viewEditMode ? (
+                  <input
+                    type="number"
+                    min={0}
+                    value={vitals.maxHitPoints}
+                    onChange={(e) => setVitals((prev) => ({ ...prev, maxHitPoints: toNonNegativeInt(e.target.value) }))}
+                  />
+                ) : (
+                  <span>{vitals.maxHitPoints}</span>
+                )}
+                <label>Current HP</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={vitals.currentHitPoints}
+                  onChange={(e) => setVitals((prev) => ({ ...prev, currentHitPoints: toNonNegativeInt(e.target.value) }))}
+                  onBlur={() => void handleSaveVitals()}
+                />
+                <label>Temp HP</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={vitals.tempHitPoints}
+                  onChange={(e) => setVitals((prev) => ({ ...prev, tempHitPoints: toNonNegativeInt(e.target.value) }))}
+                  onBlur={() => void handleSaveVitals()}
+                />
+                <label>AC</label><span>{displayedAc}</span>
+                <label>Speed</label>
+                {viewEditMode ? (
+                  <input
+                    type="number"
+                    min={0}
+                    value={vitals.baseMoveSpeed}
+                    onChange={(e) => setVitals((prev) => ({ ...prev, baseMoveSpeed: toNonNegativeInt(e.target.value) }))}
+                  />
+                ) : (
+                  <span>{vitals.baseMoveSpeed}</span>
+                )}
+                <label>Initiative</label><span>{abilityModifier(totalAbilityScores.Dexterity) >= 0 ? '+' : ''}{abilityModifier(totalAbilityScores.Dexterity)}</span>
+                <label>Passive Perception</label><span>{10 + skillModifier('Perception')}</span>
+              </div>
+              {viewEditMode && (
+                <div className="grid">
+                  <label htmlFor="ac-mode">Armor class mode</label>
+                  <select id="ac-mode" value={acMode} onChange={(e) => setAcMode(e.target.value as 'manual' | 'calculated')}>
+                    <option value="calculated">Calculated</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                  {acMode === 'manual' && (
+                    <>
+                      <label htmlFor="manual-ac">Manual AC</label>
+                      <input
+                        id="manual-ac"
+                        type="number"
+                        min={0}
+                        value={vitals.baseArmorClass}
+                        onChange={(e) => setVitals((prev) => ({ ...prev, baseArmorClass: toNonNegativeInt(e.target.value) }))}
+                      />
+                    </>
+                  )}
+                </div>
+              )}
+              {vitals.currentHitPoints <= 0 && (
+                <div className="card">
+                  <h3>Death saves</h3>
+                  <p>Successes {deathSaveSuccesses}/3 | Failures {deathSaveFailures}/3</p>
+                  <div className="row">
+                    {[1, 2, 3].map((slot) => (
+                      <button
+                        key={`success-${slot}`}
+                        onClick={() => setDeathSaveSuccesses((prev) => (prev >= slot ? slot - 1 : slot))}
+                      >
+                        Success {slot} {deathSaveSuccesses >= slot ? '✓' : ''}
+                      </button>
+                    ))}
+                    {[1, 2, 3].map((slot) => (
+                      <button
+                        key={`failure-${slot}`}
+                        onClick={() => setDeathSaveFailures((prev) => (prev >= slot ? slot - 1 : slot))}
+                      >
+                        Failure {slot} {deathSaveFailures >= slot ? '✗' : ''}
+                      </button>
+                    ))}
+                    <button onClick={() => { setDeathSaveSuccesses(0); setDeathSaveFailures(0) }}>Reset</button>
+                  </div>
+                </div>
+              )}
+              <h3>Ability scores</h3>
+              <div className="skills-grid">
+                {ABILITIES.map((ability) => (
+                  <label key={ability} className="row">
+                    {ability}
+                    {viewEditMode ? (
+                      <input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={manualScores[ability]}
+                        onChange={(e) => {
+                          const value = Math.max(1, Math.min(30, Number(e.target.value) || 1))
+                          setManualScores((prev) => ({ ...prev, [ability]: value }))
+                          setPointBuyScores((prev) => ({ ...prev, [ability]: Math.max(8, Math.min(15, value)) }))
+                          setRollAssignments((prev) => ({ ...prev, [ability]: value }))
+                        }}
+                      />
+                    ) : (
+                      <small>
+                        {totalAbilityScores[ability]} ({abilityModifier(totalAbilityScores[ability]) >= 0 ? '+' : ''}{abilityModifier(totalAbilityScores[ability])})
+                      </small>
+                    )}
+                  </label>
+                ))}
+              </div>
+              <h3>Saving throws</h3>
+              <div className="skills-grid">
+                {saveModifiers.map((save) => (
+                  <small key={save.ability}>{save.ability}: {save.value >= 0 ? '+' : ''}{save.value} {save.isProficient ? '(proficient)' : ''}</small>
+                ))}
+              </div>
+              <h3>Skills</h3>
+              <div className="row">
+                <label htmlFor="view-skill-sort">Sort</label>
+                <select id="view-skill-sort" value={viewSkillSort} onChange={(e) => setViewSkillSort(e.target.value as 'name' | 'ability')}>
+                  <option value="ability">By ability</option>
+                  <option value="name">By name</option>
+                </select>
+              </div>
+              {viewSkillGroups.map((group) => (
+                <div key={group.ability ?? 'alpha'}>
+                  {group.ability && <h4>{group.ability}</h4>}
+                  <div className="skills-grid">
+                    {group.skills.map((skill) => (
+                      <label key={skill} className="row">
+                        <span>
+                          {skill}: {skillModifier(skill) >= 0 ? '+' : ''}{skillModifier(skill)}
+                        </span>
+                        {viewEditMode ? (
+                          <select
+                            value={effectiveSkillTrainingBySkill[skill]}
+                            onChange={(e) => setSkillTrainingInView(skill, e.target.value as SkillTrainingLevel)}
+                          >
+                            <option value="None">None</option>
+                            <option value="Proficient">Proficient</option>
+                            <option value="Expertise">Expertise</option>
+                          </select>
+                        ) : (
+                          <small>({effectiveSkillTrainingBySkill[skill]})</small>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <h3>Feats</h3>
+              <p>{featSelections.length > 0 ? featSelections.map((feat) => feat.displayName).join(', ') : 'None selected'}</p>
+              <h3>Spells</h3>
+              <p>
+                Spellcasting ability: {casterAbility ?? 'Not available'} | Spell attack bonus:{' '}
+                {spellAttackBonus === null ? 'N/A' : `${spellAttackBonus >= 0 ? '+' : ''}${spellAttackBonus}`} | Spell save
+                DC: {spellSaveDc ?? 'N/A'} | Total slots: {totalSpellSlots}
+              </p>
+              {viewEditMode && (
+                <div className="skills-grid">
+                  {resourcePools
+                    .filter((resource) => resource.resourceKey.toLowerCase().includes('slot'))
+                    .map((resource, index) => (
+                      <label key={`${resource.resourceKey}-${index}`} className="row">
+                        {resource.resourceKey}
+                        <input
+                          type="number"
+                          min={0}
+                          value={resource.maxValue}
+                          onChange={(e) =>
+                            setResourcePools((prev) =>
+                              prev.map((row, i) =>
+                                i === index ? { ...row, maxValue: toNonNegativeInt(e.target.value) } : row,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                    ))}
+                </div>
+              )}
+              <ul className="inventory-list">
+                {spellEntries.map((entry, index) => (
+                  <li key={`${entry.spellModuleId}-${index}`}>{entry.spellName} ({entry.preparationMode})</li>
+                ))}
+              </ul>
+              <h3>Inventory</h3>
+              {currencyState && (
+                <small>
+                  Coin purse: {currencyState.pp} pp | {currencyState.gp} gp | {currencyState.sp} sp | {currencyState.cp} cp
+                  {currencyState.ep > 0 ? ` | ${currencyState.ep} ep` : ''}
+                </small>
+              )}
+              <div className="row">
+                <label htmlFor="view-catalog-item">Manage items</label>
+                <select id="view-catalog-item" value={effectiveSelectedCatalogItemId} onChange={(e) => setSelectedCatalogItemId(e.target.value)}>
+                  {filteredItemCatalog.length === 0 ? (
+                    <option value="">No item definitions found in DB</option>
+                  ) : (
+                    filteredItemCatalog.map((item) => (
+                      <option key={item.itemId} value={item.itemId}>
+                        {getDisplayItemName(item.itemName, item.itemId)} ({item.sourceCode}) {item.requiresAttunement ? '[attunement]' : ''}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <label htmlFor="view-catalog-item-quantity">Qty</label>
+                <input
+                  id="view-catalog-item-quantity"
+                  type="number"
+                  min={1}
+                  value={selectedCatalogQuantity}
+                  onChange={(e) => setSelectedCatalogQuantity(Math.max(1, Number(e.target.value) || 1))}
+                />
+                <label>
+                  <input type="checkbox" checked={purchaseFromCurrencyMode} onChange={(e) => setPurchaseFromCurrencyMode(e.target.checked)} /> Purchase
+                </label>
+                <button onClick={() => void handleAddItemFromCatalog()} disabled={!effectiveSelectedCatalogItemId || !currentCharacterId || isViewingArchivedCharacter}>
+                  Add item
+                </button>
+              </div>
+              {effectiveSelectedCatalogItemId && (
+                <small>
+                  {(() => {
+                    const selectedItem = filteredItemCatalog.find((item) => item.itemId === effectiveSelectedCatalogItemId)
+                    if (!selectedItem) {
+                      return 'Select an item to see details.'
+                    }
+                    return `${selectedItem.itemType} | ${selectedItem.rarity} | ${selectedItem.goldValue} gp | ${selectedItem.weight} lb${selectedItem.description ? ` | ${selectedItem.description}` : ''}`
+                  })()}
+                </small>
+              )}
+              <div className="row">
+                <label htmlFor="view-currency-convert-from">Convert</label>
+                <select id="view-currency-convert-from" value={currencyConvert.fromDenomination} onChange={(e) => setCurrencyConvert((prev) => ({ ...prev, fromDenomination: e.target.value }))}>
+                  <option value="cp">cp</option>
+                  <option value="sp">sp</option>
+                  <option value="ep">ep</option>
+                  <option value="gp">gp</option>
+                  <option value="pp">pp</option>
+                </select>
+                <span>to</span>
+                <select id="view-currency-convert-to" value={currencyConvert.toDenomination} onChange={(e) => setCurrencyConvert((prev) => ({ ...prev, toDenomination: e.target.value }))}>
+                  <option value="cp">cp</option>
+                  <option value="sp">sp</option>
+                  <option value="ep">ep</option>
+                  <option value="gp">gp</option>
+                  <option value="pp">pp</option>
+                </select>
+                <input id="view-currency-convert-amount" type="number" min={1} value={currencyConvert.amount} onChange={(e) => setCurrencyConvert((prev) => ({ ...prev, amount: Math.max(1, Number(e.target.value) || 1) }))} />
+                <button onClick={() => void handleConvertCurrency()} disabled={!currentCharacterId || isViewingArchivedCharacter}>Convert</button>
+                <button onClick={() => void handleConsolidateCurrency()} disabled={!currentCharacterId || isViewingArchivedCharacter}>Consolidate pocket change</button>
+              </div>
+              <p>Equipped items: {equippedItems.length} | Unequipped items: {unequippedItems.length}</p>
+              <ul className="inventory-list">
+                {equippedItems.map((item) => (
+                  <li key={item.inventoryItemId}>{getDisplayItemName(item.itemName, item.itemDefinitionId)} x{item.quantity} (equipped)</li>
+                ))}
+                {unequippedItems.map((item) => (
+                  <li key={item.inventoryItemId}>{getDisplayItemName(item.itemName, item.itemDefinitionId)} x{item.quantity} (unequipped)</li>
+                ))}
+              </ul>
+              <h4>Weapons</h4>
+              <ul className="inventory-list">
+                {weaponItems.map((item) => (
+                  <li key={`weapon-${item.inventoryItemId}`}>
+                    {getDisplayItemName(item.itemName, item.itemDefinitionId)} {item.damageDice} atk {item.attackBonus >= 0 ? '+' : ''}{item.attackBonus}
                   </li>
                 ))}
               </ul>
+              <h3>Notes</h3>
+              <textarea value={characterNotes} onChange={(e) => setCharacterNotes(e.target.value)} rows={5} />
+              <div className="row">
+                <button onClick={() => void handleSaveCharacterNotes()} disabled={!currentCharacterId || !savedBuild}>
+                  Save notes
+                </button>
+                {viewEditMode && (
+                  <>
+                    <button onClick={() => void handleSaveViewEdits()} disabled={!currentCharacterId || !savedBuild || isViewingArchivedCharacter}>
+                      Save edits
+                    </button>
+                    <button onClick={() => void handleResetViewDefaults()}>
+                      Reset to default
+                    </button>
+                  </>
+                )}
+              </div>
             </section>
           )}
 
@@ -1895,24 +2822,49 @@ function App() {
                 <button type="button" onClick={() => moveNewCharacterStep(-1)} disabled={newCharacterStep <= 1}>
                   Back
                 </button>
-                <button type="button" onClick={() => moveNewCharacterStep(1)} disabled={newCharacterStep >= 4}>
-                  Next
-                </button>
+                {newCharacterStep < 4 ? (
+                  <button type="button" onClick={() => moveNewCharacterStep(1)}>
+                    Next
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => void handleSubmitCharacter()} disabled={!session}>
+                    Submit character
+                  </button>
+                )}
                 <button type="button" onClick={() => void handleDiscardNewCharacter()}>
                   Exit + discard
                 </button>
               </div>
             </section>
-            <section className="card" hidden={newCharacterStep > 2}>
+            <section className="card" hidden={newCharacterStep !== 1}>
+              <h2>1. Ruleset selection</h2>
+              <div className="grid">
+                <label htmlFor="base-rules">Base ruleset</label>
+                <select id="base-rules" value={baseRules} onChange={(e) => void handleBaseRulesChange(e.target.value as RuleSystemMode)}>
+                  <option value="Rules2024">2024 rules</option>
+                  <option value="Rules2014">2014 rules</option>
+                </select>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={mixedMode}
+                    onChange={(e) => {
+                      const nextMixedMode = e.target.checked
+                      setMixedMode(nextMixedMode)
+                      if (session) {
+                        void loadCatalogData(baseRules).catch((err) => setError(String(err)))
+                      }
+                    }}
+                  />{' '}
+                  {baseRules === 'Rules2024' ? 'Plus 2014 content' : 'Plus 2024 content'}
+                </label>
+              </div>
+            </section>
+            <section className="card" hidden={newCharacterStep !== 2}>
         <h2>2. Character build setup</h2>
         <div className="grid">
           <label htmlFor="character-name">Character name</label>
           <input id="character-name" value={wizardName} onChange={(e) => setWizardName(e.target.value)} placeholder="Character name" />
-          <label htmlFor="base-rules">Base ruleset</label>
-          <select id="base-rules" value={baseRules} onChange={(e) => void handleBaseRulesChange(e.target.value as RuleSystemMode)}>
-            <option value="Rules2024">2024 rules</option>
-            <option value="Rules2014">2014 rules</option>
-          </select>
           <label htmlFor="build-method">Ability score method</label>
           <select id="build-method" value={buildMethod} onChange={(e) => setBuildMethod(e.target.value as BuildMethod)}>
             <option value="PointBuy">Point buy</option>
@@ -1925,72 +2877,16 @@ function App() {
             value={startingEquipmentMode}
             onChange={(e) => {
               const next = e.target.value as 'package' | 'gold-only'
-              if (startingEquipmentModeLocked) {
-                return
-              }
-              if (next === 'gold-only') {
-                setStartingEquipmentMode('gold-only')
-                setStartingEquipmentModeLocked(true)
-                return
-              }
-              setStartingEquipmentMode('package')
+              setStartingEquipmentMode(next)
             }}
-            disabled={startingEquipmentModeLocked}
           >
             <option value="package">Equipment package</option>
             <option value="gold-only">Starting gold</option>
           </select>
-          {startingEquipmentModeLocked && (
-            <small>
-              Starting gold is locked for this character. Class/background equipment packages are disabled for downstream
-              inventory behavior.
-            </small>
-          )}
-          <label>
-            <input
-              type="checkbox"
-              checked={mixedMode}
-              onChange={(e) => {
-                const nextMixedMode = e.target.checked
-                setMixedMode(nextMixedMode)
-                if (!nextMixedMode) {
-                  setOverlaySources([])
-                }
-              }}
-            />{' '}
-            Mixed mode
-          </label>
-          {mixedMode && (
-            <>
-              <label htmlFor="overlay-sources">Allowed overlay rule sources</label>
-              <select id="overlay-sources" multiple value={overlaySources} onChange={handleOverlaySourcesChange}>
-                {overlaySourceOptions.length === 0 ? (
-                  <option value="">No overlay sources available</option>
-                ) : (
-                  overlaySourceOptions.map((source) => (
-                    <option key={source.sourceCode} value={source.sourceCode}>
-                      {source.sourceCode} - {source.sourceName}
-                    </option>
-                  ))
-                )}
-              </select>
-            </>
-          )}
         </div>
-        <div className="row">
-          <button onClick={() => void loadCatalogData(baseRules)} disabled={!session}>
-            Refresh content catalogs
-          </button>
-        </div>
-        {mixedMode && overlaySources.length === 0 && (
-          <small>Select one or more overlay sources to include mixed-rule catalog modules.</small>
-        )}
-        <p hidden={newCharacterStep !== 2}>
-          Total level: {totalCharacterLevel} | Proficiency bonus: +{proficiencyBonus}
-        </p>
         <div className="grid" hidden={newCharacterStep !== 2}>
           <label htmlFor="main-class-module-setup">Primary class</label>
-          <select id="main-class-module-setup" value={effectiveSelectedClassModuleId} onChange={(e) => setSelectedClassModuleId(e.target.value)}>
+          <select id="main-class-module-setup" value={effectiveSelectedClassModuleId} onChange={(e) => handlePrimaryClassChange(e.target.value)}>
             {mainClassOptions.length === 0 ? (
               <option value="">No class modules found in DB</option>
             ) : (
@@ -2001,8 +2897,18 @@ function App() {
               ))
             )}
           </select>
+          <label htmlFor="primary-class-level-setup">Primary class level</label>
+          <input
+            id="primary-class-level-setup"
+            type="number"
+            min={1}
+            max={20}
+            value={primaryClassLevel}
+            onChange={(e) => setPrimaryClassLevel(Math.max(1, Math.min(20, Number(e.target.value))))}
+            placeholder="Primary class level"
+          />
           <label htmlFor="race-module">Race / species</label>
-          <select id="race-module" value={effectiveSelectedRaceModuleId} onChange={(e) => setSelectedRaceModuleId(e.target.value)}>
+          <select id="race-module" value={effectiveSelectedRaceModuleId} onChange={(e) => handleRaceModuleChange(e.target.value)}>
             {raceOptions.length === 0 ? (
               <option value="">No race/species modules found</option>
             ) : (
@@ -2041,7 +2947,18 @@ function App() {
           <select id="multiclass-module" value={secondaryClassModuleId} onChange={(e) => setSecondaryClassModuleId(e.target.value)}>
             <option value="">Add multiclass option...</option>
             {classOptions
-              .filter((x) => x.moduleId !== effectiveSelectedClassModuleId)
+              .filter(
+                (x) =>
+                  x.moduleId !== effectiveSelectedClassModuleId &&
+                  !multiClassSelections.some((entry) => entry.moduleId === x.moduleId) &&
+                  classNameByModuleId.get(x.moduleId.toLowerCase())?.toLowerCase() !==
+                    classNameByModuleId.get(effectiveSelectedClassModuleId.toLowerCase())?.toLowerCase() &&
+                  !multiClassSelections.some((entry) => {
+                    const entryClassName = classNameByModuleId.get(entry.moduleId.toLowerCase())?.toLowerCase() ?? ''
+                    const optionClassName = classNameByModuleId.get(x.moduleId.toLowerCase())?.toLowerCase() ?? ''
+                    return entryClassName.length > 0 && entryClassName === optionClassName
+                  }),
+              )
               .map((item) => (
                 <option key={item.moduleId} value={item.moduleId} disabled={moduleCompatibilityIssues(item, totalCharacterLevel).length > 0}>
                   {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, totalCharacterLevel).length > 0 ? ' - incompatible' : ''}
@@ -2056,10 +2973,8 @@ function App() {
           <div className="list">
             {multiClassSelections.map((entry) => {
               const option = classOptions.find((x) => x.moduleId === entry.moduleId)
-              const subclassChoices = subclassOptions
-              const unlockedSubclassChoices = subclassChoices.filter(
-                (item) => moduleCompatibilityIssues(item, entry.level).length === 0,
-              )
+              const subclassChoices = getSubclassChoicesForClass(entry.moduleId)
+              const unlockedSubclassChoices = getUnlockedSubclassChoicesForClass(entry.moduleId, entry.level)
               return (
                 <div key={entry.moduleId} className="row">
                   <span>{option?.displayName ?? entry.moduleId}</span>
@@ -2072,7 +2987,7 @@ function App() {
                     value={entry.level}
                     onChange={(e) => setMultiClassLevel(entry.moduleId, Number(e.target.value))}
                   />
-                  {unlockedSubclassChoices.length > 0 || Boolean(entry.subclassModuleId) ? (
+                  {unlockedSubclassChoices.length > 0 ? (
                     <>
                       <label htmlFor={`multiclass-subclass-${entry.moduleId}`}>Subclass</label>
                       <select
@@ -2217,12 +3132,9 @@ function App() {
 
       <section className="card" hidden={newCharacterStep !== 3}>
         <h2>3. Wizard + persistent build</h2>
-        <button onClick={handleStartWizard} disabled={!session}>
-          Start Wizard Draft
-        </button>
         <div className="row">
           <label htmlFor="main-class-module">Class</label>
-          <select id="main-class-module" value={effectiveSelectedClassModuleId} onChange={(e) => setSelectedClassModuleId(e.target.value)}>
+          <select id="main-class-module" value={effectiveSelectedClassModuleId} onChange={(e) => handlePrimaryClassChange(e.target.value)}>
             {mainClassOptions.length === 0 ? (
               <option value="">No class modules found in DB</option>
             ) : (
@@ -2233,23 +3145,12 @@ function App() {
               ))
             )}
           </select>
-          <label htmlFor="primary-class-level">Primary class level</label>
-          <input
-            id="primary-class-level"
-            type="number"
-            min={1}
-            max={20}
-            value={primaryClassLevel}
-            onChange={(e) => setPrimaryClassLevel(Math.max(1, Math.min(20, Number(e.target.value))))}
-            placeholder="Primary class level"
-          />
-          {subclassOptions.some((item) => moduleCompatibilityIssues(item, primaryClassLevel).length === 0) ||
-          Boolean(effectiveSelectedSubclassModuleId) ? (
+          {unlockedPrimarySubclassOptions.length > 0 ? (
             <>
               <label htmlFor="subclass-module">Subclass</label>
               <select id="subclass-module" value={effectiveSelectedSubclassModuleId} onChange={(e) => setSelectedSubclassModuleId(e.target.value)}>
                 <option value="">None</option>
-                {subclassOptions.map((item) => (
+                {primaryClassSubclassOptions.map((item) => (
                   <option key={item.moduleId} value={item.moduleId} disabled={moduleCompatibilityIssues(item, primaryClassLevel).length > 0}>
                     {item.displayName} ({item.sourceCode})
                     {moduleCompatibilityIssues(item, primaryClassLevel).length > 0
@@ -2262,22 +3163,6 @@ function App() {
           ) : (
             <small>Subclass unlocks at a higher class level.</small>
           )}
-          <button
-            onClick={handleApplySelectedClassToWizard}
-            disabled={!activeDraft?.draft || mainClassOptions.length === 0}
-          >
-            Apply selected class to wizard
-          </button>
-          <button
-            onClick={handleSaveBuildToDb}
-            disabled={
-              !currentCharacterId ||
-              mainClassOptions.length === 0 ||
-              (buildMethod === 'Roll' && !isRollAssignmentComplete)
-            }
-          >
-            Save build to persistent model
-          </button>
         </div>
         {classSections.length > 0 && (
           <div className="inventory-list">
@@ -2293,25 +3178,8 @@ function App() {
             ))}
           </div>
         )}
-        <div className="row">
-          <button onClick={handleFinalizeWizard} disabled={!activeDraft?.draft}>
-            Finalize
-          </button>
-        </div>
         {classCatalogResult && <p>{classCatalogResult}</p>}
-        {savedBuild && (
-          <details>
-            <summary>Technical details</summary>
-            <pre>{JSON.stringify(savedBuild, null, 2)}</pre>
-          </details>
-        )}
         {!savedBuild && buildResult && <p>{buildResult}</p>}
-        {activeDraft && (
-          <details>
-            <summary>Technical details</summary>
-            <pre>{JSON.stringify(activeDraft, null, 2)}</pre>
-          </details>
-        )}
       </section>
 
       <section className="card" hidden={newCharacterStep !== 3}>
@@ -2319,59 +3187,61 @@ function App() {
         {sheetResult && <p>{sheetResult}</p>}
         <h3>Vitals</h3>
         <div className="grid">
+          <label htmlFor="vitals-max-hp-method">Max HP method</label>
+          <select id="vitals-max-hp-method" value={maxHpMethod} onChange={(e) => setMaxHpMethod(e.target.value as 'manual' | 'roll')}>
+            <option value="manual">Manual</option>
+            <option value="roll">Roll</option>
+          </select>
           <label htmlFor="vitals-max-hp">Max HP</label>
-          <input
-            id="vitals-max-hp"
-            type="number"
-            min={0}
-            value={vitals.maxHitPoints}
-            onChange={(e) => setVitals((prev) => ({ ...prev, maxHitPoints: toNonNegativeInt(e.target.value) }))}
-          />
-          <label htmlFor="vitals-current-hp">Current HP</label>
-          <input
-            id="vitals-current-hp"
-            type="number"
-            min={0}
-            value={vitals.currentHitPoints}
-            onChange={(e) => setVitals((prev) => ({ ...prev, currentHitPoints: toNonNegativeInt(e.target.value) }))}
-          />
-          <label htmlFor="vitals-temp-hp">Temp HP</label>
-          <input
-            id="vitals-temp-hp"
-            type="number"
-            min={0}
-            value={vitals.tempHitPoints}
-            onChange={(e) => setVitals((prev) => ({ ...prev, tempHitPoints: toNonNegativeInt(e.target.value) }))}
-          />
-          <label htmlFor="vitals-speed">Base move speed</label>
-          <input
-            id="vitals-speed"
-            type="number"
-            min={0}
-            value={vitals.baseMoveSpeed}
-            onChange={(e) => setVitals((prev) => ({ ...prev, baseMoveSpeed: toNonNegativeInt(e.target.value) }))}
-          />
-          <label htmlFor="vitals-ac">Base armor class</label>
-          <input
-            id="vitals-ac"
-            type="number"
-            min={0}
-            value={vitals.baseArmorClass}
-            onChange={(e) => setVitals((prev) => ({ ...prev, baseArmorClass: toNonNegativeInt(e.target.value) }))}
-          />
-        </div>
-        <div className="row">
-          <button onClick={handleSaveVitals} disabled={!currentCharacterId}>
-            Save vitals
-          </button>
+          {maxHpMethod === 'manual' ? (
+            <input
+              id="vitals-max-hp"
+              type="number"
+              min={0}
+              value={vitals.maxHitPoints}
+              onChange={(e) => setVitals((prev) => ({ ...prev, maxHitPoints: toNonNegativeInt(e.target.value) }))}
+            />
+          ) : (
+            <div className="row">
+              <label>
+                <input type="checkbox" checked={generousHitPointRolls} onChange={(e) => setGenerousHitPointRolls(e.target.checked)} /> Generous rolls
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const classNameForHitDie = selectedPrimaryClassName || 'Fighter'
+                  const hitDieSides = parseHitDieSides(classNameForHitDie)
+                  const rolledMaxHp = rollHitPointsForLevel(totalCharacterLevel, hitDieSides, generousHitPointRolls)
+                  setVitals((prev) => ({
+                    ...prev,
+                    maxHitPoints: rolledMaxHp,
+                    currentHitPoints: rolledMaxHp,
+                  }))
+                }}
+              >
+                Roll HP
+              </button>
+              <small>Current value: {vitals.maxHitPoints}</small>
+            </div>
+          )}
         </div>
         <h3>Spells</h3>
         <div className="row">
+          <small>
+            Spell source context: {spellOriginNames.size > 0 ? Array.from(spellOriginNames).join(', ') : 'No class/subclass spell list selected'}
+          </small>
           <button
-            onClick={() =>
-              setSpellEntries((prev) => [...prev, { spellModuleId: '', spellName: '', preparationMode: 'Prepared' }])
-            }
-            disabled={!currentCharacterId}
+            onClick={() => {
+              const firstSpell = availableSpellOptions[0]
+              if (!firstSpell) {
+                return
+              }
+              setSpellEntries((prev) => [
+                ...prev,
+                { spellModuleId: firstSpell.moduleId, spellName: firstSpell.displayName, preparationMode: 'Prepared' },
+              ])
+            }}
+            disabled={!currentCharacterId || availableSpellOptions.length === 0}
           >
             Add spell
           </button>
@@ -2379,32 +3249,41 @@ function App() {
             Save spells
           </button>
         </div>
+        {availableSpellOptions.length === 0 && <small>No spells available for the currently selected class/subclass.</small>}
         <ul className="inventory-list">
           {spellEntries.map((entry, index) => (
             <li key={`${entry.spellModuleId}-${index}`}>
               <div className="grid">
-                <label htmlFor={`spell-module-${index}`}>Spell module id</label>
-                <input
+                <label htmlFor={`spell-module-${index}`}>Spell</label>
+                <select
                   id={`spell-module-${index}`}
                   value={entry.spellModuleId}
                   onChange={(e) =>
-                    setSpellEntries((prev) =>
-                      prev.map((spell, i) => (i === index ? { ...spell, spellModuleId: e.target.value } : spell)),
-                    )
+                    setSpellEntries((prev) => {
+                      const selectedSpell = availableSpellOptions.find((spell) => spell.moduleId === e.target.value)
+                      return prev.map((spell, i) =>
+                        i === index
+                          ? {
+                              ...spell,
+                              spellModuleId: e.target.value,
+                              spellName: selectedSpell?.displayName ?? spell.spellName,
+                            }
+                          : spell,
+                      )
+                    })
                   }
-                />
-                <label htmlFor={`spell-name-${index}`}>Spell name</label>
-                <input
-                  id={`spell-name-${index}`}
-                  value={entry.spellName}
-                  onChange={(e) =>
-                    setSpellEntries((prev) =>
-                      prev.map((spell, i) => (i === index ? { ...spell, spellName: e.target.value } : spell)),
-                    )
-                  }
-                />
+                >
+                  {!availableSpellOptions.some((spell) => spell.moduleId === entry.spellModuleId) && (
+                    <option value={entry.spellModuleId}>{entry.spellName || 'Unknown spell'}</option>
+                  )}
+                  {availableSpellOptions.map((spell) => (
+                    <option key={spell.moduleId} value={spell.moduleId}>
+                      {spell.displayName} ({spell.sourceCode}){spell.spellClasses.length > 0 ? ` - for ${spell.spellClasses.join(', ')}` : ' - class not specified'}
+                    </option>
+                  ))}
+                </select>
                 <label htmlFor={`spell-mode-${index}`}>Preparation mode</label>
-                <input
+                <select
                   id={`spell-mode-${index}`}
                   value={entry.preparationMode}
                   onChange={(e) =>
@@ -2412,7 +3291,11 @@ function App() {
                       prev.map((spell, i) => (i === index ? { ...spell, preparationMode: e.target.value } : spell)),
                     )
                   }
-                />
+                >
+                  <option value="Known">Known</option>
+                  <option value="Prepared">Prepared</option>
+                  <option value="Cantrip">Cantrip</option>
+                </select>
               </div>
               <button onClick={() => setSpellEntries((prev) => prev.filter((_, i) => i !== index))}>Remove spell</button>
             </li>
@@ -2481,33 +3364,22 @@ function App() {
                   }
                 />
               </div>
-              <button onClick={() => setResourcePools((prev) => prev.filter((_, i) => i !== index))}>Remove resource</button>
+              <button
+                onClick={() => setResourcePools((prev) => prev.filter((_, i) => i !== index))}
+                disabled={CURRENCY_RESOURCE_KEYS.has(resource.resourceKey.trim().toLowerCase())}
+              >
+                Remove resource
+              </button>
+              {CURRENCY_RESOURCE_KEYS.has(resource.resourceKey.trim().toLowerCase()) && (
+                <small>Currency rows cannot be removed; set them to 0 instead.</small>
+              )}
             </li>
           ))}
         </ul>
       </section>
 
       <section className="card" hidden={newCharacterStep !== 3}>
-        <h2>5. Skills menu and persisted checks</h2>
-        <div className="row">
-          <label htmlFor="selected-skill">Skill</label>
-          <select id="selected-skill" value={selectedSkill} onChange={(e) => setSelectedSkill(e.target.value as SkillName)}>
-            {ALL_SKILLS.map((skill) => (
-              <option key={skill} value={skill}>
-                {skill}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="skill-advantage-state">Roll mode</label>
-          <select id="skill-advantage-state" value={advantageState} onChange={(e) => setAdvantageState(e.target.value as AdvantageState)}>
-            <option value="None">None</option>
-            <option value="Advantage">Advantage</option>
-            <option value="Disadvantage">Disadvantage</option>
-          </select>
-          <button onClick={handleRollSkillCheck} disabled={!currentCharacterId}>
-            Roll persisted check
-          </button>
-        </div>
+        <h2>5. Skills setup</h2>
         <p>
           Proficiencies available: {proficiencySlotsAvailable - proficiencySlotsUsed} (used {proficiencySlotsUsed} /{' '}
           {proficiencySlotsAvailable}) | Expertise available: {expertiseSlotsAvailable - expertiseSlotsUsed} (used{' '}
@@ -2603,12 +3475,6 @@ function App() {
             </label>
           ))}
         </div>
-        {rollResult && (
-          <details>
-            <summary>Technical details</summary>
-            <pre>{rollResult}</pre>
-          </details>
-        )}
       </section>
 
       <section className="card" hidden={newCharacterStep !== 4}>
@@ -2616,51 +3482,29 @@ function App() {
         <h3>Coin purse</h3>
         <div className="grid">
           <label htmlFor="currency-cp">cp</label>
-          <input id="currency-cp" type="number" min={0} value={currencyDraft.cp} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, cp: Math.max(0, Number(e.target.value) || 0) }))} />
+          <input id="currency-cp" type="number" min={0} value={currencyDraft.cp} onBlur={() => void handleSaveCurrency()} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, cp: Math.max(0, Number(e.target.value) || 0) }))} />
           <label htmlFor="currency-sp">sp</label>
-          <input id="currency-sp" type="number" min={0} value={currencyDraft.sp} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, sp: Math.max(0, Number(e.target.value) || 0) }))} />
+          <input id="currency-sp" type="number" min={0} value={currencyDraft.sp} onBlur={() => void handleSaveCurrency()} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, sp: Math.max(0, Number(e.target.value) || 0) }))} />
           <label htmlFor="currency-ep">ep</label>
-          <input id="currency-ep" type="number" min={0} value={currencyDraft.ep} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, ep: Math.max(0, Number(e.target.value) || 0) }))} />
+          <input id="currency-ep" type="number" min={0} value={currencyDraft.ep} onBlur={() => void handleSaveCurrency()} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, ep: Math.max(0, Number(e.target.value) || 0) }))} />
           <label htmlFor="currency-gp">gp</label>
-          <input id="currency-gp" type="number" min={0} value={currencyDraft.gp} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, gp: Math.max(0, Number(e.target.value) || 0) }))} />
+          <input id="currency-gp" type="number" min={0} value={currencyDraft.gp} onBlur={() => void handleSaveCurrency()} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, gp: Math.max(0, Number(e.target.value) || 0) }))} />
           <label htmlFor="currency-pp">pp</label>
-          <input id="currency-pp" type="number" min={0} value={currencyDraft.pp} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, pp: Math.max(0, Number(e.target.value) || 0) }))} />
+          <input id="currency-pp" type="number" min={0} value={currencyDraft.pp} onBlur={() => void handleSaveCurrency()} onChange={(e) => setCurrencyDraft((prev) => ({ ...prev, pp: Math.max(0, Number(e.target.value) || 0) }))} />
         </div>
         <div className="row">
-          <button onClick={handleSaveCurrency} disabled={!currentCharacterId}>Save purse</button>
           <label>
             <input type="checkbox" checked={usePlatinumConsolidation} onChange={(e) => setUsePlatinumConsolidation(e.target.checked)} /> Consolidate toward platinum
           </label>
-          <button onClick={handleConsolidateCurrency} disabled={!currentCharacterId}>Consolidate pocket change</button>
-        </div>
-        <div className="row">
-          <label htmlFor="currency-convert-from">From</label>
-          <select id="currency-convert-from" value={currencyConvert.fromDenomination} onChange={(e) => setCurrencyConvert((prev) => ({ ...prev, fromDenomination: e.target.value }))}>
-            <option value="cp">cp</option>
-            <option value="sp">sp</option>
-            <option value="ep">ep</option>
-            <option value="gp">gp</option>
-            <option value="pp">pp</option>
-          </select>
-          <label htmlFor="currency-convert-to">To</label>
-          <select id="currency-convert-to" value={currencyConvert.toDenomination} onChange={(e) => setCurrencyConvert((prev) => ({ ...prev, toDenomination: e.target.value }))}>
-            <option value="cp">cp</option>
-            <option value="sp">sp</option>
-            <option value="ep">ep</option>
-            <option value="gp">gp</option>
-            <option value="pp">pp</option>
-          </select>
-          <label htmlFor="currency-convert-amount">Amount</label>
-          <input id="currency-convert-amount" type="number" min={1} value={currencyConvert.amount} onChange={(e) => setCurrencyConvert((prev) => ({ ...prev, amount: Math.max(1, Number(e.target.value) || 1) }))} />
-          <button onClick={handleConvertCurrency} disabled={!currentCharacterId}>Convert</button>
+          <button onClick={handleConsolidateCurrency} disabled={!currentCharacterId}>Consolidate pocket change (gp default)</button>
         </div>
         <div className="row">
           <label htmlFor="catalog-item">Item</label>
-          <select id="catalog-item" value={selectedCatalogItemId} onChange={(e) => setSelectedCatalogItemId(e.target.value)}>
-            {itemCatalog.length === 0 ? (
+          <select id="catalog-item" value={effectiveSelectedCatalogItemId} onChange={(e) => setSelectedCatalogItemId(e.target.value)}>
+            {filteredItemCatalog.length === 0 ? (
               <option value="">No item definitions found in DB</option>
             ) : (
-              itemCatalog.map((item) => (
+              filteredItemCatalog.map((item) => (
                 <option key={item.itemId} value={item.itemId}>
                   {getDisplayItemName(item.itemName, item.itemId)} ({item.sourceCode}) {item.requiresAttunement ? '[attunement]' : ''}
                 </option>
@@ -2679,10 +3523,21 @@ function App() {
           <label>
             <input type="checkbox" checked={purchaseFromCurrencyMode} onChange={(e) => setPurchaseFromCurrencyMode(e.target.checked)} /> Purchase (deduct currency)
           </label>
-          <button onClick={() => void handleAddItemFromCatalog()} disabled={!selectedCatalogItemId || !currentCharacterId}>
+          <button onClick={() => void handleAddItemFromCatalog()} disabled={!effectiveSelectedCatalogItemId || !currentCharacterId}>
             Add to persisted inventory
           </button>
         </div>
+        {effectiveSelectedCatalogItemId && (
+          <small>
+            {(() => {
+              const selectedItem = filteredItemCatalog.find((item) => item.itemId === effectiveSelectedCatalogItemId)
+              if (!selectedItem) {
+                return 'Select an item to see details.'
+              }
+              return `${selectedItem.itemType} | ${selectedItem.rarity} | ${selectedItem.goldValue} gp | ${selectedItem.weight} lb${selectedItem.description ? ` | ${selectedItem.description}` : ''}`
+            })()}
+          </small>
+        )}
         {currencyState && (
           <small>
             Current purse: {currencyState.cp} cp, {currencyState.sp} sp, {currencyState.ep} ep, {currencyState.gp} gp, {currencyState.pp} pp
@@ -2732,89 +3587,6 @@ function App() {
             </li>
           ))}
         </ul>
-        {attunementGuidance && (
-          <details>
-            <summary>Technical details</summary>
-            <pre>{attunementGuidance}</pre>
-          </details>
-        )}
-        {inventoryResult && (
-          <details>
-            <summary>Technical details</summary>
-            <pre>{inventoryResult}</pre>
-          </details>
-        )}
-      </section>
-
-      <section className="card" hidden={newCharacterStep !== 4}>
-        <h2>7. Attacks</h2>
-        <div className="row">
-          <label htmlFor="attack-advantage-state">Roll mode</label>
-          <select id="attack-advantage-state" value={attackAdvantageState} onChange={(e) => setAttackAdvantageState(e.target.value as AdvantageState)}>
-            <option value="None">None</option>
-            <option value="Advantage">Advantage</option>
-            <option value="Disadvantage">Disadvantage</option>
-          </select>
-        </div>
-        <ul className="inventory-list">
-          {attacks.map((attack) => {
-            const key = [
-              getDisplayItemName(attack.itemName, attack.itemDefinitionId),
-              attack.damageDice,
-              attack.weaponAbility,
-              attack.attackBonus,
-              attack.damageBonus,
-            ].join('|')
-            return (
-              <li key={key}>
-                <strong>{getDisplayItemName(attack.itemName, attack.itemDefinitionId)}</strong>
-                <span>
-                  to hit {attack.toHit >= 0 ? '+' : ''}
-                  {attack.toHit} | damage {attack.damageDice}
-                  {attack.damageBonus >= 0 ? '+' : ''}
-                  {attack.damageBonus} ({attack.abilityName})
-                </span>
-                <button onClick={() => void handleRollAttack(key, attack)}>Roll attack</button>
-                {attackResults[key] && <small>{attackResults[key]}</small>}
-              </li>
-            )
-          })}
-        </ul>
-        <div className="row">
-          <button onClick={handleLoadAdvancedRulesSnapshot} disabled={!currentCharacterId}>
-            Load advanced multiclass rules snapshot
-          </button>
-        </div>
-        {advancedRulesSnapshot && (
-          <div className="row">
-            <small>
-              Extra Attack stacking: {advancedRulesSnapshot.extraAttackStacks ? 'enabled' : 'disabled'} | AC resolution:{' '}
-              {advancedRulesSnapshot.armorClassResolution} | Pact Magic separate:{' '}
-              {advancedRulesSnapshot.pactMagicTrackedSeparately ? 'yes' : 'no'}
-            </small>
-            <small>Data gaps: {advancedRulesSnapshot.dataGaps.join(' | ') || 'None'}</small>
-          </div>
-        )}
-      </section>
-
-      <section className="card" hidden={newCharacterStep !== 3}>
-        <h2>8. Custom builder previews</h2>
-        <div className="row">
-          <button onClick={handlePreviewOrigin}>Preview Origin</button>
-          <button onClick={handlePreviewSpecies}>Preview Species</button>
-        </div>
-        {originPreview && (
-          <details>
-            <summary>Technical details</summary>
-            <pre>{originPreview}</pre>
-          </details>
-        )}
-        {speciesPreview && (
-          <details>
-            <summary>Technical details</summary>
-            <pre>{speciesPreview}</pre>
-          </details>
-        )}
       </section>
             </>
           )}

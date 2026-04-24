@@ -34,19 +34,21 @@ public sealed class CharacterProgressionServiceTests
         Assert.Empty(purchase.Errors);
         Assert.NotNull(purchase.Data);
         Assert.Equal(7, purchase.Data.Gp);
-        Assert.Equal(1, purchase.Data.Ep);
+        Assert.Equal(5, purchase.Data.Sp);
+        Assert.Equal(0, purchase.Data.Ep);
 
         var converted = await service.ConvertCurrencyAsync(characterId, new ConvertCurrencyRequest("gp", "sp", 1), CancellationToken.None);
         Assert.Empty(converted.Errors);
         Assert.NotNull(converted.Data);
         Assert.Equal(6, converted.Data.Gp);
-        Assert.Equal(10, converted.Data.Sp);
-        Assert.Equal(1, converted.Data.Ep);
+        Assert.Equal(15, converted.Data.Sp);
+        Assert.Equal(0, converted.Data.Ep);
 
         var consolidated = await service.ConsolidateCurrencyAsync(characterId, new ConsolidateCurrencyRequest(false), CancellationToken.None);
         Assert.Equal(7, consolidated.Gp);
-        Assert.Equal(0, consolidated.Sp);
-        Assert.Equal(1, consolidated.Ep);
+        Assert.Equal(5, consolidated.Sp);
+        Assert.Equal(0, consolidated.Ep);
+        Assert.Equal(0, consolidated.Pp);
     }
 
     [Fact]
@@ -76,6 +78,40 @@ public sealed class CharacterProgressionServiceTests
         Assert.Empty(result.RecommendedSpells);
         Assert.False(string.IsNullOrWhiteSpace(result.AdvisoryMessage));
         Assert.False(string.IsNullOrWhiteSpace(result.DataGap));
+    }
+
+    [Fact]
+    public async Task UpsertVitals_CreatesCharacterSheet_FromDraftOwner()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var characterId = Guid.NewGuid();
+        fixture.Db.CharacterDrafts.Add(new CharacterDraftEntity
+        {
+            CharacterId = characterId.ToString(),
+            OwnerUserId = "local:test-owner",
+            CharacterName = "Draft Vitals Test",
+            BaseRuleSystem = "Rules2024",
+            MixedModeEnabled = false,
+            OverlaySourcesJson = "[]",
+            IsFinalized = false,
+            StepsJson = "[]",
+            WarningsJson = "[]",
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var service = new CharacterProgressionService(fixture.Db);
+        var saved = await service.UpsertVitalsAsync(
+            characterId,
+            new UpsertCharacterVitalsRequest(15, 12, 3, 30, 16),
+            CancellationToken.None);
+
+        Assert.Equal(characterId, saved.CharacterId);
+        var sheet = await fixture.Db.CharacterSheets.SingleOrDefaultAsync(x => x.CharacterId == characterId.ToString());
+        Assert.NotNull(sheet);
+        Assert.Equal("local:test-owner", sheet.OwnerUserId);
+        Assert.Equal("Draft Vitals Test", sheet.CharacterName);
     }
 
     private static async Task<DbFixture> CreateFixtureAsync()

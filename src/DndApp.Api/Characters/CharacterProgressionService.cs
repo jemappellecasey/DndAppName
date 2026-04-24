@@ -1,4 +1,5 @@
 using DndApp.Api.Data;
+using DndApp.Api.MixedRules;
 using Microsoft.EntityFrameworkCore;
 
 namespace DndApp.Api.Characters;
@@ -59,6 +60,7 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
     public async Task<CharacterSpellsData> UpsertSpellsAsync(Guid characterId, UpsertCharacterSpellsRequest request, CancellationToken cancellationToken)
     {
         var id = characterId.ToString();
+        await EnsureCharacterSheetExistsAsync(id, cancellationToken);
         var current = await _db.CharacterSpellEntries.Where(x => x.CharacterId == id).ToListAsync(cancellationToken);
         _db.CharacterSpellEntries.RemoveRange(current);
         foreach (var entry in request.Entries
@@ -123,6 +125,7 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
     public async Task<CharacterCurrencyData> UpsertCurrencyAsync(Guid characterId, UpsertCharacterCurrencyRequest request, CancellationToken cancellationToken)
     {
         var id = characterId.ToString();
+        await EnsureCharacterSheetExistsAsync(id, cancellationToken);
         var rows = await _db.CharacterResourcePools
             .Where(x => x.CharacterId == id && (x.ResourceKey == "cp" || x.ResourceKey == "sp" || x.ResourceKey == "ep" || x.ResourceKey == "gp" || x.ResourceKey == "pp"))
             .ToListAsync(cancellationToken);
@@ -236,6 +239,7 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
     public async Task<CharacterResourcesData> UpsertResourcesAsync(Guid characterId, UpsertCharacterResourcesRequest request, CancellationToken cancellationToken)
     {
         var id = characterId.ToString();
+        await EnsureCharacterSheetExistsAsync(id, cancellationToken);
         var current = await _db.CharacterResourcePools.Where(x => x.CharacterId == id).ToListAsync(cancellationToken);
         _db.CharacterResourcePools.RemoveRange(current);
         foreach (var resource in request.Resources
@@ -278,6 +282,7 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
     public async Task<CharacterVitalsData> UpsertVitalsAsync(Guid characterId, UpsertCharacterVitalsRequest request, CancellationToken cancellationToken)
     {
         var id = characterId.ToString();
+        await EnsureCharacterSheetExistsAsync(id, cancellationToken);
         var row = await _db.CharacterVitals.SingleOrDefaultAsync(x => x.CharacterId == id, cancellationToken);
         if (row is null)
         {
@@ -319,6 +324,46 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
         return "Known";
     }
 
+    private async Task EnsureCharacterSheetExistsAsync(string characterId, CancellationToken cancellationToken)
+    {
+        var existing = await _db.CharacterSheets.SingleOrDefaultAsync(x => x.CharacterId == characterId, cancellationToken);
+        if (existing is not null)
+        {
+            return;
+        }
+
+        var record = await _db.CharacterRecords
+            .AsNoTracking()
+            .Where(x => x.CharacterId == characterId)
+            .Select(x => new { x.OwnerUserId, x.CharacterName, x.BaseRuleSystem })
+            .SingleOrDefaultAsync(cancellationToken);
+        var draft = await _db.CharacterDrafts
+            .AsNoTracking()
+            .Where(x => x.CharacterId == characterId)
+            .Select(x => new { x.OwnerUserId, x.CharacterName, x.BaseRuleSystem })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (record is null && draft is null)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        _db.CharacterSheets.Add(new CharacterSheetEntity
+        {
+            CharacterId = characterId,
+            OwnerUserId = record?.OwnerUserId ?? draft?.OwnerUserId ?? string.Empty,
+            CharacterName = record?.CharacterName ?? draft?.CharacterName ?? "New Adventurer",
+            BaseRuleSystem = record?.BaseRuleSystem ?? draft?.BaseRuleSystem ?? RuleSystemMode.Rules2024.ToString(),
+            BuildMethod = CharacterBuildMethod.PointBuy.ToString(),
+            ClassModuleId = string.Empty,
+            ClassName = "Unassigned",
+            Level = 1,
+            ProficiencyBonus = 2,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+    }
+
     private static CharacterResourcePoolEntity CreateCurrencyRow(string characterId, string key, int amount)
     {
         return new CharacterResourcePoolEntity
@@ -351,27 +396,36 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
     private static Dictionary<string, int> FromTotalCpStandard(int totalCp)
     {
         var remaining = Math.Max(0, totalCp);
-        var pp = remaining / 1000;
-        remaining %= 1000;
         var gp = remaining / 100;
         remaining %= 100;
-        var ep = remaining / 50;
-        remaining %= 50;
         var sp = remaining / 10;
         var cp = remaining % 10;
         return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["cp"] = cp,
             ["sp"] = sp,
-            ["ep"] = ep,
+            ["ep"] = 0,
             ["gp"] = gp,
-            ["pp"] = pp,
+            ["pp"] = 0,
         };
     }
 
     private static Dictionary<string, int> FromTotalCpPreferPlatinum(int totalCp)
     {
-        // Prefer larger platinum stacks, then greedily resolve remaining value.
-        return FromTotalCpStandard(totalCp);
+        var remaining = Math.Max(0, totalCp);
+        var pp = remaining / 1000;
+        remaining %= 1000;
+        var gp = remaining / 100;
+        remaining %= 100;
+        var sp = remaining / 10;
+        var cp = remaining % 10;
+        return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["cp"] = cp,
+            ["sp"] = sp,
+            ["ep"] = 0,
+            ["gp"] = gp,
+            ["pp"] = pp,
+        };
     }
 }
