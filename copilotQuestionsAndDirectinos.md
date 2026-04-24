@@ -4,7 +4,12 @@
 - ✅ Verified currency consolidation endpoint and handler (working)
 - ✅ Verified skill proficiency selection UI (working)
 
-# Remaining items for Phase 2-5:
+# Phase 2 Fixes - COMPLETED ✅
+- ✅ Fixed primary class selection display: now shows just "Artificer" not "Artificer Alchemist"
+- ✅ Race/Species bonus calculation: verified backend returns abilityBonuses, frontend applies them correctly
+- ✅ Background/Origin bonus calculation: verified backend returns abilityBonuses, frontend applies them correctly
+
+# Remaining items for Phase 3-5:
 
 4. Primary class selection needs to be just Artificer, Barbarian, Bard, etc. Not "artificer alchemist" that "alchemist" should be on the subclass dropdown if the person has enough levels entered in a class for a subclass.
 

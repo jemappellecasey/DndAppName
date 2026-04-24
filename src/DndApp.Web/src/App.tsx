@@ -285,6 +285,16 @@ function parseHitDieSides(className: string): number {
   return 8
 }
 
+function getDisplayClassName(fullClassName: string): string {
+  const words = fullClassName.trim().split(/\s+/)
+  for (const word of words) {
+    if (KNOWN_CLASSES.has(word)) {
+      return word
+    }
+  }
+  return words[0] || fullClassName
+}
+
 function rollHitPointsForLevel(level: number, hitDieSides: number, generousRolls: boolean): number {
   const boundedLevel = Math.max(1, Math.trunc(level))
   const boundedSides = Math.max(1, Math.trunc(hitDieSides))
@@ -2892,7 +2902,7 @@ function App() {
             ) : (
               mainClassOptions.map((item) => (
                 <option key={item.moduleId} value={item.moduleId}>
-                  {item.className} ({item.sourceCode})
+                  {getDisplayClassName(item.className)} ({item.sourceCode})
                 </option>
               ))
             )}
@@ -3140,7 +3150,7 @@ function App() {
             ) : (
               mainClassOptions.map((item) => (
                 <option key={item.moduleId} value={item.moduleId}>
-                  {item.className} ({item.sourceCode})
+                  {getDisplayClassName(item.className)} ({item.sourceCode})
                 </option>
               ))
             )}
