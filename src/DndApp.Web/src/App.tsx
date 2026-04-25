@@ -169,6 +169,21 @@ const CLASS_SPELLCASTING_ABILITY: Partial<Record<string, AbilityName>> = {
   warlock: 'Charisma',
   wizard: 'Intelligence',
 }
+const CLASS_STARTING_GOLD: Record<string, number> = {
+  Artificer: 75,
+  Barbarian: 50,
+  Bard: 75,
+  Cleric: 50,
+  Druid: 50,
+  Fighter: 75,
+  Monk: 25,
+  Paladin: 75,
+  Ranger: 75,
+  Rogue: 75,
+  Sorcerer: 75,
+  Warlock: 50,
+  Wizard: 50,
+}
 const FULL_CASTER_SLOTS_BY_LEVEL: ReadonlyArray<ReadonlyArray<number>> = [
   [],
   [2, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -293,6 +308,11 @@ function getDisplayClassName(fullClassName: string): string {
     }
   }
   return words[0] || fullClassName
+}
+
+function getStartingGold(className: string): number {
+  const baseName = getDisplayClassName(className)
+  return CLASS_STARTING_GOLD[baseName] ?? 75
 }
 
 function rollHitPointsForLevel(level: number, hitDieSides: number, generousRolls: boolean): { total: number; rolls: number[] } {
@@ -1245,6 +1265,14 @@ function App() {
   function handlePrimaryClassChange(nextClassModuleId: string) {
     setSelectedClassModuleId(nextClassModuleId)
     setMultiClassSelections((prev) => prev.filter((entry) => entry.moduleId !== nextClassModuleId))
+    // Auto-populate starting gold if in gold-only mode
+    if (startingEquipmentMode === 'gold-only') {
+      const selectedClass = mainClassOptions.find((item) => item.moduleId === nextClassModuleId)
+      if (selectedClass) {
+        const startingGold = getStartingGold(selectedClass.className)
+        setCurrencyDraft({ cp: 0, sp: 0, ep: 0, gp: startingGold, pp: 0 })
+      }
+    }
   }
 
   function handleRaceModuleChange(nextRaceModuleId: string) {
@@ -2887,17 +2915,26 @@ function App() {
             <option value="Roll">Roll</option>
           </select>
           <label htmlFor="starting-equipment-mode">Starting gear mode</label>
-          <select
+           <select
             id="starting-equipment-mode"
             value={startingEquipmentMode}
             onChange={(e) => {
               const next = e.target.value as 'package' | 'gold-only'
               setStartingEquipmentMode(next)
+              if (next === 'gold-only' && selectedClassOption) {
+                const startingGold = getStartingGold(selectedClassOption.displayName)
+                setCurrencyDraft({ cp: 0, sp: 0, ep: 0, gp: startingGold, pp: 0 })
+              }
             }}
           >
             <option value="package">Equipment package</option>
             <option value="gold-only">Starting gold</option>
           </select>
+          {startingEquipmentMode === 'gold-only' && selectedClassOption && (
+            <small>
+              Starting gold for {getDisplayClassName(selectedClassOption.displayName)}: {getStartingGold(selectedClassOption.displayName)} gp
+            </small>
+          )}
         </div>
         <div className="grid" hidden={newCharacterStep !== 2}>
           <label htmlFor="main-class-module-setup">Primary class</label>
