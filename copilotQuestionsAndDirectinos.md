@@ -13,15 +13,29 @@
 - ✅ Removed "view activity" button from active characters list
 - ✅ Fixed HP rolling: Level 1 always uses max hit die value; now displays per-level roll breakdown when rolled
 
+# Phase 4 - IN PROGRESS
+
+## COMPLETED ✅
+- ✅ **#8 Starting gear/gold calculation**: 
+  - Implemented CLASS_STARTING_GOLD lookup (Monk: 25gp, Fighter/Rogue/Bard: 75gp, Cleric/Druid/Wizard: 50gp)
+  - Auto-populates when selecting "gold-only" mode
+  - Updates when primary class changes
+  - Shows display text: "Starting gold for [Class]: X gp"
+
+## IN PROGRESS 🔄
+- ⏳ **#12 Spell Selection** (NEXT PRIORITY):
+  - See `NEXT_SESSION_PLAN.md` for detailed implementation guide
+  - Requires:
+    1. Backend: Implement `GetRecommendedSpellsAsync()` with spell prep calculations by class + ability modifiers
+    2. Frontend: Refactor spell UI to show sections by class/feature with prep counts and auto-granted spells
+    3. Supports 2014 & 2024 rules with different preparation formulas per class
+  - Key files: `CharacterProgressionService.cs`, `src/DndApp.Web/src/App.tsx` (lines 3286+)
+
 # Remaining items for Phase 4-5:
 
 7. After selecting a race/species/background/origin/class/subclass from a drop down a "show info" button should pop up that displays the details for that specific thing.
 
-8. Starting gear/gold is not being calculated, it needs to be.
-
 9. some of the entries for backgrounds should not be there. Please fix the imports and database so they are not included. Do you need help identifying which ones do not belong?
-
-12. the add spells part of character creation isn't working, please fully implement that part of the project. Do you need more direction on this?
 
 13. proficiencies/expertise available for skill setup is not being calculated correctly, this needs to be fully implemented, make any changes that need to be made.
 
