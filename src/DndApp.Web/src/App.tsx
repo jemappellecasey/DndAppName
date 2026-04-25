@@ -295,19 +295,21 @@ function getDisplayClassName(fullClassName: string): string {
   return words[0] || fullClassName
 }
 
-function rollHitPointsForLevel(level: number, hitDieSides: number, generousRolls: boolean): number {
+function rollHitPointsForLevel(level: number, hitDieSides: number, generousRolls: boolean): { total: number; rolls: number[] } {
   const boundedLevel = Math.max(1, Math.trunc(level))
   const boundedSides = Math.max(1, Math.trunc(hitDieSides))
   const averageFloor = Math.floor(boundedSides / 2) + 1
+  const rolls: number[] = [boundedSides]
   let total = boundedSides
   for (let i = 2; i <= boundedLevel; i += 1) {
     let roll = Math.floor(Math.random() * boundedSides) + 1
     if (generousRolls && roll < averageFloor) {
       roll = averageFloor
     }
+    rolls.push(roll)
     total += roll
   }
-  return total
+  return { total, rolls }
 }
 
 function sourceMatchesBaseRules(sourceCode: string, baseRules: RuleSystemMode): boolean {
@@ -440,6 +442,7 @@ function App() {
   const [viewSkillSort, setViewSkillSort] = useState<'name' | 'ability'>('ability')
   const [maxHpMethod, setMaxHpMethod] = useState<'manual' | 'roll'>('manual')
   const [generousHitPointRolls, setGenerousHitPointRolls] = useState(false)
+  const [hpRollDisplay, setHpRollDisplay] = useState<number[]>([])
   const [deathSaveSuccesses, setDeathSaveSuccesses] = useState(0)
   const [deathSaveFailures, setDeathSaveFailures] = useState(0)
   const [viewEditMode, setViewEditMode] = useState(false)
@@ -1296,6 +1299,7 @@ function App() {
     setViewSkillSort('ability')
     setMaxHpMethod('manual')
     setGenerousHitPointRolls(false)
+    setHpRollDisplay([])
     setDeathSaveSuccesses(0)
     setDeathSaveFailures(0)
     setViewEditMode(false)
@@ -1364,6 +1368,7 @@ function App() {
     setViewSkillSort('ability')
     setMaxHpMethod('manual')
     setGenerousHitPointRolls(false)
+    setHpRollDisplay([])
     setDeathSaveSuccesses(0)
     setDeathSaveFailures(0)
     setViewEditMode(false)
@@ -1373,7 +1378,7 @@ function App() {
     setDefaultResourcesSnapshot([])
   }
 
-  async function ensureActiveDraft() {
+  async function ensureActiveDraft(){
     if (activeDraft?.draft) {
       return activeDraft
     }
@@ -3221,17 +3226,23 @@ function App() {
                 onClick={() => {
                   const classNameForHitDie = selectedPrimaryClassName || 'Fighter'
                   const hitDieSides = parseHitDieSides(classNameForHitDie)
-                  const rolledMaxHp = rollHitPointsForLevel(totalCharacterLevel, hitDieSides, generousHitPointRolls)
+                  const { total, rolls } = rollHitPointsForLevel(totalCharacterLevel, hitDieSides, generousHitPointRolls)
+                  setHpRollDisplay(rolls)
                   setVitals((prev) => ({
                     ...prev,
-                    maxHitPoints: rolledMaxHp,
-                    currentHitPoints: rolledMaxHp,
+                    maxHitPoints: total,
+                    currentHitPoints: total,
                   }))
                 }}
               >
                 Roll HP
               </button>
               <small>Current value: {vitals.maxHitPoints}</small>
+              {hpRollDisplay.length > 0 && (
+                <small style={{ display: 'block', marginTop: '0.25rem' }}>
+                  Rolls: {hpRollDisplay.map((r, i) => (i === 0 ? `Lv1: ${r}` : `Lv${i + 1}: ${r}`)).join(', ')}
+                </small>
+              )}
             </div>
           )}
         </div>

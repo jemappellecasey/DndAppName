@@ -52,7 +52,6 @@ export default function CharactersPage(props: Props) {
             <button onClick={() => props.onViewCharacter(character.characterId)}>View</button>
             <button onClick={() => props.onArchiveCharacter(character.characterId)}>Archive</button>
             <button onClick={() => props.onDuplicateCharacter(character.characterId)}>Duplicate</button>
-            <button onClick={() => props.onLoadHistory(character.characterId)}>View activity</button>
           </li>
         ))}
       </ul>
