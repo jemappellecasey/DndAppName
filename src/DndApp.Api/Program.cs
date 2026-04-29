@@ -837,6 +837,35 @@ app.MapPost(
         return result is null ? Results.NotFound() : Results.Ok(result);
     });
 
+app.MapPost(
+    "/characters/reorder",
+    async (ReorderCharactersRequest request, AppDbContext db, CancellationToken cancellationToken) =>
+    {
+        // Reorder characters based on the provided ID order
+        // This persists the user's custom sort order from drag-and-drop
+        var characters = await db.CharacterRecords
+            .Where(c => request.CharacterIds.Contains(c.CharacterId))
+            .ToListAsync(cancellationToken);
+
+        if (characters.Count != request.CharacterIds.Count)
+        {
+            return Results.BadRequest(new { error = "One or more character IDs not found" });
+        }
+
+        // Update DisplayOrder based on position in the provided array
+        for (int i = 0; i < request.CharacterIds.Count; i++)
+        {
+            var character = characters.FirstOrDefault(c => c.CharacterId == request.CharacterIds[i]);
+            if (character != null)
+            {
+                character.DisplayOrder = i;
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
+    });
+
 app.MapGet(
     "/characters/{characterId:guid}/history",
     async (Guid characterId, ICharacterWizardService wizardService, CancellationToken cancellationToken) =>

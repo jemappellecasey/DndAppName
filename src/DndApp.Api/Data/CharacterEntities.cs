@@ -52,6 +52,7 @@ public sealed class CharacterRecordEntity
     public bool MixedModeEnabled { get; set; }
     public string OverlaySourcesJson { get; set; } = "[]";
     public bool IsArchived { get; set; }
+    public int DisplayOrder { get; set; } = 0;
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }

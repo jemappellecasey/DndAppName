@@ -58,6 +58,14 @@ export default function CharactersPage(props: Props) {
     newOrder.splice(targetIndex, 0, draggedChar)
     setOrderedCharacters(newOrder)
     setDraggedIndex(null)
+
+    // Persist the new order to backend
+    const characterIds = newOrder.map(c => c.characterId)
+    fetch('/characters/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ characterIds })
+    }).catch(err => console.error('Failed to save character order:', err))
   }
 
   return (

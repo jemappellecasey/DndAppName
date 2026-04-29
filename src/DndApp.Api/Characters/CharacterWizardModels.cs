@@ -57,6 +57,8 @@ public sealed record UpdateCharacterRequest(string? CharacterName);
 
 public sealed record DuplicateCharacterRequest(string? NameSuffix);
 
+public sealed record ReorderCharactersRequest(IReadOnlyList<string> CharacterIds);
+
 public sealed record CharacterRevisionEntry(
     DateTimeOffset TimestampUtc,
     string Action,
