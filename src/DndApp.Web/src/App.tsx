@@ -3256,7 +3256,11 @@ function App() {
                 <button onClick={() => void handleLoadRecommendedSpells(entry.moduleId, entry.className, entry.level)} disabled={!currentCharacterId}>
                   See recommended spells for this class
                 </button>
-                {recommendedSpellsByClass[entry.moduleId] && <small>{recommendedSpellsByClass[entry.moduleId]}</small>}
+                {recommendedSpellsByClass[entry.moduleId] && (
+                  <div style={{ backgroundColor: '#f0f0f0', padding: '8px', borderRadius: '4px', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
+                    <small style={{ display: 'block', lineHeight: '1.5' }}>{recommendedSpellsByClass[entry.moduleId]}</small>
+                  </div>
+                )}
               </div>
             ))}
           </div>
