@@ -445,7 +445,7 @@ function App() {
   const [selectedCatalogQuantity, setSelectedCatalogQuantity] = useState(1)
   const [purchaseFromCurrencyMode, setPurchaseFromCurrencyMode] = useState(false)
   const [inventoryState, setInventoryState] = useState<CharacterInventoryState | null>(null)
-  const [itemDetailsModal, setItemDetailsModal] = useState<{ isOpen: boolean; itemId: string }>({ isOpen: false, itemId: '' })
+  const [detailsModal, setDetailsModal] = useState<{ isOpen: boolean; type: 'item' | 'module'; id: string }>({ isOpen: false, type: 'item', id: '' })
   const [currencyState, setCurrencyState] = useState<CharacterCurrencyData | null>(null)
   const [currencyDraft, setCurrencyDraft] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 })
   const [currencyConvert, setCurrencyConvert] = useState({ fromDenomination: 'gp', toDenomination: 'sp', amount: 1 })
@@ -2939,17 +2939,27 @@ function App() {
         </div>
         <div className="grid" hidden={newCharacterStep !== 2}>
           <label htmlFor="main-class-module-setup">Primary class</label>
-          <select id="main-class-module-setup" value={effectiveSelectedClassModuleId} onChange={(e) => handlePrimaryClassChange(e.target.value)}>
-            {mainClassOptions.length === 0 ? (
-              <option value="">No class modules found in DB</option>
-            ) : (
-              mainClassOptions.map((item) => (
-                <option key={item.moduleId} value={item.moduleId}>
-                  {getDisplayClassName(item.className)} ({item.sourceCode})
-                </option>
-              ))
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <select id="main-class-module-setup" value={effectiveSelectedClassModuleId} onChange={(e) => handlePrimaryClassChange(e.target.value)} style={{ flex: 1 }}>
+              {mainClassOptions.length === 0 ? (
+                <option value="">No class modules found in DB</option>
+              ) : (
+                mainClassOptions.map((item) => (
+                  <option key={item.moduleId} value={item.moduleId}>
+                    {getDisplayClassName(item.className)} ({item.sourceCode})
+                  </option>
+                ))
+              )}
+            </select>
+            {effectiveSelectedClassModuleId && (
+              <button
+                onClick={() => setDetailsModal({ isOpen: true, type: 'module', id: effectiveSelectedClassModuleId })}
+                style={{ padding: '8px 12px' }}
+              >
+                ℹ️ Info
+              </button>
             )}
-          </select>
+          </div>
           <label htmlFor="primary-class-level-setup">Primary class level</label>
           <input
             id="primary-class-level-setup"
@@ -2961,17 +2971,27 @@ function App() {
             placeholder="Primary class level"
           />
           <label htmlFor="race-module">Race / species</label>
-          <select id="race-module" value={effectiveSelectedRaceModuleId} onChange={(e) => handleRaceModuleChange(e.target.value)}>
-            {raceOptions.length === 0 ? (
-              <option value="">No race/species modules found</option>
-            ) : (
-              raceOptions.map((item) => (
-                <option key={item.moduleId} value={item.moduleId}>
-                  {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, totalCharacterLevel).length > 0 ? ' - incompatible' : ''}
-                </option>
-              ))
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <select id="race-module" value={effectiveSelectedRaceModuleId} onChange={(e) => handleRaceModuleChange(e.target.value)} style={{ flex: 1 }}>
+              {raceOptions.length === 0 ? (
+                <option value="">No race/species modules found</option>
+              ) : (
+                raceOptions.map((item) => (
+                  <option key={item.moduleId} value={item.moduleId}>
+                    {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, totalCharacterLevel).length > 0 ? ' - incompatible' : ''}
+                  </option>
+                ))
+              )}
+            </select>
+            {effectiveSelectedRaceModuleId && (
+              <button
+                onClick={() => setDetailsModal({ isOpen: true, type: 'module', id: effectiveSelectedRaceModuleId })}
+                style={{ padding: '8px 12px' }}
+              >
+                ℹ️ Info
+              </button>
             )}
-          </select>
+          </div>
           <label htmlFor="subrace-module">Subrace (if available)</label>
           <select id="subrace-module" value={effectiveSelectedSubraceModuleId} onChange={(e) => setSelectedSubraceModuleId(e.target.value)}>
             <option value="">None</option>
@@ -2985,17 +3005,27 @@ function App() {
             <small>No linked subraces were found in the catalog for this race.</small>
           )}
           <label htmlFor="background-module">Background / origin</label>
-          <select id="background-module" value={effectiveSelectedBackgroundModuleId} onChange={(e) => setSelectedBackgroundModuleId(e.target.value)}>
-            {backgroundOptions.length === 0 ? (
-              <option value="">No background/origin modules found</option>
-            ) : (
-              backgroundOptions.map((item) => (
-                <option key={item.moduleId} value={item.moduleId}>
-                  {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, totalCharacterLevel).length > 0 ? ' - incompatible' : ''}
-                </option>
-              ))
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <select id="background-module" value={effectiveSelectedBackgroundModuleId} onChange={(e) => setSelectedBackgroundModuleId(e.target.value)} style={{ flex: 1 }}>
+              {backgroundOptions.length === 0 ? (
+                <option value="">No background/origin modules found</option>
+              ) : (
+                backgroundOptions.map((item) => (
+                  <option key={item.moduleId} value={item.moduleId}>
+                    {item.displayName} ({item.sourceCode}){moduleCompatibilityIssues(item, totalCharacterLevel).length > 0 ? ' - incompatible' : ''}
+                  </option>
+                ))
+              )}
+            </select>
+            {effectiveSelectedBackgroundModuleId && (
+              <button
+                onClick={() => setDetailsModal({ isOpen: true, type: 'module', id: effectiveSelectedBackgroundModuleId })}
+                style={{ padding: '8px 12px' }}
+              >
+                ℹ️ Info
+              </button>
             )}
-          </select>
+          </div>
           <label htmlFor="multiclass-module">Multiclass option</label>
           <select id="multiclass-module" value={secondaryClassModuleId} onChange={(e) => setSecondaryClassModuleId(e.target.value)}>
             <option value="">Add multiclass option...</option>
@@ -3593,7 +3623,7 @@ function App() {
                     </div>
                   )}
                   <button
-                    onClick={() => setItemDetailsModal({ isOpen: true, itemId: selectedItem.itemId })}
+                    onClick={() => setDetailsModal({ isOpen: true, type: 'item', id: selectedItem.itemId })}
                     style={{ marginTop: '8px' }}
                   >
                     Details
@@ -3657,7 +3687,7 @@ function App() {
           )}
         </>
       )}
-      {itemDetailsModal.isOpen && (
+      {detailsModal.isOpen && (
         <div
           style={{
             position: 'fixed',
@@ -3671,7 +3701,7 @@ function App() {
             alignItems: 'center',
             zIndex: 1000,
           }}
-          onClick={() => setItemDetailsModal({ isOpen: false, itemId: '' })}
+          onClick={() => setDetailsModal({ isOpen: false, type: 'item', id: '' })}
         >
           <div
             style={{
@@ -3684,8 +3714,8 @@ function App() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {(() => {
-              const item = itemCatalog.find((i) => i.itemId === itemDetailsModal.itemId)
+            {detailsModal.type === 'item' && (() => {
+              const item = itemCatalog.find((i) => i.itemId === detailsModal.id)
               if (!item) {
                 return <p>Item not found</p>
               }
@@ -3718,15 +3748,51 @@ function App() {
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                    <button onClick={() => setItemDetailsModal({ isOpen: false, itemId: '' })}>Close</button>
+                    <button onClick={() => setDetailsModal({ isOpen: false, type: 'item', id: '' })}>Close</button>
                     {selectedCatalogItemId === item.itemId && (
                       <button onClick={() => {
                         void handleAddItemFromCatalog()
-                        setItemDetailsModal({ isOpen: false, itemId: '' })
+                        setDetailsModal({ isOpen: false, type: 'item', id: '' })
                       }}>
                         Add to Inventory
                       </button>
                     )}
+                  </div>
+                </div>
+              )
+            })()}
+            {detailsModal.type === 'module' && (() => {
+              const module = moduleCatalog.find((m) => m.moduleId === detailsModal.id)
+              if (!module) {
+                return <p>Item not found</p>
+              }
+              return (
+                <div>
+                  <h2 style={{ marginTop: 0 }}>{module.displayName}</h2>
+                  <div style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #ddd' }}>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Type:</strong> {module.moduleType}
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Source:</strong> {module.sourceCode}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '15px' }}>
+                    <strong>Details:</strong>
+                    <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+                      {module.abilityBonuses && Object.entries(module.abilityBonuses).length > 0 && (
+                        <li>Ability Bonuses: {Object.entries(module.abilityBonuses).map(([k, v]) => `${k} +${v}`).join(', ')}</li>
+                      )}
+                      {module.fixedSkillProficiencies && module.fixedSkillProficiencies.length > 0 && (
+                        <li>Skill Proficiencies: {module.fixedSkillProficiencies.join(', ')}</li>
+                      )}
+                      {module.walkingSpeed !== null && module.walkingSpeed !== undefined && (
+                        <li>Walking Speed: {module.walkingSpeed} ft</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setDetailsModal({ isOpen: false, type: 'item', id: '' })}>Close</button>
                   </div>
                 </div>
               )
