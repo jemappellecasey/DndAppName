@@ -3659,11 +3659,11 @@ function App() {
                 {item.requiresAttunement ? 'requires attunement' : 'no attunement'} | {item.isEquipped ? 'equipped' : 'unequipped'} |{' '}
                 {item.isAttuned ? 'attuned' : 'not attuned'}
               </span>
-              {item.isWeapon && (
-                <small>
-                  weapon: {item.damageDice} using {item.weaponAbility || 'Strength'} (atk bonus {item.attackBonus}, dmg bonus {item.damageBonus})
-                </small>
-              )}
+               {item.isWeapon && (
+                 <small>
+                   weapon: {item.damageDice} using {item.weaponAbility || 'Strength'} (atk bonus {item.attackBonus >= 0 ? '+' : ''}{item.attackBonus}, dmg {item.damageDice} + {abilityModifier(totalAbilityScores[item.weaponAbility as AbilityName] ?? 10) >= 0 ? '+' : ''}{abilityModifier(totalAbilityScores[item.weaponAbility as AbilityName] ?? 10)} (ability){item.damageBonus !== 0 ? ` + ${item.damageBonus >= 0 ? '+' : ''}${item.damageBonus} (item)` : ''})
+                 </small>
+               )}
               <div className="row">
                 <button
                   onClick={() => void handleUpdateInventoryItem(item.inventoryItemId, { isEquipped: !item.isEquipped })}
