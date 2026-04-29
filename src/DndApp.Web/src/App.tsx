@@ -3642,6 +3642,14 @@ function App() {
             Current purse: {currencyState.cp} cp, {currencyState.sp} sp, {currencyState.ep} ep, {currencyState.gp} gp, {currencyState.pp} pp
           </small>
         )}
+        {inventoryState && (
+          <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '4px', border: '1px solid #ddd' }}>
+            <strong>Attunement Status:</strong> {inventoryState.activeAttunementCount}/{inventoryState.attunementCap} items attuned
+            {inventoryState.activeAttunementCount >= inventoryState.attunementCap && (
+              <span style={{ color: '#d9534f', marginLeft: '10px' }}>⚠️ Attunement limit reached</span>
+            )}
+          </div>
+        )}
         <ul className="inventory-list">
           {(inventoryState?.items ?? []).map((item) => (
             <li key={item.inventoryItemId}>
