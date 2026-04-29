@@ -175,7 +175,11 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
 
         var itemStates = inventory.Select(row =>
         {
-            var definition = itemDefinitions[row.ItemDefinitionId];
+            if (!itemDefinitions.TryGetValue(row.ItemDefinitionId, out var definition))
+            {
+                // Skip items with missing definitions
+                return null;
+            }
             var rowEffects = effectsByDefinition.TryGetValue(row.ItemDefinitionId, out var foundEffects)
                 ? foundEffects
                 : Array.Empty<ItemEffectEntity>();
@@ -186,7 +190,7 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
                 IsEquipped: row.IsEquipped,
                 IsAttuned: row.IsAttuned,
                 Effects: rowEffects.Select(MapEffect).ToArray());
-        }).ToArray();
+        }).Where(x => x is not null).Cast<CharacterItemState>().ToArray();
 
         var updateResult = _pipeline.UpdateItemState(new UpdateInventoryItemStateRequest(
             BaseStats: BuildBaseStats(),
@@ -265,7 +269,11 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
 
         var itemStates = inventory.Select(row =>
         {
-            var definition = definitions[row.ItemDefinitionId];
+            if (!definitions.TryGetValue(row.ItemDefinitionId, out var definition))
+            {
+                // Skip items with missing definitions
+                return null;
+            }
             var rowEffects = effectsByDefinition.TryGetValue(row.ItemDefinitionId, out var foundEffects)
                 ? foundEffects
                 : Array.Empty<ItemEffectEntity>();
@@ -276,26 +284,31 @@ public sealed class CharacterInventoryService : ICharacterInventoryService
                 IsEquipped: row.IsEquipped,
                 IsAttuned: row.IsAttuned,
                 Effects: rowEffects.Select(MapEffect).ToArray());
-        }).ToArray();
+        }).Where(x => x is not null).Cast<CharacterItemState>().ToArray();
 
         var pipelineResult = _pipeline.ApplyEffects(new ApplyItemEffectsRequest(BuildBaseStats(), itemStates));
         var activeAttunementCount = itemStates.Count(x => x.RequiresAttunement && x.IsEquipped && x.IsAttuned);
-        var inventoryRows = itemStates.Select(x => new CharacterInventoryItemData(
-            x.ItemId,
-            inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId,
-            x.ItemName,
-            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].ItemType,
-            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].GoldValue,
-            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].Weight,
-            inventory.Single(row => row.InventoryItemId == x.ItemId).Quantity,
-            x.RequiresAttunement,
-            x.IsEquipped,
-            x.IsAttuned,
-            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].IsWeapon,
-            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].DamageDice,
-            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].WeaponAbility,
-            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].AttackBonus,
-            definitions[inventory.Single(row => row.InventoryItemId == x.ItemId).ItemDefinitionId].DamageBonus)).ToArray();
+        var inventoryRows = itemStates.Select(x =>
+        {
+            var inventoryRow = inventory.Single(row => row.InventoryItemId == x.ItemId);
+            var definition = definitions[inventoryRow.ItemDefinitionId];
+            return new CharacterInventoryItemData(
+                x.ItemId,
+                inventoryRow.ItemDefinitionId,
+                x.ItemName,
+                definition.ItemType,
+                definition.GoldValue,
+                definition.Weight,
+                inventoryRow.Quantity,
+                x.RequiresAttunement,
+                x.IsEquipped,
+                x.IsAttuned,
+                definition.IsWeapon,
+                definition.DamageDice,
+                definition.WeaponAbility,
+                definition.AttackBonus,
+                definition.DamageBonus);
+        }).ToArray();
 
         return new CharacterInventoryState(
             characterId,
