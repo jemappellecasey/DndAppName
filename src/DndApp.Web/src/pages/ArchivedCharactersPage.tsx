@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { CharacterSummary } from '../types'
 
 type Props = {
@@ -15,7 +15,15 @@ type Props = {
 
 export default function ArchivedCharactersPage(props: Props) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-  const [orderedCharacters, setOrderedCharacters] = useState<CharacterSummary[]>(props.archivedCharacters)
+  const [orderedCharacters, setOrderedCharacters] = useState<CharacterSummary[]>([])
+
+  // Sort archived characters by updated date (most recent/archive date first) - memoized to sync with prop changes
+  useMemo(() => {
+    const sorted = [...props.archivedCharacters].sort(
+      (a, b) => new Date(b.updatedAtUtc).getTime() - new Date(a.updatedAtUtc).getTime()
+    )
+    setOrderedCharacters(sorted)
+  }, [props.archivedCharacters])
 
   function handleDragStart(index: number) {
     setDraggedIndex(index)
@@ -48,7 +56,7 @@ export default function ArchivedCharactersPage(props: Props) {
         <button onClick={props.onBackToCharacters}>Back to active characters</button>
       </div>
       <small style={{ color: '#666', marginBottom: '8px', display: 'block' }}>
-        Drag and drop characters to reorder them
+        Characters are sorted by archive date (most recent first). Drag and drop to reorder them.
       </small>
       <ul className="list">
         {orderedCharacters.map((character, index) => (
@@ -66,6 +74,7 @@ export default function ArchivedCharactersPage(props: Props) {
           >
             <button onClick={() => props.onSelectCharacter(character.characterId)}>{character.characterName}</button>
             <span className="ruleset-badge">{props.rulesetLabel(character.baseRuleSystem)}</span>
+            <small>{new Date(character.updatedAtUtc).toLocaleString()}</small>
             <button onClick={() => props.onViewCharacter(character.characterId)}>View</button>
             <button onClick={() => props.onRestoreCharacter(character.characterId)}>Restore</button>
             <button onClick={() => props.onDeleteCharacter(character.characterId)}>Delete permanently</button>

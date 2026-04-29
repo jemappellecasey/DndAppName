@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { CharacterHistoryEntry, CharacterSummary } from '../types'
 
 type Props = {
@@ -21,7 +21,15 @@ type Props = {
 
 export default function CharactersPage(props: Props) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-  const [orderedCharacters, setOrderedCharacters] = useState<CharacterSummary[]>(props.characters)
+  const [orderedCharacters, setOrderedCharacters] = useState<CharacterSummary[]>([])
+
+  // Sort characters by creation date (newest first) - memoized to sync with prop changes
+  useMemo(() => {
+    const sorted = [...props.characters].sort(
+      (a, b) => new Date(b.createdAtUtc).getTime() - new Date(a.createdAtUtc).getTime()
+    )
+    setOrderedCharacters(sorted)
+  }, [props.characters])
 
   function mixedModeLabel(character: CharacterSummary) {
     if (!character.mixedModeEnabled) {
@@ -68,7 +76,7 @@ export default function CharactersPage(props: Props) {
         </button>
       </div>
       <small style={{ color: '#666', marginBottom: '8px', display: 'block' }}>
-        Drag and drop characters to reorder them
+        Characters are sorted by creation date (newest first). Drag and drop to reorder them.
       </small>
       <ul className="list">
         {orderedCharacters.map((character, index) => (
