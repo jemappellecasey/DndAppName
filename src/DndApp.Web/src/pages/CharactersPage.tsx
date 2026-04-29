@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { CharacterHistoryEntry, CharacterSummary } from '../types'
 
 type Props = {
@@ -19,12 +20,36 @@ type Props = {
 }
 
 export default function CharactersPage(props: Props) {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [orderedCharacters, setOrderedCharacters] = useState<CharacterSummary[]>(props.characters)
+
   function mixedModeLabel(character: CharacterSummary) {
     if (!character.mixedModeEnabled) {
       return 'Single ruleset'
     }
 
     return character.baseRuleSystem === 'Rules2024' ? 'Plus 2014 content' : 'Plus 2024 content'
+  }
+
+  function handleDragStart(index: number) {
+    setDraggedIndex(index)
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+  }
+
+  function handleDrop(targetIndex: number) {
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null)
+      return
+    }
+
+    const newOrder = [...orderedCharacters]
+    const [draggedChar] = newOrder.splice(draggedIndex, 1)
+    newOrder.splice(targetIndex, 0, draggedChar)
+    setOrderedCharacters(newOrder)
+    setDraggedIndex(null)
   }
 
   return (
@@ -42,9 +67,24 @@ export default function CharactersPage(props: Props) {
           Copy to other ruleset
         </button>
       </div>
+      <small style={{ color: '#666', marginBottom: '8px', display: 'block' }}>
+        Drag and drop characters to reorder them
+      </small>
       <ul className="list">
-        {props.characters.map((character) => (
-          <li key={character.characterId} className={props.selectedCharacterId === character.characterId ? 'selected' : ''}>
+        {orderedCharacters.map((character, index) => (
+          <li
+            key={character.characterId}
+            className={props.selectedCharacterId === character.characterId ? 'selected' : ''}
+            draggable
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={handleDragOver}
+            onDrop={() => handleDrop(index)}
+            style={{
+              cursor: 'grab',
+              opacity: draggedIndex === index ? 0.5 : 1,
+              transition: 'opacity 0.2s',
+            }}
+          >
             <button onClick={() => props.onSelectCharacter(character.characterId)}>{character.characterName}</button>
             <span className="ruleset-badge">{props.rulesetLabel(character.baseRuleSystem)}</span>
             <span className="ruleset-badge">{mixedModeLabel(character)}</span>
