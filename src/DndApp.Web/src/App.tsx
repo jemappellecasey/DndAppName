@@ -2337,9 +2337,9 @@ function App() {
       const lines = [
         `${className} level ${classLevel}: ${result.advisoryMessage}`,
         result.dataGap ?? '',
-        result.recommendedSpells.length > 0
-          ? `Recommendations: ${result.recommendedSpells.map((x) => x.spellName).join(', ')}`
-          : 'Recommendations: none available from curated source.',
+        result.spellSources.length > 0
+          ? `Spell Sources: ${result.spellSources.map((src) => `${src.sourceName} (${src.prepareCount} prepare)`).join(' | ')}`
+          : 'No spell sources available.',
       ].filter((x) => x.trim().length > 0)
       setRecommendedSpellsByClass((prev) => ({ ...prev, [classModuleId]: lines.join('\n') }))
     } catch (e) {
@@ -3288,21 +3288,6 @@ function App() {
           <small>
             Spell source context: {spellOriginNames.size > 0 ? Array.from(spellOriginNames).join(', ') : 'No class/subclass spell list selected'}
           </small>
-          <button
-            onClick={() => {
-              const firstSpell = availableSpellOptions[0]
-              if (!firstSpell) {
-                return
-              }
-              setSpellEntries((prev) => [
-                ...prev,
-                { spellModuleId: firstSpell.moduleId, spellName: firstSpell.displayName, preparationMode: 'Prepared' },
-              ])
-            }}
-            disabled={!currentCharacterId || availableSpellOptions.length === 0}
-          >
-            Add spell
-          </button>
           <button onClick={handleSaveSpells} disabled={!currentCharacterId}>
             Save spells
           </button>

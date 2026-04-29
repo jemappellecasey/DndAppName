@@ -313,11 +313,18 @@ export interface CharacterSpellsData {
   entries: CharacterSpellEntryData[]
 }
 
+export interface SpellSourceGroup {
+  sourceName: string
+  prepareCount: number
+  automaticSpells: CharacterSpellEntryData[]
+  selectableSpells: CharacterSpellEntryData[]
+}
+
 export interface RecommendedSpellsResult {
   characterId: string
   classModuleId: string
   classLevel: number
-  recommendedSpells: CharacterSpellEntryData[]
+  spellSources: SpellSourceGroup[]
   advisoryMessage: string
   dataGap: string | null
 }
