@@ -52,7 +52,7 @@ public sealed class CharacterProgressionServiceTests
     }
 
     [Fact]
-    public async Task RecommendedSpells_ReturnsAdvisoryDataGap_WhenCuratedSourceMissing()
+    public async Task RecommendedSpells_CalculatesWizardPrepCount_BasedOnLevelAndIntMod()
     {
         await using var fixture = await CreateFixtureAsync();
         var characterId = Guid.NewGuid();
@@ -60,24 +60,199 @@ public sealed class CharacterProgressionServiceTests
         {
             CharacterId = characterId.ToString(),
             OwnerUserId = "local:test-owner",
-            CharacterName = "Spells Test",
+            CharacterName = "Wizard Test",
             BaseRuleSystem = "Rules2024",
             BuildMethod = "PointBuy",
             ClassModuleId = "class-wizard",
             ClassName = "Wizard",
-            Level = 1,
-            ProficiencyBonus = 2,
+            Level = 5,
+            ProficiencyBonus = 3,
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        fixture.Db.CharacterAbilityScores.AddRange(
+            new CharacterAbilityScoreEntity { CharacterId = characterId.ToString(), AbilityName = "Intelligence", Score = 16 },
+            new CharacterAbilityScoreEntity { CharacterId = characterId.ToString(), AbilityName = "Wisdom", Score = 10 }
+        );
+        fixture.Db.CharacterClassLevels.Add(new CharacterClassLevelEntity
+        {
+            CharacterId = characterId.ToString(),
+            ClassModuleId = "class-wizard",
+            ClassName = "Wizard",
+            Level = 5,
+            SortOrder = 0,
         });
         await fixture.Db.SaveChangesAsync();
 
         var service = new CharacterProgressionService(fixture.Db);
-        var result = await service.GetRecommendedSpellsAsync(characterId, "class-wizard", 1, CancellationToken.None);
+        var result = await service.GetRecommendedSpellsAsync(characterId, "class-wizard", 5, CancellationToken.None);
         Assert.NotNull(result);
-        Assert.Empty(result.RecommendedSpells);
-        Assert.False(string.IsNullOrWhiteSpace(result.AdvisoryMessage));
-        Assert.False(string.IsNullOrWhiteSpace(result.DataGap));
+        var wizardSource = result.SpellSources.FirstOrDefault(x => x.SourceName == "Wizard Spells");
+        Assert.NotNull(wizardSource);
+        // Wizard: level (5) + INT mod (+3) = 8 spells
+        Assert.Equal(8, wizardSource.PrepareCount);
+    }
+
+    [Fact]
+    public async Task RecommendedSpells_CalculatesClericPrepCount_BasedOnLevelAndWisMod()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var characterId = Guid.NewGuid();
+        fixture.Db.CharacterSheets.Add(new CharacterSheetEntity
+        {
+            CharacterId = characterId.ToString(),
+            OwnerUserId = "local:test-owner",
+            CharacterName = "Cleric Test",
+            BaseRuleSystem = "Rules2024",
+            BuildMethod = "PointBuy",
+            ClassModuleId = "class-cleric",
+            ClassName = "Cleric",
+            Level = 3,
+            ProficiencyBonus = 2,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        fixture.Db.CharacterAbilityScores.AddRange(
+            new CharacterAbilityScoreEntity { CharacterId = characterId.ToString(), AbilityName = "Wisdom", Score = 14 },
+            new CharacterAbilityScoreEntity { CharacterId = characterId.ToString(), AbilityName = "Intelligence", Score = 10 }
+        );
+        fixture.Db.CharacterClassLevels.Add(new CharacterClassLevelEntity
+        {
+            CharacterId = characterId.ToString(),
+            ClassModuleId = "class-cleric",
+            ClassName = "Cleric",
+            Level = 3,
+            SortOrder = 0,
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var service = new CharacterProgressionService(fixture.Db);
+        var result = await service.GetRecommendedSpellsAsync(characterId, "class-cleric", 3, CancellationToken.None);
+        Assert.NotNull(result);
+        var clericSource = result.SpellSources.FirstOrDefault(x => x.SourceName == "Cleric Spells");
+        Assert.NotNull(clericSource);
+        // Cleric: level (3) + WIS mod (+2) = 5 spells
+        Assert.Equal(5, clericSource.PrepareCount);
+    }
+
+    [Fact]
+    public async Task RecommendedSpells_CalculatesBardPrepCount_BasedOnHalfLevelAndChaMod()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var characterId = Guid.NewGuid();
+        fixture.Db.CharacterSheets.Add(new CharacterSheetEntity
+        {
+            CharacterId = characterId.ToString(),
+            OwnerUserId = "local:test-owner",
+            CharacterName = "Bard Test",
+            BaseRuleSystem = "Rules2024",
+            BuildMethod = "PointBuy",
+            ClassModuleId = "class-bard",
+            ClassName = "Bard",
+            Level = 4,
+            ProficiencyBonus = 2,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        fixture.Db.CharacterAbilityScores.AddRange(
+            new CharacterAbilityScoreEntity { CharacterId = characterId.ToString(), AbilityName = "Charisma", Score = 15 },
+            new CharacterAbilityScoreEntity { CharacterId = characterId.ToString(), AbilityName = "Intelligence", Score = 10 }
+        );
+        fixture.Db.CharacterClassLevels.Add(new CharacterClassLevelEntity
+        {
+            CharacterId = characterId.ToString(),
+            ClassModuleId = "class-bard",
+            ClassName = "Bard",
+            Level = 4,
+            SortOrder = 0,
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var service = new CharacterProgressionService(fixture.Db);
+        var result = await service.GetRecommendedSpellsAsync(characterId, "class-bard", 4, CancellationToken.None);
+        Assert.NotNull(result);
+        var bardSource = result.SpellSources.FirstOrDefault(x => x.SourceName == "Bard Spells");
+        Assert.NotNull(bardSource);
+        // Bard: (level + 1) / 2 = (4 + 1) / 2 = 2, + CHA mod (+2) = 4 spells
+        Assert.Equal(4, bardSource.PrepareCount);
+    }
+
+    [Fact]
+    public async Task RecommendedSpells_PaladinRequiresLevel5_BeforeSpellPrep()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var characterId = Guid.NewGuid();
+        fixture.Db.CharacterSheets.Add(new CharacterSheetEntity
+        {
+            CharacterId = characterId.ToString(),
+            OwnerUserId = "local:test-owner",
+            CharacterName = "Paladin Test",
+            BaseRuleSystem = "Rules2024",
+            BuildMethod = "PointBuy",
+            ClassModuleId = "class-paladin",
+            ClassName = "Paladin",
+            Level = 3,
+            ProficiencyBonus = 2,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        fixture.Db.CharacterAbilityScores.AddRange(
+            new CharacterAbilityScoreEntity { CharacterId = characterId.ToString(), AbilityName = "Charisma", Score = 16 }
+        );
+        fixture.Db.CharacterClassLevels.Add(new CharacterClassLevelEntity
+        {
+            CharacterId = characterId.ToString(),
+            ClassModuleId = "class-paladin",
+            ClassName = "Paladin",
+            Level = 3,
+            SortOrder = 0,
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var service = new CharacterProgressionService(fixture.Db);
+        var result = await service.GetRecommendedSpellsAsync(characterId, "class-paladin", 3, CancellationToken.None);
+        Assert.NotNull(result);
+        var paladinSource = result.SpellSources.FirstOrDefault(x => x.SourceName == "Paladin Spells");
+        Assert.Null(paladinSource);
+    }
+
+    [Fact]
+    public async Task RecommendedSpells_SorcererReturnsZeroPrepCount()
+    {
+        await using var fixture = await CreateFixtureAsync();
+        var characterId = Guid.NewGuid();
+        fixture.Db.CharacterSheets.Add(new CharacterSheetEntity
+        {
+            CharacterId = characterId.ToString(),
+            OwnerUserId = "local:test-owner",
+            CharacterName = "Sorcerer Test",
+            BaseRuleSystem = "Rules2024",
+            BuildMethod = "PointBuy",
+            ClassModuleId = "class-sorcerer",
+            ClassName = "Sorcerer",
+            Level = 5,
+            ProficiencyBonus = 3,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        });
+        fixture.Db.CharacterAbilityScores.AddRange(
+            new CharacterAbilityScoreEntity { CharacterId = characterId.ToString(), AbilityName = "Charisma", Score = 16 }
+        );
+        fixture.Db.CharacterClassLevels.Add(new CharacterClassLevelEntity
+        {
+            CharacterId = characterId.ToString(),
+            ClassModuleId = "class-sorcerer",
+            ClassName = "Sorcerer",
+            Level = 5,
+            SortOrder = 0,
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var service = new CharacterProgressionService(fixture.Db);
+        var result = await service.GetRecommendedSpellsAsync(characterId, "class-sorcerer", 5, CancellationToken.None);
+        Assert.NotNull(result);
+        var sorcererSource = result.SpellSources.FirstOrDefault(x => x.SourceName == "Sorcerer Spells");
+        Assert.Null(sorcererSource);
     }
 
     [Fact]

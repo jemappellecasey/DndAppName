@@ -12,11 +12,17 @@ public sealed record CharacterSpellsData(
 public sealed record UpsertCharacterSpellsRequest(
     IReadOnlyList<CharacterSpellEntryData> Entries);
 
+public sealed record SpellSourceGroup(
+    string SourceName,
+    int PrepareCount,
+    IReadOnlyList<CharacterSpellEntryData> AutomaticSpells,
+    IReadOnlyList<CharacterSpellEntryData> SelectableSpells);
+
 public sealed record RecommendedSpellsResult(
     Guid CharacterId,
     string ClassModuleId,
     int ClassLevel,
-    IReadOnlyList<CharacterSpellEntryData> RecommendedSpells,
+    IReadOnlyList<SpellSourceGroup> SpellSources,
     string AdvisoryMessage,
     string? DataGap);
 
