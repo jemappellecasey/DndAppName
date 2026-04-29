@@ -445,6 +445,7 @@ function App() {
   const [selectedCatalogQuantity, setSelectedCatalogQuantity] = useState(1)
   const [purchaseFromCurrencyMode, setPurchaseFromCurrencyMode] = useState(false)
   const [inventoryState, setInventoryState] = useState<CharacterInventoryState | null>(null)
+  const [itemDetailsModal, setItemDetailsModal] = useState<{ isOpen: boolean; itemId: string }>({ isOpen: false, itemId: '' })
   const [currencyState, setCurrencyState] = useState<CharacterCurrencyData | null>(null)
   const [currencyDraft, setCurrencyDraft] = useState({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 })
   const [currencyConvert, setCurrencyConvert] = useState({ fromDenomination: 'gp', toDenomination: 'sp', amount: 1 })
@@ -3571,15 +3572,36 @@ function App() {
           </button>
         </div>
         {effectiveSelectedCatalogItemId && (
-          <small>
+          <div style={{ border: '1px solid #ccc', padding: '10px', marginTop: '10px' }}>
             {(() => {
               const selectedItem = filteredItemCatalog.find((item) => item.itemId === effectiveSelectedCatalogItemId)
               if (!selectedItem) {
-                return 'Select an item to see details.'
+                return <small>Select an item to see details.</small>
               }
-              return `${selectedItem.itemType} | ${selectedItem.rarity} | ${selectedItem.goldValue} gp | ${selectedItem.weight} lb${selectedItem.description ? ` | ${selectedItem.description}` : ''}`
+              return (
+                <div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>{selectedItem.itemName}</strong> - <span style={{ color: '#0066cc' }}><strong>{selectedItem.goldValue} gp</strong></span>
+                  </div>
+                  <small>
+                    {selectedItem.itemType} | {selectedItem.rarity} | {selectedItem.weight} lb
+                    {selectedItem.requiresAttunement && ' | Requires Attunement'}
+                  </small>
+                  {selectedItem.description && (
+                    <div style={{ marginTop: '8px', fontSize: '0.9em' }}>
+                      <em>{selectedItem.description}</em>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setItemDetailsModal({ isOpen: true, itemId: selectedItem.itemId })}
+                    style={{ marginTop: '8px' }}
+                  >
+                    Details
+                  </button>
+                </div>
+              )
             })()}
-          </small>
+          </div>
         )}
         {currencyState && (
           <small>
@@ -3634,6 +3656,83 @@ function App() {
             </>
           )}
         </>
+      )}
+      {itemDetailsModal.isOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setItemDetailsModal({ isOpen: false, itemId: '' })}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              padding: '20px',
+              borderRadius: '8px',
+              maxWidth: '500px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const item = itemCatalog.find((i) => i.itemId === itemDetailsModal.itemId)
+              if (!item) {
+                return <p>Item not found</p>
+              }
+              return (
+                <div>
+                  <h2 style={{ marginTop: 0 }}>{item.itemName}</h2>
+                  <div style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #ddd' }}>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Price:</strong> <span style={{ fontSize: '1.1em', color: '#0066cc' }}>{item.goldValue} gp</span>
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Type:</strong> {item.itemType}
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Rarity:</strong> {item.rarity}
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Weight:</strong> {item.weight} lb
+                    </div>
+                    {item.requiresAttunement && (
+                      <div style={{ marginBottom: '8px', color: '#d9534f' }}>
+                        <strong>⚠️ Requires Attunement</strong>
+                      </div>
+                    )}
+                  </div>
+                  {item.description && (
+                    <div style={{ marginBottom: '15px' }}>
+                      <strong>Description:</strong>
+                      <p style={{ margin: '8px 0 0 0' }}>{item.description}</p>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setItemDetailsModal({ isOpen: false, itemId: '' })}>Close</button>
+                    {selectedCatalogItemId === item.itemId && (
+                      <button onClick={() => {
+                        void handleAddItemFromCatalog()
+                        setItemDetailsModal({ isOpen: false, itemId: '' })
+                      }}>
+                        Add to Inventory
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        </div>
       )}
     </main>
   )
