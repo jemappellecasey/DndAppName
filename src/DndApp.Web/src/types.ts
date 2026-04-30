@@ -367,3 +367,35 @@ export interface AdvancedRulesSnapshotResponse {
   pactMagicTrackedSeparately: boolean
   dataGaps: string[]
 }
+
+export interface CharacterExperienceResponse {
+  characterId: string
+  currentLevel: number
+  totalExperience: number
+  experienceForNextLevel: number
+  experienceTowardNextLevel: number
+  abilityScoreImprovementsUsed: number
+  availableAbilityScoreImprovements: number
+  lastLevelUpAtUtc: string | null
+  updatedAtUtc: string
+}
+
+export interface LevelUpGrantResponse {
+  level: number
+  experienceRequired: number
+  grantsAbilityScoreImprovement: boolean
+  grantsFeatOption: boolean
+  leveledUpAtUtc: string
+}
+
+export interface LevelUpNotificationResponse {
+  characterId: string
+  oldLevel: number
+  newLevel: number
+  levelsGained: number
+  levelUps: LevelUpGrantResponse[]
+}
+
+export interface AwardExperiencePayload {
+  experienceAmount: number
+}

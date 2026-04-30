@@ -1,7 +1,9 @@
 import type {
   AdvancedRulesSnapshotResponse,
   AdvantageState,
+  AwardExperiencePayload,
   CharacterBuildData,
+  CharacterExperienceResponse,
   CharacterHistoryEntry,
   CharacterInventoryState,
   CharacterResourcesData,
@@ -16,6 +18,7 @@ import type {
   ContentSourceCatalogItem,
   ItemCatalogItem,
   LocalSession,
+  LevelUpNotificationResponse,
   ModuleCatalogItem,
   PersistedComputeCheckPayload,
   RuleModuleSelection,
@@ -384,4 +387,25 @@ export function computePersistedAttack(
 
 export function getAdvancedRulesSnapshot(characterId: string) {
   return request<AdvancedRulesSnapshotResponse>(`/characters/${characterId}/compute/advanced-rules`)
+}
+
+export function getCharacterExperience(characterId: string) {
+  return request<CharacterExperienceResponse>(`/characters/${characterId}/experience`)
+}
+
+export function awardCharacterExperience(characterId: string, experienceAmount: number) {
+  return request<LevelUpNotificationResponse>(`/characters/${characterId}/experience`, {
+    method: 'POST',
+    body: JSON.stringify({ experienceAmount }),
+  })
+}
+
+export function getCharacterExperienceProgression(characterId: string) {
+  return request<Array<{
+    level: number
+    experienceRequired: number
+    leveledUpAt: string
+    grantedAbilityScoreImprovement: boolean
+    grantedFeatOption: boolean
+  }>>(`/characters/${characterId}/experience/progression`)
 }
