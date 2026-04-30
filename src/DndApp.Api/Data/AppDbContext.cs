@@ -47,12 +47,14 @@ public sealed class AppDbContext : DbContext
     public DbSet<CharacterResourcePoolEntity> CharacterResourcePools => Set<CharacterResourcePoolEntity>();
     public DbSet<CharacterVitalsEntity> CharacterVitals => Set<CharacterVitalsEntity>();
     public DbSet<UserAccountEntity> UserAccounts => Set<UserAccountEntity>();
-     public DbSet<UserSessionEntity> UserSessions => Set<UserSessionEntity>();
+      public DbSet<UserSessionEntity> UserSessions => Set<UserSessionEntity>();
     public DbSet<IngestionRunEntity> IngestionRuns => Set<IngestionRunEntity>();
     public DbSet<ReviewQueueEntity> ReviewQueue => Set<ReviewQueueEntity>();
     public DbSet<CorrectionOverrideEntity> CorrectionOverrides => Set<CorrectionOverrideEntity>();
     public DbSet<ImportReportEntity> ImportReports => Set<ImportReportEntity>();
     public DbSet<SkillProficiencySourceEntity> SkillProficiencySources => Set<SkillProficiencySourceEntity>();
+    public DbSet<CharacterExperienceEntity> CharacterExperience => Set<CharacterExperienceEntity>();
+    public DbSet<CharacterLevelProgressionEntity> CharacterLevelProgression => Set<CharacterLevelProgressionEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

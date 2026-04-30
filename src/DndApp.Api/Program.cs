@@ -52,6 +52,7 @@ builder.Services.AddScoped<ICharacterComputationService, CharacterComputationSer
 builder.Services.AddScoped<ICharacterProgressionService, CharacterProgressionService>();
 builder.Services.AddScoped<IRuleValidationService, RuleValidationService>();
 builder.Services.AddScoped<ISkillProficiencyService, SkillProficiencyService>();
+builder.Services.AddScoped<IExperienceService, ExperienceService>();
 
 var app = builder.Build();
 
