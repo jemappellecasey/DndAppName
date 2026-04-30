@@ -38,6 +38,8 @@ import {
   upsertCharacterBuild,
   upsertCharacterSpells,
   upsertCharacterVitals,
+  saveLevelUpChoice,
+  confirmLevelUpChoices,
 } from './api'
 import type {
   AbilityName,
@@ -62,6 +64,7 @@ import type {
 import CharactersPage from './pages/CharactersPage'
 import ArchivedCharactersPage from './pages/ArchivedCharactersPage'
 import SettingsPage from './pages/SettingsPage'
+import LevelUpModal from './components/LevelUpModal'
 
 const ABILITIES: AbilityName[] = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
 
@@ -451,6 +454,9 @@ function App() {
   const [currencyConvert, setCurrencyConvert] = useState({ fromDenomination: 'gp', toDenomination: 'sp', amount: 1 })
   const [usePlatinumConsolidation, setUsePlatinumConsolidation] = useState(false)
   const [startingEquipmentMode, setStartingEquipmentMode] = useState<'package' | 'gold-only'>('package')
+
+  const [levelUpModalOpen, setLevelUpModalOpen] = useState(false)
+  const [pendingLevelUpChoices, setPendingLevelUpChoices] = useState<Array<{ level: number; choiceType: 'ASI' | 'Feat' }>>([])
 
   const [spellEntries, setSpellEntries] = useState<CharacterSpellEntryData[]>([])
   const [recommendedSpellsByClass, setRecommendedSpellsByClass] = useState<Record<string, string>>({})
@@ -2421,6 +2427,31 @@ function App() {
     .filter((resource) => resource.resourceKey.toLowerCase().includes('slot'))
     .reduce((sum, resource) => sum + Math.max(0, resource.maxValue), 0)
 
+  const handleSaveLevelUpChoice = async (
+    level: number,
+    choiceType: 'ASI' | 'Feat',
+    chosenAbility?: string,
+    chosenFeatId?: string,
+  ) => {
+    if (!selectedCharacterId) return
+    try {
+      await saveLevelUpChoice(selectedCharacterId, level, choiceType, chosenAbility, chosenFeatId)
+    } catch (err) {
+      throw err
+    }
+  }
+
+  const handleConfirmLevelUpChoices = async (level: number) => {
+    if (!selectedCharacterId) return
+    try {
+      await confirmLevelUpChoices(selectedCharacterId, level)
+      setLevelUpModalOpen(false)
+      setPendingLevelUpChoices([])
+    } catch (err) {
+      throw err
+    }
+  }
+
   return (
     <main className="layout">
       {!isNewCharacterRoute && (
@@ -3812,6 +3843,13 @@ function App() {
           </div>
         </div>
       )}
+      <LevelUpModal
+        isOpen={levelUpModalOpen}
+        pendingChoices={pendingLevelUpChoices}
+        onSaveChoice={handleSaveLevelUpChoice}
+        onConfirmChoices={handleConfirmLevelUpChoices}
+        onClose={() => setLevelUpModalOpen(false)}
+      />
     </main>
   )
 }
