@@ -399,3 +399,24 @@ export interface LevelUpNotificationResponse {
 export interface AwardExperiencePayload {
   experienceAmount: number
 }
+
+export interface LevelUpChoice {
+  id: string
+  level: number
+  choiceType: 'ASI' | 'Feat'
+  chosenAbility?: string
+  chosenFeatId?: string
+  isConfirmed: boolean
+  createdAt: string
+}
+
+export interface SaveLevelUpChoicePayload {
+  level: number
+  choiceType: 'ASI' | 'Feat'
+  chosenAbility?: string
+  chosenFeatId?: string
+}
+
+export interface ConfirmLevelUpChoicesPayload {
+  level: number
+}

@@ -150,4 +150,82 @@ public sealed class ExperienceServiceTests
         // Assert
         Assert.Equal(355000, nextXp); // Max level, cap at 355000
     }
+
+    [Fact]
+    public void CalculateLevelFromMilestone_With0XP_ReturnsLevel1()
+    {
+        // Arrange
+        var service = new ExperienceService();
+
+        // Act
+        var level = service.CalculateLevelFromMilestone(0);
+
+        // Assert
+        Assert.Equal(1, level);
+    }
+
+    [Fact]
+    public void CalculateLevelFromMilestone_With3999XP_ReturnsLevel1()
+    {
+        // Arrange
+        var service = new ExperienceService();
+
+        // Act
+        var level = service.CalculateLevelFromMilestone(3999);
+
+        // Assert
+        Assert.Equal(1, level);
+    }
+
+    [Fact]
+    public void CalculateLevelFromMilestone_With4000XP_ReturnsLevel2()
+    {
+        // Arrange
+        var service = new ExperienceService();
+
+        // Act
+        var level = service.CalculateLevelFromMilestone(4000);
+
+        // Assert
+        Assert.Equal(2, level);
+    }
+
+    [Fact]
+    public void CalculateLevelFromMilestone_With16000XP_ReturnsLevel5()
+    {
+        // Arrange
+        var service = new ExperienceService();
+
+        // Act
+        var level = service.CalculateLevelFromMilestone(16000);
+
+        // Assert
+        Assert.Equal(5, level);
+    }
+
+    [Fact]
+    public void GetExperienceForNextMilestone_At0XP_Returns4000()
+    {
+        // Arrange
+        var service = new ExperienceService();
+
+        // Act
+        var nextXp = service.GetExperienceForNextMilestone(0);
+
+        // Assert
+        Assert.Equal(4000, nextXp);
+    }
+
+    [Fact]
+    public void GetExperienceForNextMilestone_At8000XP_Returns12000()
+    {
+        // Arrange
+        var service = new ExperienceService();
+
+        // Act
+        var nextXp = service.GetExperienceForNextMilestone(8000);
+
+        // Assert
+        Assert.Equal(12000, nextXp);
+    }
 }

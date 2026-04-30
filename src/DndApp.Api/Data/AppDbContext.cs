@@ -55,6 +55,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<SkillProficiencySourceEntity> SkillProficiencySources => Set<SkillProficiencySourceEntity>();
     public DbSet<CharacterExperienceEntity> CharacterExperience => Set<CharacterExperienceEntity>();
     public DbSet<CharacterLevelProgressionEntity> CharacterLevelProgression => Set<CharacterLevelProgressionEntity>();
+    public DbSet<CharacterLevelUpChoiceEntity> CharacterLevelUpChoices => Set<CharacterLevelUpChoiceEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -738,6 +739,47 @@ public sealed class AppDbContext : DbContext
             entity.HasOne<IngestionRunEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.IngestionRunId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterExperienceEntity>(entity =>
+        {
+            entity.ToTable("character_experience");
+            entity.HasKey(x => x.CharacterId);
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterLevelProgressionEntity>(entity =>
+        {
+            entity.ToTable("character_level_progression");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.FeatOrASIChosenJson).HasColumnType("TEXT");
+            entity.HasIndex(x => new { x.CharacterId, x.Level });
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CharacterLevelUpChoiceEntity>(entity =>
+        {
+            entity.ToTable("character_levelup_choice");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.CharacterId).HasMaxLength(36);
+            entity.Property(x => x.ChoiceType).HasMaxLength(40);
+            entity.Property(x => x.ChosenAbility).HasMaxLength(24);
+            entity.Property(x => x.ChosenFeatId).HasMaxLength(64);
+            entity.HasIndex(x => new { x.CharacterId, x.Level, x.IsConfirmed });
+            entity.HasOne<CharacterSheetEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CharacterId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

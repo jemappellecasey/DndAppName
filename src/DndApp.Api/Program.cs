@@ -1249,7 +1249,104 @@ app.MapGet(
         return Results.Ok(progression);
     });
 
+app.MapPost(
+    "/characters/{characterId:guid}/level-up-choices",
+    async (Guid characterId, LevelUpChoiceConfirmRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, IExperienceService experienceService, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        try
+        {
+            // Confirm all choices for this level
+            await experienceService.ConfirmLevelUpChoicesAsync(characterId.ToString(), request.Level, db);
+            return Results.Ok(new { message = "Choices confirmed successfully" });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return Results.StatusCode(500);
+        }
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/level-up-choices/save",
+    async (Guid characterId, SaveLevelUpChoiceRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, IExperienceService experienceService, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        try
+        {
+            var choice = await experienceService.SaveLevelUpChoiceAsync(
+                characterId.ToString(),
+                request.Level,
+                request.ChoiceType,
+                request.ChosenAbility,
+                request.ChosenFeatId,
+                db);
+
+            return Results.Ok(new
+            {
+                id = choice.Id,
+                level = choice.Level,
+                choiceType = choice.ChoiceType,
+                chosenAbility = choice.ChosenAbility,
+                chosenFeatId = choice.ChosenFeatId,
+                isConfirmed = choice.IsConfirmed
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return Results.StatusCode(500);
+        }
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/level-up-choices",
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, IExperienceService experienceService, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        var pendingChoices = await experienceService.GetPendingChoicesAsync(characterId.ToString(), db);
+        return Results.Ok(pendingChoices.Select(x => new
+        {
+            id = x.Id,
+            level = x.Level,
+            choiceType = x.ChoiceType,
+            chosenAbility = x.ChosenAbility,
+            chosenFeatId = x.ChosenFeatId,
+            isConfirmed = x.IsConfirmed,
+            createdAt = x.CreatedAtUtc
+        }).ToList());
+    });
+
 app.Run();
+
+public sealed record LevelUpChoiceConfirmRequest(int Level);
+
+public sealed record SaveLevelUpChoiceRequest(
+    int Level,
+    string ChoiceType,
+    string? ChosenAbility,
+    string? ChosenFeatId);
 
 public sealed record ClassCatalogItem(
     string ModuleId,

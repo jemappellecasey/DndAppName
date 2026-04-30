@@ -25,3 +25,16 @@ public sealed class CharacterLevelProgressionEntity
     public bool GrantedFeatOption { get; set; }
     public string? FeatOrASIChosenJson { get; set; }
 }
+
+public sealed class CharacterLevelUpChoiceEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string CharacterId { get; set; } = string.Empty;
+    public int Level { get; set; }
+    public string ChoiceType { get; set; } = string.Empty; // "AbilityScoreImprovement" or "Feat"
+    public string? ChosenAbility { get; set; } // "Strength", "Dexterity", etc.
+    public string? ChosenFeatId { get; set; } // Feat module ID
+    public bool IsConfirmed { get; set; } = false;
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset? ConfirmedAtUtc { get; set; }
+}

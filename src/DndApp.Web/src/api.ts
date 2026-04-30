@@ -1,7 +1,6 @@
 import type {
   AdvancedRulesSnapshotResponse,
   AdvantageState,
-  AwardExperiencePayload,
   CharacterBuildData,
   CharacterExperienceResponse,
   CharacterHistoryEntry,
@@ -408,4 +407,48 @@ export function getCharacterExperienceProgression(characterId: string) {
     grantedAbilityScoreImprovement: boolean
     grantedFeatOption: boolean
   }>>(`/characters/${characterId}/experience/progression`)
+}
+
+export function getPendingLevelUpChoices(characterId: string) {
+  return request<Array<{
+    id: string
+    level: number
+    choiceType: 'ASI' | 'Feat'
+    chosenAbility?: string
+    chosenFeatId?: string
+    isConfirmed: boolean
+    createdAt: string
+  }>>(`/characters/${characterId}/level-up-choices`)
+}
+
+export function saveLevelUpChoice(
+  characterId: string,
+  level: number,
+  choiceType: 'ASI' | 'Feat',
+  chosenAbility?: string,
+  chosenFeatId?: string
+) {
+  return request<{
+    id: string
+    level: number
+    choiceType: 'ASI' | 'Feat'
+    chosenAbility?: string
+    chosenFeatId?: string
+    isConfirmed: boolean
+  }>(`/characters/${characterId}/level-up-choices/save`, {
+    method: 'POST',
+    body: JSON.stringify({
+      level,
+      choiceType,
+      chosenAbility,
+      chosenFeatId
+    })
+  })
+}
+
+export function confirmLevelUpChoices(characterId: string, level: number) {
+  return request<{ message: string }>(`/characters/${characterId}/level-up-choices`, {
+    method: 'POST',
+    body: JSON.stringify({ level })
+  })
 }

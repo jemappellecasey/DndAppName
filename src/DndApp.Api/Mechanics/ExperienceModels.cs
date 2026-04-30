@@ -26,3 +26,16 @@ public sealed record LevelUpGrantResponse(
     bool GrantsAbilityScoreImprovement,
     bool GrantsFeatOption,
     DateTimeOffset LeveledUpAtUtc);
+
+public sealed record LevelUpChoiceRequest(
+    int Level,
+    string ChoiceType); // "AbilityScoreImprovement" or "Feat"
+
+public sealed record ConfirmLevelUpChoicesRequest(
+    List<LevelUpChoiceRequest> Choices);
+
+public sealed record LevelUpChoiceResponse(
+    int Level,
+    string ChoiceType,
+    string? ChosenAbility = null, // "Strength", "Dexterity", etc. if ASI
+    string? ChosenFeatId = null); // Feat module ID if Feat

@@ -48,6 +48,27 @@ public interface IExperienceService
     /// Award XP and return response model
     /// </summary>
     Task<LevelUpNotificationResponse?> AwardExperienceResponseAsync(string characterId, long xpToAward, AppDbContext db);
+
+    /// <summary>
+    /// Store or update a pending level-up choice (feat or ASI)
+    /// </summary>
+    Task<CharacterLevelUpChoiceEntity> SaveLevelUpChoiceAsync(string characterId, int level, string choiceType,
+        string? chosenAbility, string? chosenFeatId, AppDbContext db);
+
+    /// <summary>
+    /// Get all pending (unconfirmed) choices for a character
+    /// </summary>
+    Task<List<CharacterLevelUpChoiceEntity>> GetPendingChoicesAsync(string characterId, AppDbContext db);
+
+    /// <summary>
+    /// Confirm all choices for a specific level, marking them as ready to apply
+    /// </summary>
+    Task ConfirmLevelUpChoicesAsync(string characterId, int level, AppDbContext db);
+
+    /// <summary>
+    /// Get confirmed choices for a specific level
+    /// </summary>
+    Task<List<CharacterLevelUpChoiceEntity>> GetConfirmedChoicesAsync(string characterId, int level, AppDbContext db);
 }
 
 public sealed class ExperienceService : IExperienceService
@@ -291,6 +312,183 @@ public sealed class ExperienceService : IExperienceService
                 LeveledUpAtUtc: DateTimeOffset.UtcNow
             )).ToList()
         );
+    }
+
+    /// <summary>
+    /// Store or update a pending level-up choice (feat or ASI)
+    /// </summary>
+    public async Task<CharacterLevelUpChoiceEntity> SaveLevelUpChoiceAsync(string characterId, int level, string choiceType,
+        string? chosenAbility, string? chosenFeatId, AppDbContext db)
+    {
+        if (string.IsNullOrWhiteSpace(characterId))
+            throw new ArgumentException("Character ID cannot be empty");
+        if (level < 1)
+            throw new ArgumentException("Level must be >= 1");
+        if (string.IsNullOrWhiteSpace(choiceType))
+            throw new ArgumentException("Choice type cannot be empty");
+
+        // Validate choice type
+        if (choiceType != "ASI" && choiceType != "Feat")
+            throw new ArgumentException($"Invalid choice type: {choiceType}. Must be 'ASI' or 'Feat'");
+
+        // Validate choices based on type
+        if (choiceType == "ASI" && string.IsNullOrWhiteSpace(chosenAbility))
+            throw new ArgumentException("ASI choice must specify an ability");
+        if (choiceType == "Feat" && string.IsNullOrWhiteSpace(chosenFeatId))
+            throw new ArgumentException("Feat choice must specify a feat ID");
+
+        var existingChoice = await db.CharacterLevelUpChoices
+            .FirstOrDefaultAsync(x => x.CharacterId == characterId && x.Level == level && x.ChoiceType == choiceType);
+
+        if (existingChoice != null)
+        {
+            existingChoice.ChosenAbility = chosenAbility;
+            existingChoice.ChosenFeatId = chosenFeatId;
+            db.CharacterLevelUpChoices.Update(existingChoice);
+        }
+        else
+        {
+            var choice = new CharacterLevelUpChoiceEntity
+            {
+                Id = $"choice-{Guid.NewGuid()}",
+                CharacterId = characterId,
+                Level = level,
+                ChoiceType = choiceType,
+                ChosenAbility = chosenAbility,
+                ChosenFeatId = chosenFeatId,
+                IsConfirmed = false,
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            };
+            db.CharacterLevelUpChoices.Add(choice);
+            existingChoice = choice;
+        }
+
+        await db.SaveChangesAsync();
+        return existingChoice;
+    }
+
+    /// <summary>
+    /// Get all pending (unconfirmed) choices for a character
+    /// </summary>
+    public async Task<List<CharacterLevelUpChoiceEntity>> GetPendingChoicesAsync(string characterId, AppDbContext db)
+    {
+        return await db.CharacterLevelUpChoices
+            .Where(x => x.CharacterId == characterId && !x.IsConfirmed)
+            .OrderBy(x => x.Level)
+            .ToListAsync();
+    }
+
+    /// <summary>
+    /// Confirm all choices for a specific level, marking them as ready to apply
+    /// </summary>
+    public async Task ConfirmLevelUpChoicesAsync(string characterId, int level, AppDbContext db)
+    {
+        var choices = await db.CharacterLevelUpChoices
+            .Where(x => x.CharacterId == characterId && x.Level == level)
+            .ToListAsync();
+
+        foreach (var choice in choices)
+        {
+            choice.IsConfirmed = true;
+            choice.ConfirmedAtUtc = DateTimeOffset.UtcNow;
+        }
+
+        if (choices.Count > 0)
+            await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Get confirmed choices for a specific level
+    /// </summary>
+    public async Task<List<CharacterLevelUpChoiceEntity>> GetConfirmedChoicesAsync(string characterId, int level, AppDbContext db)
+    {
+        return await db.CharacterLevelUpChoices
+            .Where(x => x.CharacterId == characterId && x.Level == level && x.IsConfirmed)
+            .ToListAsync();
+    }
+
+    /// <summary>
+    /// Calculate level using milestone system (4000 XP per level up, no maximum)
+    /// </summary>
+    public int CalculateLevelFromMilestone(long totalExperience)
+    {
+        if (totalExperience < 0)
+            return 1;
+        return (int)(totalExperience / 4000) + 1;
+    }
+
+    /// <summary>
+    /// Get XP required for next milestone level
+    /// </summary>
+    public long GetExperienceForNextMilestone(long currentXp)
+    {
+        var currentLevel = CalculateLevelFromMilestone(currentXp);
+        var nextMilestone = currentLevel * 4000;
+        return Math.Max(nextMilestone, 4000);
+    }
+
+    /// <summary>
+    /// Award XP using milestone leveling system
+    /// </summary>
+    public async Task<LevelUpResult> AwardExperienceMilestoneAsync(string characterId, long xpToAward, AppDbContext db)
+    {
+        if (xpToAward < 0)
+            throw new ArgumentException("XP to award cannot be negative");
+
+        var exp = await db.CharacterExperience.FirstOrDefaultAsync(x => x.CharacterId == characterId);
+        if (exp is null)
+            throw new InvalidOperationException($"Character {characterId} has no experience record");
+
+        var oldLevel = CalculateLevelFromMilestone(exp.TotalExperience);
+        var newTotal = exp.TotalExperience + xpToAward;
+        var newLevel = CalculateLevelFromMilestone(newTotal);
+        var levelsGained = newLevel - oldLevel;
+
+        var levelUps = new List<LevelUpGrant>();
+        for (int level = oldLevel + 1; level <= newLevel; level++)
+        {
+            // Milestone leveling: every level grants a feat option
+            // ASI at levels 4, 8, 12, 16, 19, 23, 27, 31, ... (every 4 levels)
+            var grantedASI = level % 4 == 0;
+            levelUps.Add(new LevelUpGrant
+            {
+                Level = level,
+                GrantsAbilityScoreImprovement = grantedASI,
+                GrantsFeatOption = true // Every level grants a feat option in milestone system
+            });
+
+            // Record level progression
+            var progressionId = $"prog-{characterId}-{level}-{DateTimeOffset.UtcNow.Ticks}";
+            var progression = new CharacterLevelProgressionEntity
+            {
+                Id = progressionId,
+                CharacterId = characterId,
+                Level = level,
+                ExperienceRequired = (level - 1) * 4000,
+                LeveledUpAtUtc = DateTimeOffset.UtcNow,
+                GrantedAbilityScoreImprovement = grantedASI,
+                GrantedFeatOption = true
+            };
+            db.CharacterLevelProgression.Add(progression);
+        }
+
+        exp.TotalExperience = newTotal;
+        exp.CurrentLevel = newLevel;
+        exp.ExperienceForNextLevel = GetExperienceForNextMilestone(newTotal);
+        exp.LastLevelUpAtUtc = levelsGained > 0 ? DateTimeOffset.UtcNow : exp.LastLevelUpAtUtc;
+        exp.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync();
+
+        return new LevelUpResult
+        {
+            OldLevel = oldLevel,
+            NewLevel = newLevel,
+            ExperienceAwarded = xpToAward,
+            TotalExperience = newTotal,
+            LevelsGained = levelsGained,
+            LevelUps = levelUps
+        };
     }
 }
 
