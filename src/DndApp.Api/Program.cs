@@ -51,6 +51,7 @@ builder.Services.AddScoped<ICharacterInventoryService, CharacterInventoryService
 builder.Services.AddScoped<ICharacterComputationService, CharacterComputationService>();
 builder.Services.AddScoped<ICharacterProgressionService, CharacterProgressionService>();
 builder.Services.AddScoped<IRuleValidationService, RuleValidationService>();
+builder.Services.AddScoped<ISkillProficiencyService, SkillProficiencyService>();
 
 var app = builder.Build();
 
