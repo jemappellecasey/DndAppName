@@ -202,4 +202,110 @@ public sealed class SkillProficiencyServiceTests : IAsyncLifetime
         // Assert - Should work because we use ToLower() in the query
         Assert.NotEmpty(result);
     }
+
+    [Fact]
+    public async Task SeedBackgroundProficiencies_Soldier_HasAthletics()
+    {
+        // Arrange
+        var backgroundName = "Soldier";
+        var edition = "2024";
+        
+        // Add background proficiency
+        _db.SkillProficiencySources.Add(new SkillProficiencySourceEntity
+        {
+            Id = "background-test-soldier-athletics",
+            SourceType = "background",
+            SourceId = "soldier",
+            SourceName = "Soldier",
+            SkillName = "Athletics",
+            IsExpertise = false,
+            IsChoice = false,
+            Edition = edition
+        });
+        await _db.SaveChangesAsync();
+
+        // Act
+        var result = await _service.GetSourceSkillsAsync("background", "soldier", edition);
+
+        // Assert
+        Assert.Contains("Athletics", result);
+    }
+
+    [Fact]
+    public async Task SeedRaceProficiencies_HalfElf_HasMultipleSkills()
+    {
+        // Arrange
+        var raceName = "Half-Elf";
+        var edition = "2024";
+        
+        // Add race proficiencies
+        var skills = new[] { "Insight", "Persuasion" };
+        foreach (var skill in skills)
+        {
+            _db.SkillProficiencySources.Add(new SkillProficiencySourceEntity
+            {
+                Id = $"race-test-half-elf-{skill.ToLower()}",
+                SourceType = "race",
+                SourceId = "half-elf",
+                SourceName = "Half-Elf",
+                SkillName = skill,
+                IsExpertise = false,
+                IsChoice = false,
+                Edition = edition
+            });
+        }
+        await _db.SaveChangesAsync();
+
+        // Act
+        var result = await _service.GetSourceSkillsAsync("race", "half-elf", edition);
+
+        // Assert
+        Assert.Contains("Insight", result);
+        Assert.Contains("Persuasion", result);
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public async Task GetClassSkillProficienciesAsync_BackgroundAndRaceDataSeeded_ReturnsCorrectTypes()
+    {
+        // Arrange
+        var sourceTypes = new[] { "class", "background", "race" };
+
+        // Add test proficiencies for each source type
+        _db.SkillProficiencySources.Add(new SkillProficiencySourceEntity
+        {
+            Id = "test-background-acolyte",
+            SourceType = "background",
+            SourceId = "acolyte",
+            SourceName = "Acolyte",
+            SkillName = "Insight",
+            IsExpertise = false,
+            IsChoice = false,
+            Edition = "2024"
+        });
+
+        _db.SkillProficiencySources.Add(new SkillProficiencySourceEntity
+        {
+            Id = "test-race-dwarf",
+            SourceType = "race",
+            SourceId = "dwarf",
+            SourceName = "Dwarf",
+            SkillName = "Insight",
+            IsExpertise = false,
+            IsChoice = false,
+            Edition = "2024"
+        });
+
+        await _db.SaveChangesAsync();
+
+        // Act
+        var backgroundSkills = await _service.GetSourceSkillsAsync("background", "acolyte", "2024");
+        var raceSkills = await _service.GetSourceSkillsAsync("race", "dwarf", "2024");
+
+        // Assert
+        Assert.NotEmpty(backgroundSkills);
+        Assert.NotEmpty(raceSkills);
+        Assert.Contains("Insight", backgroundSkills);
+        Assert.Contains("Insight", raceSkills);
+    }
 }
