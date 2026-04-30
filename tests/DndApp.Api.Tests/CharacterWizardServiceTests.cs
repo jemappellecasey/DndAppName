@@ -1,5 +1,6 @@
 using DndApp.Api.Characters;
 using DndApp.Api.Data;
+using DndApp.Api.Mechanics;
 using DndApp.Api.MixedRules;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,7 @@ public sealed class CharacterWizardServiceTests
     public async Task StartDraft_AllowsEmptyName_UsesDefault()
     {
         await using var fixture = await CreateFixtureAsync();
-        var service = new CharacterWizardService(fixture.Db, new MixedRulesResolutionService());
+        var service = new CharacterWizardService(fixture.Db, new MixedRulesResolutionService(), new ExperienceService());
 
         var result = await service.StartDraftAsync(
             new StartCharacterWizardRequest(
@@ -56,7 +57,7 @@ public sealed class CharacterWizardServiceTests
             });
         await fixture.Db.SaveChangesAsync();
 
-        var service = new CharacterWizardService(fixture.Db, new MixedRulesResolutionService());
+        var service = new CharacterWizardService(fixture.Db, new MixedRulesResolutionService(), new ExperienceService());
         var activeOnly = await service.ListCharactersAsync(includeArchived: false, archivedOnly: false, ownerUserId: "local:user-1", CancellationToken.None);
         var archivedOnly = await service.ListCharactersAsync(includeArchived: true, archivedOnly: true, ownerUserId: "local:user-1", CancellationToken.None);
 
@@ -113,7 +114,7 @@ public sealed class CharacterWizardServiceTests
         });
         await fixture.Db.SaveChangesAsync();
 
-        var service = new CharacterWizardService(fixture.Db, new MixedRulesResolutionService());
+        var service = new CharacterWizardService(fixture.Db, new MixedRulesResolutionService(), new ExperienceService());
         var restored = await service.RestoreCharacterAsync(characterId, CancellationToken.None);
         var deleted = await service.DeleteCharacterAsync(characterId, CancellationToken.None);
 

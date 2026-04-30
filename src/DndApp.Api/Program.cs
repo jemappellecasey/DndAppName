@@ -1192,6 +1192,63 @@ app.MapPut(
         return Results.Ok(await progression.UpsertVitalsAsync(characterId, request, cancellationToken));
     });
 
+app.MapGet(
+    "/characters/{characterId:guid}/experience",
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, IExperienceService experienceService, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+        var experience = await experienceService.GetCharacterExperienceResponseAsync(characterId.ToString(), db);
+        return experience is null ? Results.NotFound() : Results.Ok(experience);
+    });
+
+app.MapPost(
+    "/characters/{characterId:guid}/experience",
+    async (Guid characterId, AwardExperienceRequest request, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, IExperienceService experienceService, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        if (request.ExperienceAmount < 0)
+        {
+            return Results.BadRequest(new { errors = new[] { "Experience amount must be non-negative." } });
+        }
+
+        var result = await experienceService.AwardExperienceResponseAsync(characterId.ToString(), request.ExperienceAmount, db);
+        return Results.Ok(result);
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/experience/progression",
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, IExperienceService experienceService, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+        var progression = await db.CharacterLevelProgression
+            .AsNoTracking()
+            .Where(x => x.CharacterId == characterId.ToString())
+            .OrderBy(x => x.Level)
+            .Select(x => new
+            {
+                level = x.Level,
+                experienceRequired = x.ExperienceRequired,
+                leveledUpAt = x.LeveledUpAtUtc,
+                grantedAbilityScoreImprovement = x.GrantedAbilityScoreImprovement,
+                grantedFeatOption = x.GrantedFeatOption
+            })
+            .ToListAsync(cancellationToken);
+        return Results.Ok(progression);
+    });
+
 app.Run();
 
 public sealed record ClassCatalogItem(

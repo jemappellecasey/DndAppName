@@ -38,6 +38,16 @@ public interface IExperienceService
     /// Initialize experience for a new character
     /// </summary>
     Task InitializeCharacterExperienceAsync(string characterId, AppDbContext db);
+
+    /// <summary>
+    /// Get character experience as response model
+    /// </summary>
+    Task<CharacterExperienceResponse?> GetCharacterExperienceResponseAsync(string characterId, AppDbContext db);
+
+    /// <summary>
+    /// Award XP and return response model
+    /// </summary>
+    Task<LevelUpNotificationResponse?> AwardExperienceResponseAsync(string characterId, long xpToAward, AppDbContext db);
 }
 
 public sealed class ExperienceService : IExperienceService
@@ -236,6 +246,51 @@ public sealed class ExperienceService : IExperienceService
         db.CharacterLevelProgression.Add(progression);
 
         await db.SaveChangesAsync();
+    }
+
+    public async Task<CharacterExperienceResponse?> GetCharacterExperienceResponseAsync(string characterId, AppDbContext db)
+    {
+        var state = await GetCharacterExperienceAsync(characterId, db);
+        if (state is null)
+            return null;
+
+        var experienceTowardNextLevel = state.TotalExperience;
+        if (state.CurrentLevel > 1)
+        {
+            var prevLevelXp = GetExperienceForLevel(state.CurrentLevel);
+            experienceTowardNextLevel = state.TotalExperience - prevLevelXp;
+        }
+
+        return new CharacterExperienceResponse(
+            CharacterId: characterId,
+            CurrentLevel: state.CurrentLevel,
+            TotalExperience: state.TotalExperience,
+            ExperienceForNextLevel: state.ExperienceForNextLevel,
+            ExperienceTowardNextLevel: experienceTowardNextLevel,
+            AbilityScoreImprovementsUsed: state.AbilityScoreImprovementsAvailable,
+            AvailableAbilityScoreImprovements: ASILevels.Count(x => x <= state.CurrentLevel) - state.AbilityScoreImprovementsAvailable,
+            LastLevelUpAtUtc: (await db.CharacterExperience.FirstOrDefaultAsync(x => x.CharacterId == characterId))?.LastLevelUpAtUtc,
+            UpdatedAtUtc: (await db.CharacterExperience.FirstOrDefaultAsync(x => x.CharacterId == characterId))?.UpdatedAtUtc ?? DateTimeOffset.UtcNow
+        );
+    }
+
+    public async Task<LevelUpNotificationResponse?> AwardExperienceResponseAsync(string characterId, long xpToAward, AppDbContext db)
+    {
+        var result = await AwardExperienceAsync(characterId, xpToAward, db);
+
+        return new LevelUpNotificationResponse(
+            CharacterId: characterId,
+            OldLevel: result.OldLevel,
+            NewLevel: result.NewLevel,
+            LevelsGained: result.LevelsGained,
+            LevelUps: result.LevelUps.Select(x => new LevelUpGrantResponse(
+                Level: x.Level,
+                ExperienceRequired: GetExperienceForLevel(x.Level),
+                GrantsAbilityScoreImprovement: x.GrantsAbilityScoreImprovement,
+                GrantsFeatOption: x.GrantsFeatOption,
+                LeveledUpAtUtc: DateTimeOffset.UtcNow
+            )).ToList()
+        );
     }
 }
 

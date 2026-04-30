@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DndApp.Api.Data;
+using DndApp.Api.Mechanics;
 using DndApp.Api.MixedRules;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,11 +29,13 @@ public sealed class CharacterWizardService : ICharacterWizardService
 
     private readonly AppDbContext _db;
     private readonly IMixedRulesResolutionService _resolver;
+    private readonly IExperienceService _experienceService;
 
-    public CharacterWizardService(AppDbContext db, IMixedRulesResolutionService resolver)
+    public CharacterWizardService(AppDbContext db, IMixedRulesResolutionService resolver, IExperienceService experienceService)
     {
         _db = db;
         _resolver = resolver;
+        _experienceService = experienceService;
     }
 
     public async Task<CharacterWizardResult> StartDraftAsync(StartCharacterWizardRequest request, CancellationToken cancellationToken)
@@ -225,6 +228,10 @@ public sealed class CharacterWizardService : ICharacterWizardService
         _db.CharacterRecords.Add(duplicate);
         AppendHistory(duplicateId, "character-duplicated", source.OwnerUserId, $"Duplicated from '{source.CharacterId}'.");
         await _db.SaveChangesAsync(cancellationToken);
+
+        // Initialize experience for the duplicated character
+        await _experienceService.InitializeCharacterExperienceAsync(duplicateId.ToString(), _db);
+
         return ToSummary(duplicate);
     }
 
@@ -329,6 +336,9 @@ public sealed class CharacterWizardService : ICharacterWizardService
 
         AppendHistory(characterId, "character-finalized", entity.OwnerUserId, "Wizard draft finalized into character record.");
         await _db.SaveChangesAsync(cancellationToken);
+
+        // Initialize experience for the new character
+        await _experienceService.InitializeCharacterExperienceAsync(characterId.ToString(), _db);
 
         return new CharacterWizardResult(
             true,
