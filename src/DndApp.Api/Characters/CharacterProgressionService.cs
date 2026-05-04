@@ -105,8 +105,7 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
                               where m.ModuleType == "spell"
                               join v in _db.RuleVariants.AsNoTracking() on m.Id equals v.RuleModuleId
                               where v.RuleSystemId == sheet.BaseRuleSystem
-                              select new { Module = m, Variant = v })
-            .ToListAsync(cancellationToken);
+                              select new { m.Id, m.DisplayName, v.PayloadJson }).Cast<dynamic>().ToListAsync(cancellationToken);
 
         var spellSources = new List<SpellSourceGroup>();
 
@@ -115,7 +114,7 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
         {
             var prepCount = CalculateSpellPrepCount(classLevelData.ClassName, sheet.Level, abilityScores, sheet.BaseRuleSystem);
             var automaticSpells = GetAutomaticSpells(classLevelData.ClassName, sheet.BaseRuleSystem);
-            var selectableSpells = GetSelectableSpells(classLevelData.ClassName, sheet.BaseRuleSystem, allSpells, automaticSpells);
+            var selectableSpells = GetSelectableSpells(classLevelData.ClassName, allSpells, automaticSpells);
 
             if (prepCount > 0 || automaticSpells.Count > 0 || selectableSpells.Count > 0)
             {
@@ -209,15 +208,57 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
         return spells;
     }
 
-    private static IReadOnlyList<CharacterSpellEntryData> GetSelectableSpells<T>(
+    private static IReadOnlyList<CharacterSpellEntryData> GetSelectableSpells(
         string className,
-        string baseRuleSystem,
-        List<T> allSpells,
+        List<dynamic> allSpells,
         IReadOnlyList<CharacterSpellEntryData> automaticSpells)
     {
-        // For now, return empty - this will be populated from database once schema is updated
-        // The schema needs to include spell class associations in the RuleVariant PayloadJson
-        return Array.Empty<CharacterSpellEntryData>();
+        if (allSpells == null || allSpells.Count == 0)
+        {
+            return Array.Empty<CharacterSpellEntryData>();
+        }
+
+        var automaticIds = automaticSpells
+            .Select(x => $"{x.SpellModuleId}\u001F{x.SpellName}".ToUpperInvariant())
+            .ToHashSet();
+
+        var selectableSpells = new List<CharacterSpellEntryData>();
+
+        foreach (var spellItem in allSpells)
+        {
+            // Extract properties from anonymous type
+            var id = spellItem.Id as string;
+            var displayName = spellItem.DisplayName as string;
+            var payloadJson = spellItem.PayloadJson as string;
+
+            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(displayName) || string.IsNullOrEmpty(payloadJson))
+            {
+                continue;
+            }
+
+            // Parse spell classes from payload
+            var spellClasses = CatalogParsing.ParseStringArray(payloadJson, "spellClasses");
+
+            // Check if this class can use this spell
+            if (!spellClasses.Contains(className, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // Exclude automatic spells
+            var spellKey = $"{id}\u001F{displayName}".ToUpperInvariant();
+            if (automaticIds.Contains(spellKey))
+            {
+                continue;
+            }
+
+            selectableSpells.Add(new CharacterSpellEntryData(
+                id,
+                displayName,
+                "selected"));
+        }
+
+        return selectableSpells.OrderBy(x => x.SpellName, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     public async Task<CharacterCurrencyData?> GetCurrencyAsync(Guid characterId, CancellationToken cancellationToken)
@@ -549,3 +590,5 @@ public sealed class CharacterProgressionService : ICharacterProgressionService
         };
     }
 }
+
+

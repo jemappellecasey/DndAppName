@@ -36,6 +36,16 @@ namespace DndApp.Api.Data.Migrations
                     .HasColumnType("TEXT")
                     .HasMaxLength(80);
 
+                b.Property<string>("SourceId")
+                    .IsRequired()
+                    .HasColumnType("TEXT")
+                    .HasMaxLength(128);
+
+                b.Property<string>("Edition")
+                    .IsRequired()
+                    .HasColumnType("TEXT")
+                    .HasMaxLength(10);
+
                 b.Property<bool>("IsExpertise")
                     .ValueGeneratedOnAdd()
                     .HasColumnType("INTEGER")
