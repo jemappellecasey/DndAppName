@@ -57,6 +57,7 @@ import type {
   ItemCatalogItem,
   LocalSession,
   ModuleCatalogItem,
+  RecommendedSpellsResult,
   RuleSystemMode,
   SkillName,
   UpsertCharacterBuildPayload,
@@ -459,7 +460,7 @@ function App() {
   const [pendingLevelUpChoices, setPendingLevelUpChoices] = useState<Array<{ level: number; choiceType: 'ASI' | 'Feat' }>>([])
 
   const [spellEntries, setSpellEntries] = useState<CharacterSpellEntryData[]>([])
-  const [recommendedSpellsByClass, setRecommendedSpellsByClass] = useState<Record<string, string>>({})
+  const [recommendedSpellsByClass, setRecommendedSpellsByClass] = useState<Record<string, RecommendedSpellsResult>>({})
   const [resourcePools, setResourcePools] = useState<CharacterResourcePoolData[]>([])
   const [vitals, setVitals] = useState<Omit<CharacterVitalsData, 'characterId' | 'updatedAtUtc'>>({
     ...DEFAULT_VITALS,
@@ -2337,18 +2338,11 @@ function App() {
     }
   }
 
-  async function handleLoadRecommendedSpells(classModuleId: string, className: string, classLevel: number) {
+  async function handleLoadRecommendedSpells(classModuleId: string, _className: string, classLevel: number) {
     if (!currentCharacterId) return
     try {
       const result = await getRecommendedSpells(currentCharacterId, classModuleId, classLevel)
-      const lines = [
-        `${className} level ${classLevel}: ${result.advisoryMessage}`,
-        result.dataGap ?? '',
-        result.spellSources.length > 0
-          ? `Spell Sources: ${result.spellSources.map((src) => `${src.sourceName} (${src.prepareCount} prepare)`).join(' | ')}`
-          : 'No spell sources available.',
-      ].filter((x) => x.trim().length > 0)
-      setRecommendedSpellsByClass((prev) => ({ ...prev, [classModuleId]: lines.join('\n') }))
+      setRecommendedSpellsByClass((prev) => ({ ...prev, [classModuleId]: result }))
     } catch (e) {
       setError(String(e))
     }
@@ -2778,10 +2772,26 @@ function App() {
                 </div>
               )}
               <ul className="inventory-list">
-                {spellEntries.map((entry, index) => (
-                  <li key={`${entry.spellModuleId}-${index}`}>{entry.spellName} ({entry.preparationMode})</li>
-                ))}
+                {spellEntries.length > 0 ? (
+                  spellEntries.map((entry, index) => (
+                    <li key={`${entry.spellModuleId}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{entry.spellName} ({entry.preparationMode})</span>
+                      {viewEditMode && (
+                        <button onClick={() => setSpellEntries((prev) => prev.filter((_, i) => i !== index))} style={{ fontSize: '0.8em', padding: '2px 6px' }}>
+                          Remove
+                        </button>
+                      )}
+                    </li>
+                  ))
+                ) : (
+                  <li style={{ color: '#888' }}>No spells selected</li>
+                )}
               </ul>
+              {viewEditMode && spellEntries.length > 0 && (
+                <button onClick={() => void handleSaveSpells()} disabled={!currentCharacterId || isViewingArchivedCharacter} style={{ marginTop: '8px' }}>
+                  Save Spells
+                </button>
+              )}
               <h3>Inventory</h3>
               {currencyState && (
                 <small>
@@ -3287,11 +3297,76 @@ function App() {
                 <button onClick={() => void handleLoadRecommendedSpells(entry.moduleId, entry.className, entry.level)} disabled={!currentCharacterId}>
                   See recommended spells for this class
                 </button>
-                {recommendedSpellsByClass[entry.moduleId] && (
-                  <div style={{ backgroundColor: '#f0f0f0', padding: '8px', borderRadius: '4px', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
-                    <small style={{ display: 'block', lineHeight: '1.5' }}>{recommendedSpellsByClass[entry.moduleId]}</small>
-                  </div>
-                )}
+                {recommendedSpellsByClass[entry.moduleId] && (() => {
+                  const recommendation = recommendedSpellsByClass[entry.moduleId]
+                  return (
+                    <div style={{ backgroundColor: '#f0f0f0', padding: '12px', borderRadius: '4px', marginTop: '8px' }}>
+                      <small style={{ display: 'block', marginBottom: '8px' }}>
+                        <strong>{recommendation.advisoryMessage}</strong>
+                      </small>
+                      {recommendation.dataGap && (
+                        <small style={{ display: 'block', color: '#666', marginBottom: '8px' }}>{recommendation.dataGap}</small>
+                      )}
+                      {recommendation.spellSources.map((source: any, srcIdx: number) => (
+                        <div key={srcIdx} style={{ marginBottom: '12px', borderLeft: '3px solid #888', paddingLeft: '8px' }}>
+                          <strong style={{ fontSize: '0.9em' }}>
+                            {source.sourceName}
+                            {source.prepareCount > 0 && ` - Prepare ${source.prepareCount}`}
+                          </strong>
+                          {source.automaticSpells.length > 0 && (
+                            <div style={{ marginTop: '4px', fontSize: '0.85em' }}>
+                              <em>Automatic spells:</em>
+                              <div style={{ marginLeft: '8px' }}>
+                                {source.automaticSpells.map((spell: any, idx: number) => (
+                                  <div key={idx} style={{ color: '#0066cc' }}>
+                                    • {spell.spellName}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {source.selectableSpells.length > 0 && (
+                            <div style={{ marginTop: '8px', fontSize: '0.85em' }}>
+                              <em>Available to select:</em>
+                              <div style={{ marginLeft: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                                {source.selectableSpells.map((spell: any, idx: number) => (
+                                  <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={spellEntries.some(
+                                        (e) =>
+                                          e.spellModuleId === spell.spellModuleId &&
+                                          e.spellName === spell.spellName &&
+                                          e.preparationMode === 'selected'
+                                      )}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSpellEntries((prev) => [...prev, spell])
+                                        } else {
+                                          setSpellEntries((prev) =>
+                                            prev.filter(
+                                              (x) =>
+                                                !(
+                                                  x.spellModuleId === spell.spellModuleId &&
+                                                  x.spellName === spell.spellName &&
+                                                  x.preparationMode === 'selected'
+                                                )
+                                            )
+                                          )
+                                        }
+                                      }}
+                                    />
+                                    <span>{spell.spellName}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
             ))}
           </div>
