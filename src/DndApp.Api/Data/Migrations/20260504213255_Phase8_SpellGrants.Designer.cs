@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DndApp.Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260504212757_Phase8_SpellGrants")]
+    [Migration("20260504213255_Phase8_SpellGrants")]
     partial class Phase8_SpellGrants
     {
         /// <inheritdoc />
