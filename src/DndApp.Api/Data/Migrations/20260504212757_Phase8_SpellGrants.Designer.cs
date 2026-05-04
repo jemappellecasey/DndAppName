@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DndApp.Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260504062332_Phase8_AutomaticSpellGrants")]
-    partial class Phase8_AutomaticSpellGrants
+    [Migration("20260504212757_Phase8_SpellGrants")]
+    partial class Phase8_SpellGrants
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

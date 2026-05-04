@@ -26,27 +26,43 @@ namespace DndApp.Api.Data.Migrations
                     .HasColumnType("TEXT")
                     .HasMaxLength(64);
 
-                b.Property<string>("SourceType")
+                b.Property<string>("ChoiceGroup")
+                    .HasColumnType("TEXT")
+                    .HasMaxLength(120);
+
+                b.Property<string>("Edition")
                     .IsRequired()
                     .HasColumnType("TEXT")
-                    .HasMaxLength(40);
+                    .HasMaxLength(10);
+
+                b.Property<bool>("IsChoice")
+                    .HasColumnType("INTEGER");
+
+                b.Property<bool>("IsExpertise")
+                    .HasColumnType("INTEGER")
+                    .HasDefaultValue(false);
 
                 b.Property<string>("SkillName")
                     .IsRequired()
                     .HasColumnType("TEXT")
                     .HasMaxLength(80);
 
-                b.Property<bool>("IsExpertise")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("INTEGER")
-                    .HasDefaultValue(false);
+                b.Property<string>("SourceId")
+                    .IsRequired()
+                    .HasColumnType("TEXT")
+                    .HasMaxLength(64);
+
+                b.Property<string>("SourceName")
+                    .IsRequired()
+                    .HasColumnType("TEXT")
+                    .HasMaxLength(300);
+
+                b.Property<string>("SourceType")
+                    .IsRequired()
+                    .HasColumnType("TEXT")
+                    .HasMaxLength(40);
 
                 b.HasKey("Id");
-
-                b.HasIndex("Edition");
-                b.HasIndex("SkillName");
-                b.HasIndex("SourceId");
-                b.HasIndex("SourceType");
 
                 b.ToTable("skill_proficiency_source");
             });
