@@ -31,6 +31,12 @@ if (args.Any(a => string.Equals(a, "--validate-catalog", StringComparison.Ordina
     return;
 }
 
+if (args.Any(a => string.Equals(a, "--seed-spell-grants", StringComparison.OrdinalIgnoreCase)))
+{
+    await SeedSpellGrantsAsync(repoRoot);
+    return;
+}
+
 var sources = new[]
 {
     new SourceSpec("phb2014", "DnDPHB2014.md"),
@@ -1897,6 +1903,109 @@ static void WriteJson<T>(string path, T value)
     };
 
     File.WriteAllText(path, JsonSerializer.Serialize(value, options));
+}
+
+static async Task SeedSpellGrantsAsync(string repoRoot)
+{
+    var sqlitePath = Path.Combine(repoRoot, "src", "DndApp.Api", "dndapp-dev.sqlite");
+    var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
+        .UseSqlite($"Data Source={sqlitePath}")
+        .Options;
+
+    await using var db = new AppDbContext(dbOptions);
+    await db.Database.MigrateAsync();
+
+    var seedCount = 0;
+    Console.WriteLine("Seeding spell grants...");
+
+    // Class spell grants - core spellcasting classes get cantrips
+    var classSpellGrants = new List<(string ClassName, string Edition, string[] SpellSlugs, int MinLevel, string Source)>
+    {
+        // Wizard cantrips at level 1
+        ("Wizard", "2014", new[] { "acid-splash", "fire-bolt", "light", "mage-hand", "mending", "message", "minor-illusion", "prestidigitation", "ray-of-frost", "shocking-grasp" }, 1, "Wizard Spellcasting"),
+        ("Wizard", "2024", new[] { "acid-splash", "fire-bolt", "light", "mage-hand", "mending", "message", "minor-illusion", "prestidigitation", "ray-of-frost", "shocking-grasp" }, 1, "Wizard Spellcasting"),
+        // Cleric cantrips at level 1
+        ("Cleric", "2014", new[] { "guidance", "light", "mending", "resistance", "sacred-flame", "spare-the-dying", "thaumaturgy" }, 1, "Cleric Spellcasting"),
+        ("Cleric", "2024", new[] { "guidance", "light", "mending", "resistance", "sacred-flame", "spare-the-dying", "thaumaturgy" }, 1, "Cleric Spellcasting"),
+        // Bard cantrips at level 1
+        ("Bard", "2014", new[] { "mage-hand", "minor-illusion", "prestidigitation", "vicious-mockery" }, 1, "Bard Spellcasting"),
+        ("Bard", "2024", new[] { "mage-hand", "minor-illusion", "prestidigitation", "vicious-mockery" }, 1, "Bard Spellcasting"),
+        // Sorcerer cantrips at level 1
+        ("Sorcerer", "2014", new[] { "acid-splash", "fire-bolt", "light", "mage-hand", "mending", "message", "minor-illusion", "prestidigitation", "ray-of-frost", "shocking-grasp" }, 1, "Sorcerer Spellcasting"),
+        ("Sorcerer", "2024", new[] { "acid-splash", "fire-bolt", "light", "mage-hand", "mending", "message", "minor-illusion", "prestidigitation", "ray-of-frost", "shocking-grasp" }, 1, "Sorcerer Spellcasting"),
+        // Druid cantrips at level 1
+        ("Druid", "2014", new[] { "druidcraft", "guidance", "mending", "produce-flame", "resistance", "shillelagh" }, 1, "Druid Spellcasting"),
+        ("Druid", "2024", new[] { "druidcraft", "guidance", "mending", "produce-flame", "resistance", "shillelagh" }, 1, "Druid Spellcasting"),
+        // Warlock cantrips at level 1
+        ("Warlock", "2014", new[] { "chill-touch", "eldritch-blast", "mage-hand", "minor-illusion", "prestidigitation", "true-strike" }, 1, "Warlock Spellcasting"),
+        ("Warlock", "2024", new[] { "chill-touch", "eldritch-blast", "mage-hand", "minor-illusion", "prestidigitation", "true-strike" }, 1, "Warlock Spellcasting"),
+    };
+
+    foreach (var (className, edition, spellSlugs, minLevel, source) in classSpellGrants)
+    {
+        // Query using EF Core to find class by name and edition
+        List<dynamic> classes = new();
+        if (edition == "2014")
+        {
+            classes = db.Classes2014.Where(c => c.Name == className).Cast<dynamic>().ToList();
+        }
+        else
+        {
+            classes = db.Classes2024.Where(c => c.Name == className).Cast<dynamic>().ToList();
+        }
+        
+        if (classes.Count == 0)
+        {
+            Console.WriteLine($"  Warning: Class '{className}' not found in {edition} edition");
+            continue;
+        }
+
+        var classId = (string)classes[0].Id;
+        var addedForClass = 0;
+
+        foreach (var spellSlug in spellSlugs)
+        {
+            var spell = await db.Spells.FirstOrDefaultAsync(s => s.Slug == spellSlug && s.EditionYear == int.Parse(edition));
+            if (spell == null)
+            {
+                // Try without edition filter (spell might exist in both)
+                spell = await db.Spells.FirstOrDefaultAsync(s => s.Slug == spellSlug);
+            }
+            
+            if (spell == null)
+            {
+                // Don't warn for every missing spell; spell definitions may not be complete yet
+                continue;
+            }
+
+            var existingGrant = await db.ClassSpellGrants.FirstOrDefaultAsync(g => 
+                g.ClassId == classId && g.SpellId == spell.Id && g.Edition == edition);
+            if (existingGrant != null)
+            {
+                continue;
+            }
+
+            db.ClassSpellGrants.Add(new ClassSpellGrantEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ClassId = classId,
+                Edition = edition,
+                SpellId = spell.Id,
+                MinLevel = minLevel,
+                SourceDescription = source
+            });
+            seedCount++;
+            addedForClass++;
+        }
+
+        if (addedForClass > 0)
+        {
+            Console.WriteLine($"  {className} ({edition}): +{addedForClass} cantrips");
+        }
+    }
+
+    await db.SaveChangesAsync();
+    Console.WriteLine($"Spell grants seeding complete: {seedCount} total grants added");
 }
 
 sealed record SourceSpec(string Code, string FileName);
