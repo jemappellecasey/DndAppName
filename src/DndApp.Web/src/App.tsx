@@ -10,6 +10,7 @@ import {
   duplicateCharacter,
   finalizeWizard,
   getArchivedCharacters,
+  getAutomaticSpells,
   getCharacterBuild,
   getCharacterHistory,
   getCharacterInventory,
@@ -20,9 +21,11 @@ import {
   getCharacters,
   getClassCatalog,
   getContentSources,
+  getFeatSpellGrants,
   getRecommendedSpells,
   getModuleCatalog,
   getItemCatalog,
+  getSpellVariants,
   health,
   loginLocal,
   registerLocal,
@@ -43,6 +46,7 @@ import {
 } from './api'
 import type {
   AbilityName,
+  AutomaticSpellGrant,
   BuildMethod,
   CharacterBuildData,
   CharacterHistoryEntry,
@@ -54,12 +58,14 @@ import type {
   CharacterVitalsData,
   CharacterWizardResult,
   ClassCatalogItem,
+  FeatSpellChoice,
   ItemCatalogItem,
   LocalSession,
   ModuleCatalogItem,
   RecommendedSpellsResult,
   RuleSystemMode,
   SkillName,
+  SpellVariantComparison,
   UpsertCharacterBuildPayload,
 } from './types'
 import CharactersPage from './pages/CharactersPage'
@@ -461,6 +467,9 @@ function App() {
 
   const [spellEntries, setSpellEntries] = useState<CharacterSpellEntryData[]>([])
   const [recommendedSpellsByClass, setRecommendedSpellsByClass] = useState<Record<string, RecommendedSpellsResult>>({})
+  const [automaticSpellsByClass, setAutomaticSpellsByClass] = useState<Record<string, AutomaticSpellGrant[]>>({})
+  const [_featSpellChoices, setFeatSpellChoices] = useState<FeatSpellChoice[]>([])
+  const [spellVariantCache, setSpellVariantCache] = useState<Record<string, SpellVariantComparison>>({})
   const [resourcePools, setResourcePools] = useState<CharacterResourcePoolData[]>([])
   const [vitals, setVitals] = useState<Omit<CharacterVitalsData, 'characterId' | 'updatedAtUtc'>>({
     ...DEFAULT_VITALS,
@@ -1193,6 +1202,13 @@ function App() {
       setSpellEntries(spells.entries)
     } catch {
       setSpellEntries([])
+    }
+
+    try {
+      const result = await getFeatSpellGrants(characterId)
+      setFeatSpellChoices(result)
+    } catch {
+      setFeatSpellChoices([])
     }
 
     try {
@@ -2348,6 +2364,31 @@ function App() {
     }
   }
 
+  async function handleLoadAutomaticSpells(classModuleId: string, _className: string, classLevel: number) {
+    if (!currentCharacterId) return
+    try {
+      const result = await getAutomaticSpells(currentCharacterId, classModuleId, classLevel)
+      setAutomaticSpellsByClass((prev) => ({ ...prev, [classModuleId]: result }))
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleGetSpellVariants(spellSlug: string): Promise<SpellVariantComparison | null> {
+    if (!currentCharacterId) return null
+    try {
+      if (spellVariantCache[spellSlug]) {
+        return spellVariantCache[spellSlug]
+      }
+      const result = await getSpellVariants(currentCharacterId, spellSlug)
+      setSpellVariantCache((prev) => ({ ...prev, [spellSlug]: result }))
+      return result
+    } catch (e) {
+      setError(String(e))
+      return null
+    }
+  }
+
   function skillModifier(skill: SkillName) {
     const ability = SKILL_ABILITY[skill]
     const abilityMod = abilityModifier(totalAbilityScores[ability])
@@ -3297,6 +3338,54 @@ function App() {
                 <button onClick={() => void handleLoadRecommendedSpells(entry.moduleId, entry.className, entry.level)} disabled={!currentCharacterId}>
                   See recommended spells for this class
                 </button>
+                <button onClick={() => void handleLoadAutomaticSpells(entry.moduleId, entry.className, entry.level)} disabled={!currentCharacterId}>
+                  See automatic spells for this class
+                </button>
+                {automaticSpellsByClass[entry.moduleId] && (() => {
+                  const automaticSpells = automaticSpellsByClass[entry.moduleId]
+                  const groupedBySource = automaticSpells.reduce((acc, spell) => {
+                    if (!acc[spell.sourceType]) {
+                      acc[spell.sourceType] = []
+                    }
+                    acc[spell.sourceType].push(spell)
+                    return acc
+                  }, {} as Record<string, AutomaticSpellGrant[]>)
+
+                  return (
+                    <div style={{ backgroundColor: '#e8f4f8', padding: '12px', borderRadius: '4px', marginTop: '8px', borderLeft: '4px solid #00a8d8' }}>
+                      <strong style={{ display: 'block', marginBottom: '8px' }}>Automatic Spells</strong>
+                      {Object.entries(groupedBySource).map(([sourceType, spells]) => (
+                        <div key={sourceType} style={{ marginBottom: '10px' }}>
+                          <em style={{ fontSize: '0.9em', color: '#666' }}>{sourceType}</em>
+                          <div style={{ marginLeft: '12px', marginTop: '4px' }}>
+                            {spells.map((spell, idx) => (
+                              <div key={idx} style={{ fontSize: '0.9em', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>✓ {spell.spellName}</span>
+                                <span style={{ fontSize: '0.85em', color: '#888' }}>({spell.sourceFeature})</span>
+                                {spell.hasMultipleEditions && (
+                                  <button
+                                    onClick={() => void (async () => {
+                                      const variants = await handleGetSpellVariants(spell.spellId)
+                                      if (variants) {
+                                        const msg = variants.variant2014 && variants.variant2024
+                                          ? `${spell.spellName} exists in both 2014 and 2024 editions:\n\n2014: ${variants.variant2014.description?.substring(0, 100)}\n\n2024: ${variants.variant2024.description?.substring(0, 100)}`
+                                          : `${spell.spellName} is available in one edition`
+                                        alert(msg)
+                                      }
+                                    })()}
+                                    style={{ fontSize: '0.8em', padding: '2px 6px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', cursor: 'pointer' }}
+                                  >
+                                    Compare Editions
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
                 {recommendedSpellsByClass[entry.moduleId] && (() => {
                   const recommendation = recommendedSpellsByClass[entry.moduleId]
                   return (

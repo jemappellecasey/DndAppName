@@ -1076,6 +1076,58 @@ app.MapGet(
     });
 
 app.MapGet(
+    "/characters/{characterId:guid}/spells/automatic",
+    async (Guid characterId, string classModuleId, int classLevel, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, IClassFeatureSpellService classFeatureService, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        if (string.IsNullOrWhiteSpace(classModuleId))
+        {
+            return Results.BadRequest(new { errors = new[] { "classModuleId is required." } });
+        }
+
+        var automaticSpells = await classFeatureService.GetAutomaticSpellsAsync(characterId.ToString(), classModuleId.Trim(), classLevel, cancellationToken);
+        return Results.Ok(automaticSpells);
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/spells/variants/{spellSlug}",
+    async (Guid characterId, string spellSlug, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, IClassFeatureSpellService classFeatureService, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        if (string.IsNullOrWhiteSpace(spellSlug))
+        {
+            return Results.BadRequest(new { errors = new[] { "spellSlug is required." } });
+        }
+
+        var variants = await classFeatureService.GetSpellVariantsAsync(spellSlug, cancellationToken);
+        return variants is null ? Results.NotFound() : Results.Ok(variants);
+    });
+
+app.MapGet(
+    "/characters/{characterId:guid}/feats/spells",
+    async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, IClassFeatureSpellService classFeatureService, CancellationToken cancellationToken) =>
+    {
+        var ownerResult = await EndpointAuth.AuthorizeCharacterOwnerAsync(httpContext, characterId, db, auth, cancellationToken);
+        if (ownerResult is not null)
+        {
+            return ownerResult;
+        }
+
+        var featSpells = await classFeatureService.GetFeatSpellGrantsAsync(characterId.ToString(), cancellationToken);
+        return Results.Ok(featSpells);
+    });
+
+app.MapGet(
     "/characters/{characterId:guid}/resources",
     async (Guid characterId, HttpContext httpContext, AppDbContext db, ILocalAuthService auth, ICharacterProgressionService progression, CancellationToken cancellationToken) =>
     {

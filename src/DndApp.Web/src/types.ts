@@ -329,6 +329,45 @@ export interface RecommendedSpellsResult {
   dataGap: string | null
 }
 
+export interface SpellVariantData {
+  spellId: string
+  name: string
+  level: number
+  school: string
+  castingTime: string
+  rangeText: string
+  duration: string
+  ritual: boolean
+  concentration: boolean
+  description: string
+}
+
+export interface SpellVariantComparison {
+  spellSlug: string
+  spellName: string
+  variant2014: SpellVariantData | null
+  variant2024: SpellVariantData | null
+  bothEditionsAvailable: boolean
+}
+
+export interface AutomaticSpellGrant {
+  spellId: string
+  spellName: string
+  sourceFeature: string
+  sourceType: string
+  minLevel: number
+  hasMultipleEditions: boolean
+  variants: SpellVariantComparison | null
+}
+
+export interface FeatSpellChoice {
+  featId: string
+  featName: string
+  grantType: string
+  selectionCount: number
+  availableSpellIds: string[]
+}
+
 export interface CharacterResourcePoolData {
   resourceKey: string
   currentValue: number

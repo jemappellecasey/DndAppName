@@ -1,6 +1,7 @@
 import type {
   AdvancedRulesSnapshotResponse,
   AdvantageState,
+  AutomaticSpellGrant,
   CharacterBuildData,
   CharacterExperienceResponse,
   CharacterHistoryEntry,
@@ -15,14 +16,16 @@ import type {
   CharacterWizardResult,
   ClassCatalogItem,
   ContentSourceCatalogItem,
+  FeatSpellChoice,
   ItemCatalogItem,
   LocalSession,
   LevelUpNotificationResponse,
   ModuleCatalogItem,
   PersistedComputeCheckPayload,
+  RecommendedSpellsResult,
   RuleModuleSelection,
   RuleSystemMode,
-  RecommendedSpellsResult,
+  SpellVariantComparison,
   UpsertCharacterBuildPayload,
 } from './types'
 
@@ -260,6 +263,21 @@ export function getRecommendedSpells(characterId: string, classModuleId: string,
   query.set('classModuleId', classModuleId)
   query.set('classLevel', String(classLevel))
   return request<RecommendedSpellsResult>(`/characters/${characterId}/spells/recommended?${query.toString()}`)
+}
+
+export function getAutomaticSpells(characterId: string, classModuleId: string, classLevel: number) {
+  const query = new URLSearchParams()
+  query.set('classModuleId', classModuleId)
+  query.set('classLevel', String(classLevel))
+  return request<AutomaticSpellGrant[]>(`/characters/${characterId}/spells/automatic?${query.toString()}`)
+}
+
+export function getSpellVariants(characterId: string, spellSlug: string) {
+  return request<SpellVariantComparison>(`/characters/${characterId}/spells/variants/${encodeURIComponent(spellSlug)}`)
+}
+
+export function getFeatSpellGrants(characterId: string) {
+  return request<FeatSpellChoice[]>(`/characters/${characterId}/feats/spells`)
 }
 
 export function getCharacterResources(characterId: string) {
