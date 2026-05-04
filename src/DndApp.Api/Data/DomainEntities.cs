@@ -58,3 +58,63 @@ public sealed class ItemEffectEntity
     public string EffectPayloadJson { get; set; } = "{}";
     public string ConditionJson { get; set; } = "{}";
 }
+
+// Automatic Spell Grant Entities
+
+public sealed class ClassSpellGrantEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string ClassId { get; set; } = string.Empty;
+    public string Edition { get; set; } = string.Empty; // "2014" or "2024"
+    public string SpellId { get; set; } = string.Empty;
+    public int MinLevel { get; set; }
+    public bool IsAlwaysPrepared { get; set; }
+    public string SourceDescription { get; set; } = string.Empty;
+}
+
+public sealed class SubclassSpellGrantEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string SubclassId { get; set; } = string.Empty;
+    public string Edition { get; set; } = string.Empty; // "2014" or "2024"
+    public string SpellId { get; set; } = string.Empty;
+    public int MinLevel { get; set; }
+    public string SourceDescription { get; set; } = string.Empty;
+}
+
+public sealed class RaceSpellGrantEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string RaceOrSpeciesId { get; set; } = string.Empty;
+    public string Edition { get; set; } = string.Empty; // "2014" or "2024"
+    public string SpellId { get; set; } = string.Empty;
+    public string SourceDescription { get; set; } = string.Empty;
+}
+
+public sealed class BackgroundSpellGrantEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string BackgroundId { get; set; } = string.Empty;
+    public string Edition { get; set; } = string.Empty; // "2014" or "2024"
+    public string SpellId { get; set; } = string.Empty;
+    public string SourceDescription { get; set; } = string.Empty;
+}
+
+public sealed class OriginSpellGrantEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string OriginId { get; set; } = string.Empty;
+    public string SpellId { get; set; } = string.Empty;
+    public string SourceDescription { get; set; } = string.Empty;
+}
+
+public sealed class FeatSpellGrantEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string FeatId { get; set; } = string.Empty;
+    public string Edition { get; set; } = string.Empty; // "2014" or "2024"
+    public string GrantType { get; set; } = string.Empty; // "Fixed", "Selection", "SpellsKnown"
+    public string SpellIdsJson { get; set; } = "[]"; // Array of spell IDs
+    public int SelectionCount { get; set; } // How many to choose if Selection/SpellsKnown
+    public string SourceDescription { get; set; } = string.Empty;
+}

@@ -50,6 +50,7 @@ builder.Services.AddScoped<ICharacterBuildService, CharacterBuildService>();
 builder.Services.AddScoped<ICharacterInventoryService, CharacterInventoryService>();
 builder.Services.AddScoped<ICharacterComputationService, CharacterComputationService>();
 builder.Services.AddScoped<ICharacterProgressionService, CharacterProgressionService>();
+builder.Services.AddScoped<IClassFeatureSpellService, ClassFeatureSpellService>();
 builder.Services.AddScoped<IRuleValidationService, RuleValidationService>();
 builder.Services.AddScoped<ISkillProficiencyService, SkillProficiencyService>();
 builder.Services.AddScoped<IExperienceService, ExperienceService>();

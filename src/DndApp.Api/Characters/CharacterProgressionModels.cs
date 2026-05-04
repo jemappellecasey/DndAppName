@@ -81,3 +81,40 @@ public sealed record UpsertCharacterVitalsRequest(
     int TempHitPoints,
     int BaseMoveSpeed,
     int BaseArmorClass);
+
+// Automatic Spell Grant Models
+
+public sealed record SpellVariantComparison(
+    string SpellSlug,
+    string SpellName,
+    SpellVariantData? Variant2014,
+    SpellVariantData? Variant2024,
+    bool BothEditionsAvailable);
+
+public sealed record SpellVariantData(
+    string SpellId,
+    string Name,
+    int Level,
+    string School,
+    string CastingTime,
+    string RangeText,
+    string Duration,
+    bool Ritual,
+    bool Concentration,
+    string Description);
+
+public sealed record AutomaticSpellGrant(
+    string SpellId,
+    string SpellName,
+    string SourceFeature,
+    string SourceType,
+    int MinLevel,
+    bool HasMultipleEditions,
+    SpellVariantComparison? Variants);
+
+public sealed record FeatSpellChoice(
+    string FeatId,
+    string FeatName,
+    string GrantType,
+    int SelectionCount,
+    IReadOnlyList<string> AvailableSpellIds);

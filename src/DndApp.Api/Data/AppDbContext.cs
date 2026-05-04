@@ -56,6 +56,12 @@ public sealed class AppDbContext : DbContext
     public DbSet<CharacterExperienceEntity> CharacterExperience => Set<CharacterExperienceEntity>();
     public DbSet<CharacterLevelProgressionEntity> CharacterLevelProgression => Set<CharacterLevelProgressionEntity>();
     public DbSet<CharacterLevelUpChoiceEntity> CharacterLevelUpChoices => Set<CharacterLevelUpChoiceEntity>();
+    public DbSet<ClassSpellGrantEntity> ClassSpellGrants => Set<ClassSpellGrantEntity>();
+    public DbSet<SubclassSpellGrantEntity> SubclassSpellGrants => Set<SubclassSpellGrantEntity>();
+    public DbSet<RaceSpellGrantEntity> RaceSpellGrants => Set<RaceSpellGrantEntity>();
+    public DbSet<BackgroundSpellGrantEntity> BackgroundSpellGrants => Set<BackgroundSpellGrantEntity>();
+    public DbSet<OriginSpellGrantEntity> OriginSpellGrants => Set<OriginSpellGrantEntity>();
+    public DbSet<FeatSpellGrantEntity> FeatSpellGrants => Set<FeatSpellGrantEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -781,6 +787,79 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.CharacterId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Automatic Spell Grant Entities
+        modelBuilder.Entity<ClassSpellGrantEntity>(entity =>
+        {
+            entity.ToTable("class_spell_grant");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.ClassId).HasMaxLength(64);
+            entity.Property(x => x.Edition).HasMaxLength(4);
+            entity.Property(x => x.SpellId).HasMaxLength(64);
+            entity.Property(x => x.SourceDescription).HasMaxLength(200);
+            entity.HasIndex(x => new { x.ClassId, x.Edition });
+        });
+
+        modelBuilder.Entity<SubclassSpellGrantEntity>(entity =>
+        {
+            entity.ToTable("subclass_spell_grant");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.SubclassId).HasMaxLength(64);
+            entity.Property(x => x.Edition).HasMaxLength(4);
+            entity.Property(x => x.SpellId).HasMaxLength(64);
+            entity.Property(x => x.SourceDescription).HasMaxLength(200);
+            entity.HasIndex(x => new { x.SubclassId, x.Edition });
+        });
+
+        modelBuilder.Entity<RaceSpellGrantEntity>(entity =>
+        {
+            entity.ToTable("race_spell_grant");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.RaceOrSpeciesId).HasMaxLength(64);
+            entity.Property(x => x.Edition).HasMaxLength(4);
+            entity.Property(x => x.SpellId).HasMaxLength(64);
+            entity.Property(x => x.SourceDescription).HasMaxLength(200);
+            entity.HasIndex(x => new { x.RaceOrSpeciesId, x.Edition });
+        });
+
+        modelBuilder.Entity<BackgroundSpellGrantEntity>(entity =>
+        {
+            entity.ToTable("background_spell_grant");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.BackgroundId).HasMaxLength(64);
+            entity.Property(x => x.Edition).HasMaxLength(4);
+            entity.Property(x => x.SpellId).HasMaxLength(64);
+            entity.Property(x => x.SourceDescription).HasMaxLength(200);
+            entity.HasIndex(x => new { x.BackgroundId, x.Edition });
+        });
+
+        modelBuilder.Entity<OriginSpellGrantEntity>(entity =>
+        {
+            entity.ToTable("origin_spell_grant");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.OriginId).HasMaxLength(64);
+            entity.Property(x => x.SpellId).HasMaxLength(64);
+            entity.Property(x => x.SourceDescription).HasMaxLength(200);
+            entity.HasIndex(x => x.OriginId);
+        });
+
+        modelBuilder.Entity<FeatSpellGrantEntity>(entity =>
+        {
+            entity.ToTable("feat_spell_grant");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(64);
+            entity.Property(x => x.FeatId).HasMaxLength(64);
+            entity.Property(x => x.Edition).HasMaxLength(4);
+            entity.Property(x => x.GrantType).HasMaxLength(20);
+            entity.Property(x => x.SpellIdsJson).HasColumnType("TEXT");
+            entity.Property(x => x.SourceDescription).HasMaxLength(200);
+            entity.HasIndex(x => new { x.FeatId, x.Edition });
         });
     }
 }
