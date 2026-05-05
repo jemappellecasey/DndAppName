@@ -2344,6 +2344,24 @@ function App() {
     }
   }
 
+  async function handleEquipItem(item: CharacterInventoryItemData) {
+    if (!currentCharacterId) return
+    try {
+      await handleUpdateInventoryItem(item.inventoryItemId, { isEquipped: !item.isEquipped })
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  async function handleAttuneItem(item: CharacterInventoryItemData) {
+    if (!currentCharacterId) return
+    try {
+      await handleUpdateInventoryItem(item.inventoryItemId, { isAttuned: !item.isAttuned })
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
   async function handleUpdateInventoryItem(
     inventoryItemId: string,
     update: { isEquipped?: boolean; isAttuned?: boolean; quantity?: number },
@@ -3829,7 +3847,15 @@ function App() {
             + Add Starting Equipment
           </button>
         </div>
-        {inventoryState && <InventoryPanel inventory={inventoryState} loading={loadingInventory} />}
+        {inventoryState && (
+          <InventoryPanel
+            inventory={inventoryState}
+            loading={loadingInventory}
+            onEquip={handleEquipItem}
+            onAttune={handleAttuneItem}
+            onRemove={handleRemoveItem}
+          />
+        )}
         <div className="row">
           <label htmlFor="catalog-item">Item</label>
           <select id="catalog-item" value={effectiveSelectedCatalogItemId} onChange={(e) => setSelectedCatalogItemId(e.target.value)}>
