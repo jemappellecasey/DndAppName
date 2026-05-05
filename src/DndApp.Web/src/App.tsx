@@ -50,6 +50,7 @@ import type {
   BuildMethod,
   CharacterBuildData,
   CharacterHistoryEntry,
+  CharacterInventoryItemData,
   CharacterInventoryState,
   CharacterCurrencyData,
   CharacterResourcePoolData,
@@ -72,6 +73,8 @@ import CharactersPage from './pages/CharactersPage'
 import ArchivedCharactersPage from './pages/ArchivedCharactersPage'
 import SettingsPage from './pages/SettingsPage'
 import LevelUpModal from './components/LevelUpModal'
+import EquipmentSelectionModal from './components/EquipmentSelectionModal'
+import InventoryPanel from './components/InventoryPanel'
 
 const ABILITIES: AbilityName[] = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
 
@@ -461,6 +464,8 @@ function App() {
   const [currencyConvert, setCurrencyConvert] = useState({ fromDenomination: 'gp', toDenomination: 'sp', amount: 1 })
   const [usePlatinumConsolidation, setUsePlatinumConsolidation] = useState(false)
   const [startingEquipmentMode, setStartingEquipmentMode] = useState<'package' | 'gold-only'>('package')
+  const [equipmentSelectionModalOpen, setEquipmentSelectionModalOpen] = useState(false)
+  const [loadingInventory, setLoadingInventory] = useState(false)
 
   const [levelUpModalOpen, setLevelUpModalOpen] = useState(false)
   const [pendingLevelUpChoices, setPendingLevelUpChoices] = useState<Array<{ level: number; choiceType: 'ASI' | 'Feat' }>>([])
@@ -1037,6 +1042,37 @@ function App() {
       cancelled = true
     }
   }, [isArchivedRoute, isCharactersRoute, selectedCharacterId, session])
+
+  useEffect(() => {
+    if (!currentCharacterId) {
+      setInventoryState(null)
+      return
+    }
+
+    let cancelled = false
+
+    async function loadInventory() {
+      try {
+        setLoadingInventory(true)
+        const inventory = await getCharacterInventory(currentCharacterId)
+        if (!cancelled) {
+          setInventoryState(inventory)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(`Failed to load inventory: ${String(e)}`)
+        }
+      } finally {
+        setLoadingInventory(false)
+      }
+    }
+
+    loadInventory()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentCharacterId])
 
   function navigate(path: string) {
     if (window.location.pathname === path) {
@@ -2288,6 +2324,23 @@ function App() {
       setCurrencyDraft({ cp: next.cp, sp: next.sp, ep: next.ep, gp: next.gp, pp: next.pp })
     } catch (e) {
       setError(String(e))
+    }
+  }
+
+  async function handleAddStartingEquipment(items: CharacterInventoryItemData[]) {
+    if (!currentCharacterId) return
+    try {
+      setLoadingInventory(true)
+      for (const item of items) {
+        await addInventoryItem(currentCharacterId, item.itemDefinitionId, item.quantity)
+      }
+      // Reload inventory after adding items
+      const updatedInventory = await getCharacterInventory(currentCharacterId)
+      setInventoryState(updatedInventory)
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setLoadingInventory(false)
     }
   }
 
@@ -3771,6 +3824,12 @@ function App() {
           </label>
           <button onClick={handleConsolidateCurrency} disabled={!currentCharacterId}>Consolidate pocket change (gp default)</button>
         </div>
+        <div className="row" style={{ marginBottom: '16px' }}>
+          <button onClick={() => setEquipmentSelectionModalOpen(true)} style={{ backgroundColor: '#2196F3', color: 'white', cursor: 'pointer' }}>
+            + Add Starting Equipment
+          </button>
+        </div>
+        {inventoryState && <InventoryPanel inventory={inventoryState} loading={loadingInventory} />}
         <div className="row">
           <label htmlFor="catalog-item">Item</label>
           <select id="catalog-item" value={effectiveSelectedCatalogItemId} onChange={(e) => setSelectedCatalogItemId(e.target.value)}>
@@ -4013,6 +4072,14 @@ function App() {
         onSaveChoice={handleSaveLevelUpChoice}
         onConfirmChoices={handleConfirmLevelUpChoices}
         onClose={() => setLevelUpModalOpen(false)}
+      />
+      <EquipmentSelectionModal
+        isOpen={equipmentSelectionModalOpen}
+        onClose={() => setEquipmentSelectionModalOpen(false)}
+        onConfirm={handleAddStartingEquipment}
+        availableItems={itemCatalog}
+        startingGold={getStartingGold(selectedClassOption?.displayName ?? '')}
+        equipmentMode={startingEquipmentMode}
       />
     </main>
   )
