@@ -2911,6 +2911,15 @@ function App() {
                   {currencyState.ep > 0 ? ` | ${currencyState.ep} ep` : ''}
                 </small>
               )}
+              {inventoryState && (
+                <InventoryPanel
+                  inventory={inventoryState}
+                  loading={loadingInventory}
+                  onEquip={handleEquipItem}
+                  onAttune={handleAttuneItem}
+                  onRemove={handleRemoveItem}
+                />
+              )}
               <div className="row">
                 <label htmlFor="view-catalog-item">Manage items</label>
                 <select id="view-catalog-item" value={effectiveSelectedCatalogItemId} onChange={(e) => setSelectedCatalogItemId(e.target.value)}>
